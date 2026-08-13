@@ -31,6 +31,16 @@ importers:
         specifier: ^3.24.0
         version: 3.25.76
 
+  packages/server:
+    dependencies:
+      '@dwell/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+    devDependencies:
+      '@types/node':
+        specifier: ^26.2.0
+        version: 26.2.0
+
 packages:
 
   '@esbuild/aix-ppc64@0.28.2':

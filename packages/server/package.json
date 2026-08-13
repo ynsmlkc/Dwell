@@ -1,0 +1,16 @@
+{
+  "name": "@dwell/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@dwell/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0"
+  }
+}
