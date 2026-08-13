@@ -1,0 +1,12 @@
+{
+  "name": "spike-stellar-payout",
+  "private": true,
+  "type": "module",
+  "description": "Kivilcim 2 — atilacak kod. Batch odemenin gercekten calistigini ve tek bir kotu hedefin tum transaction'i nasil oldurdugunu kanitlar.",
+  "scripts": {
+    "spike": "node run.mjs"
+  },
+  "dependencies": {
+    "@stellar/stellar-sdk": "^14.0.0"
+  }
+}
