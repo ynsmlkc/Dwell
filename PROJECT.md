@@ -219,12 +219,23 @@ Gelecek: `SpinnerTipSurface`, `TmuxStatusSurface`, `CodexSource`.
 
 **Ölçüm (2026-08-13, gerçek shim + gerçek socket):**
 
-| Shim biçimi | p50 | p90 | Sonuç |
+| Shim biçimi | boş makine p50 | yüklü makine p50 | 50 ms'i aşan |
 |---|---|---|---|
-| TypeScript kaynak (`--experimental-strip-types`) | **40 ms** | 44 ms | ⚠️ bütçenin dibinde |
-| Derlenmiş düz `.mjs` | **22 ms** | 23 ms | ✅ 28 ms marj |
+| TypeScript kaynak (`--experimental-strip-types`) | 40 ms | **48 ms** | %25 |
+| Derlenmiş düz `.mjs` | **22 ms** | **27 ms** | %5 |
 
-Bunun ~15 ms'i Node'un kendi başlangıcı; socket gidiş-dönüşü yalnızca ~5-7 ms. **Karar: shim dağıtımda TypeScript kaynağı olarak değil, derlenmiş tek dosya JS olarak gider.** Çalışma anında tip sıyırmak maliyeti ikiye katlıyor ve bütçeyi riske atıyor.
+Bunun ~15 ms'i Node'un kendi başlangıcı; socket gidiş-dönüşü yalnızca ~5-7 ms.
+
+**Karar 1 — shim derlenmiş gider.** Çalışma anında tip sıyırmak maliyeti ikiye katlıyor.
+
+**Karar 2 — bütçe 50 ms değil, 200 ms.** İlk 50 ms değeri ölçülerek değil akıl yürütülerek konmuştu ve iki noktada yanlıştı:
+
+1. **Aşmanın bedeli sanıldığından büyük.** Shim boş dönünce statusLine o yenilemede **kayboluyor** — ölçülemeyen bir gösterim değil, kullanıcının gördüğü titreme.
+2. **Düşük bütçeyi savunan gerekçe hatalı.** Claude Code zaten 300 ms debounce uyguluyor ve yeni tetik gelirse çalışan script'i **iptal ediyor**; yavaş bir script arayüzü bloklamıyor, yalnızca o yenilemeyi geciktiriyor.
+
+200 ms'te yüklü makinede bile aşım **0/20**. Daemon takılırsa saniyede bir 200 ms'lik gecikme kabul edilebilir sınırlarda.
+
+**Bu bulgu yüklü makinede ortaya çıktı ve önemi buradan geliyor:** geliştirici build veya test koştururken makine yüklü olur — yani beklemelerin en uzun, reklamın en değerli olduğu an. Envanteri tam orada kaybediyorduk.
 
 Günlük maliyet: 13.733 çağrı × 22 ms ≈ **5 dakika CPU/gün**. Kabul edilebilir ama ihmal edilebilir değil — ileride sıkışırsak derlenmiş binary (~2-5 ms) seçeneği duruyor.
 

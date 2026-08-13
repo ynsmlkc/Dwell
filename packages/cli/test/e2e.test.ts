@@ -44,7 +44,14 @@ const AD: AdPayload = {
 async function runShim(socket: string, session = 's1', columns = 120, input?: string) {
   const t0 = performance.now()
   const child = run(process.execPath, ['--experimental-strip-types', SHIM], {
-    env: { ...process.env, DWELL_SOCKET: socket, COLUMNS: String(columns) },
+    env: {
+      ...process.env, DWELL_SOCKET: socket, COLUMNS: String(columns),
+      // Testte butce acikca yukseltiliyor: buradaki amac DOGRULUK, zamanlama
+      // degil. Uretim butcesi ayri olculuyor (shimbench). Yuklu bir makinede
+      // ts-strip ile 50ms asilabiliyor ve shim sessizce bos donuyor — dogru
+      // davranis ama testi kirilgan yapar.
+      DWELL_BUDGET_MS: process.env['DWELL_BUDGET_MS'] ?? '2000',
+    },
     encoding: 'utf8',
   })
   child.child.stdin?.end(input ?? JSON.stringify({ session_id: session, model: { display_name: 'Opus 5' } }))

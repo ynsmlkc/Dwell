@@ -22,20 +22,22 @@ describe('shim maliyeti', () => {
     daemon.hook('UserPromptSubmit','s1')
 
     const variants: [string, string[]][] = [
-      ['ts-strip', ['--experimental-strip-types', resolve(import.meta.dirname,'../src/shim/statusline.ts')]],
-      
+      ['ts-strip', ['--experimental-strip-types', resolve(import.meta.dirname, '../src/shim/statusline.ts')]],
+      ['derlenmis', [resolve(import.meta.dirname, '../dist/statusline.mjs')]],
     ]
     for (const [name, args] of variants) {
-      const t: number[] = []; let empty = 0
+      const t: number[] = []; let empty = 0; let overBudget = 0
       for (let i=0;i<20;i++){
         const t0=performance.now()
         const c = run(process.execPath, args, { env:{...process.env,DWELL_SOCKET:sock,COLUMNS:'120'}, encoding:'utf8' })
         c.child.stdin?.end(JSON.stringify({session_id:'s1'}))
         const { stdout } = await c
-        t.push(performance.now()-t0); if(!stdout) empty++
+        const ms = performance.now() - t0
+        t.push(ms); if (!stdout) empty++
+        if (ms > 200) overBudget++
       }
       t.sort((a,b)=>a-b)
-      console.log(`    ${name.padEnd(9)} p50 ${t[10]!.toFixed(0).padStart(3)}ms  p90 ${t[18]!.toFixed(0).padStart(3)}ms  max ${t.at(-1)!.toFixed(0).padStart(3)}ms  bos ${empty}/20`)
+      console.log(`    ${name.padEnd(10)} p50 ${t[10]!.toFixed(0).padStart(3)}ms  p90 ${t[18]!.toFixed(0).padStart(3)}ms  max ${t.at(-1)!.toFixed(0).padStart(3)}ms  >200ms: ${String(overBudget).padStart(2)}/20`)
     }
   }, 60_000)
 })
