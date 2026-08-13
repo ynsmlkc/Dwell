@@ -66,18 +66,36 @@ export class Pipeline {
   /**
    * Reklamverenin harcayabilecegi tutar — ADR-021.
    *
-   * `bakiye − rezerve`. Rezerve, `pending` durumdaki gosterimlerin toplami:
-   * o para henuz ledger'a girmedi ama girecek. Rezervasyon olmadan 24 saatlik
-   * pending penceresi kadar butce asimi GARANTIDIR.
+   * `bakiye − rezerve`. Rezerve IKI parcadan olusur ve ikisi de gerekli:
+   *
+   *   1. **Teslim edilmis ama henuz raporlanmamis reklamlar.** Reklam teslim
+   *      edildigi anda para taahhut edilmis sayilir. Yalnizca raporlanan
+   *      gosterimleri rezerve etseydik, bir istemci butun butceyi asacak
+   *      kadar reklam cekip sonra hepsini raporlayabilirdi — teslimat
+   *      asamasinda hicbir sinir olmazdi.
+   *   2. **`pending` gosterimler.** Borc 24 saat sonra ledger'a yaziliyor;
+   *      o pencerede butce serbestmis gibi gorunurdu.
+   *
+   * Cift sayim yok: gosterim kabul edilince teslimat `consumed` isaretlenir
+   * ve birinci parcadan cikar.
    */
   spendable(advertiserId: string): Stroops {
     const balance = this.opts.ledger.balance(accountId('advertiser', advertiserId))
+    const now = this.opts.clock.now()
     let reserved = ZERO
+
+    for (const d of this.#deliveries.values()) {
+      // Suresi dolmus teslimat rezerve tutmaz — o reklam artik raporlanamaz.
+      if (d.advertiserId === advertiserId && !d.consumed && d.expiresAt >= now) {
+        reserved = add(reserved, stroops(d.rate))
+      }
+    }
     for (const i of this.#impressions.values()) {
       if (i.advertiserId === advertiserId && i.state === 'pending') {
         reserved = add(reserved, stroops(i.rateStroops))
       }
     }
+
     const left = sub(balance, reserved)
     return left > 0n ? left : ZERO
   }

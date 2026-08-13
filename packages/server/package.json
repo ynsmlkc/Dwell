@@ -8,7 +8,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@dwell/protocol": "workspace:*"
+    "@dwell/protocol": "workspace:*",
+    "hono": "^4.13.1"
   },
   "devDependencies": {
     "@types/node": "^26.2.0"

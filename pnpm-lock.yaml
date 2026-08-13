@@ -36,6 +36,9 @@ importers:
       '@dwell/protocol':
         specifier: workspace:*
         version: link:../protocol
+      hono:
+        specifier: ^4.13.1
+        version: 4.13.1
     devDependencies:
       '@types/node':
         specifier: ^26.2.0
@@ -431,6 +434,10 @@ packages:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
+
+  hono@4.13.1:
+    resolution: {integrity: sha512-kdJoFVv2xmayw6cY09H7AbMJMt8Jn5jdlEdXsP7AGBdF2DIptVlKlOLKXP41yPip4/a3yQPv9gVcJYI8YY04dw==}
+    engines: {node: '>=16.9.0'}
 
   js-tokens@9.0.1:
     resolution: {integrity: sha512-mxa9E9ITFOt0ban3j6L5MpjwegGz6lBQmM1IJkWeBZGcMxto50+eWdjC/52xDbS2vy0k7vIMK0Fe2wfL9OQSpQ==}
@@ -877,6 +884,8 @@ snapshots:
 
   fsevents@2.3.3:
     optional: true
+
+  hono@4.13.1: {}
 
   js-tokens@9.0.1: {}
 
