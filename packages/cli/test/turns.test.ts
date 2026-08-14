@@ -68,7 +68,7 @@ describe('ADR-023 — bosta ekran temiz', () => {
     const d = m.onTick('s1', clock.now())
     expect(d.ad).toBeNull()
     expect(d.phase).toBe('idle')
-    expect(d.reason).toBe('aktif tur yok')
+    expect(d.reason).toBe('bu oturumda aktif tur yok')
   })
 
   it('tur baslayinca gosterilir', () => {
@@ -189,6 +189,58 @@ describe('ADR-022 — rotasyon', () => {
     const imps = m.drainImpressions()
     expect(imps.length).toBe(1)
     expect(imps[0]!.rejectedReason).not.toBeNull()
+  })
+})
+
+describe('oturum yalitimi — bostaki oturum reklam GORMEZ', () => {
+  it('bir oturum tur icindeyken bostaki oturuma hicbir sey basilmaz', () => {
+    // Kullaniciya "reklam hic kapanmiyor" gibi gorunen hata buydu: tur
+    // durumu makine genelinde tutuluyordu, bir oturumun turu digerlerinde
+    // de reklam gosteriyordu.
+    const { m, clock } = setup()
+    m.onTurnStart('calisan', clock.now())
+
+    expect(m.onTick('calisan', clock.now()).ad, 'calisan gormeli').not.toBeNull()
+    expect(m.onTick('bosta', clock.now()).ad, 'bostaki GORMEMELI').toBeNull()
+  })
+
+  it('bostaki oturum kendi turunu baslatinca gorur', () => {
+    const { m, clock } = setup()
+    m.onTurnStart('a', clock.now())
+    expect(m.onTick('b', clock.now()).ad).toBeNull()
+
+    m.onTurnStart('b', clock.now())
+    const d = m.onTick('b', clock.now())
+    expect(d.ad, 'artik gormeli').not.toBeNull()
+    expect(d.reason, 'ama sayilmamali').toBe('baska oturum sayiyor')
+  })
+
+  it('her oturumun toleransi AYRI isler', () => {
+    const { m, clock, run } = setup()
+    m.onTurnStart('a', clock.now())
+    m.onTurnStart('b', clock.now())
+    run('a', 12_000)
+
+    m.onTurnEnd('b', clock.now())          // yalnizca b bitti
+    clock.advance(5_000)                    // b'nin toleransi doldu
+
+    expect(m.onTick('b', clock.now()).ad, 'b susmali').toBeNull()
+    expect(m.onTick('a', clock.now()).ad, 'a devam etmeli').not.toBeNull()
+  })
+
+  it('mutex sahibi bosa dusunce bekleyen oturuma gecer', () => {
+    const { m, clock, run } = setup()
+    m.onTurnStart('a', clock.now())
+    m.onTurnStart('b', clock.now())
+    expect(m.activeSession).toBe('a')
+
+    run('a', 12_000)
+    m.onTurnEnd('a', clock.now())
+    clock.advance(5_000)
+    m.onTick('a', clock.now())              // a'nin toleransi doldu
+
+    expect(m.activeSession, 'b devralmali').toBe('b')
+    expect(m.onTick('b', clock.now()).reason, 'artik b sayiyor').toBeNull()
   })
 })
 

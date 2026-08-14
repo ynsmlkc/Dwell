@@ -44,6 +44,21 @@ export interface RenderDecision {
 const HIDDEN = (phase: TurnPhase, reason: string): RenderDecision =>
   ({ ad: null, phase, reason })
 
+/**
+ * Oturum basina durum.
+ *
+ * Tur durumu OTURUM BASINADIR, makine genelinde degil. Global tutmak
+ * su hataya yol aciyordu: bir oturum tur icindeyken BOSTAKI diger
+ * oturumlarda da reklam goruntuleniyordu.
+ *
+ * ADR-012 "ikinci bir oturum BEKLEMEYE GIRDIGINDE satir yine gosterilir
+ * ama sayilmaz" diyor — beklemeye girdiginde. Bostaki oturum reklam gormez.
+ */
+interface SessionState {
+  phase: TurnPhase
+  cooldownUntil: number
+}
+
 interface ActiveShow {
   readonly ad: AdPayload
   readonly startedAt: number
@@ -67,32 +82,38 @@ export interface TurnMachineDeps {
 /* ─────────────────────────── makine ─────────────────────────── */
 
 export class TurnMachine {
-  #phase: TurnPhase = 'idle'
-  /** ADR-012: makine kapsaminda TEK aktif oturum. */
+  /** Oturum basina tur durumu. */
+  readonly #sessions = new Map<string, SessionState>()
+  /** ADR-012: gosterim sayma hakki makine kapsaminda TEK oturumdadir. */
   #activeSession: string | null = null
-  /** Aktif turu olan oturumlar — mutex'i kim tutarsa o sayar. */
-  readonly #openTurns = new Set<string>()
+  /** Yalnizca mutex sahibinin gosterimi sayilir. */
   #show: ActiveShow | null = null
-  /** Tur bittiginde tolerans sayaci baslar. */
-  #cooldownUntil = 0
   readonly #completed: CompletedImpression[] = []
 
   constructor(private readonly deps: TurnMachineDeps) {}
 
-  get phase(): TurnPhase { return this.#phase }
+  /** Mutex sahibinin durumu — saglik ciktisi icin. */
+  get phase(): TurnPhase {
+    return (this.#activeSession && this.#sessions.get(this.#activeSession)?.phase) || 'idle'
+  }
   get activeSession(): string | null { return this.#activeSession }
+  /** Su an tur icinde olan oturum sayisi. */
+  get openTurns(): number {
+    let n = 0
+    for (const s of this.#sessions.values()) if (s.phase !== 'idle') n++
+    return n
+  }
 
   /* ── olaylar ── */
 
   /** `UserPromptSubmit` — tur acilir. */
   onTurnStart(sessionId: string, ts: number = this.deps.clock.now()): void {
-    this.#openTurns.add(sessionId)
+    this.#sessions.set(sessionId, { phase: 'showing', cooldownUntil: 0 })
+
     // ADR-012: mutex bostaysa veya bu oturum zaten tutuyorsa devral.
     // Doluysa devralma — digeri sayiyor, bu oturum SILENT.
     if (this.#activeSession === null || this.#activeSession === sessionId) {
       this.#activeSession = sessionId
-      this.#phase = 'showing'
-      this.#cooldownUntil = 0
       // Cooldown icinde yeni tur geldiyse gosterim KESILMEZ — reklam
       // yanip sonmesin diye ayni show devam eder (ADR-023).
       //
@@ -104,12 +125,12 @@ export class TurnMachine {
 
   /** `Stop` — tur kapanir, tolerans baslar. */
   onTurnEnd(sessionId: string, ts: number = this.deps.clock.now()): void {
-    this.#openTurns.delete(sessionId)
-    if (this.#activeSession !== sessionId) return
-    if (this.#phase !== 'showing') return
+    const st = this.#sessions.get(sessionId)
+    if (!st || st.phase !== 'showing') return
 
-    this.#phase = 'cooldown'
-    this.#cooldownUntil = ts + this.deps.config().idleGraceMs
+    // Tolerans HER oturum icin ayri isler; mutex sahibi olmasi gerekmez.
+    st.phase = 'cooldown'
+    st.cooldownUntil = ts + this.deps.config().idleGraceMs
     // `lastSeenAt` burada da guncellenmez — ayni gerekce.
   }
 
@@ -120,7 +141,7 @@ export class TurnMachine {
    * ekrana basilmistir. spinner'da boyle bir sinyal yok, o yuzden sayilmaz.
    */
   onTick(sessionId: string, ts: number = this.deps.clock.now()): RenderDecision {
-    this.#expireCooldown(ts)
+    this.#expireCooldowns(ts)
 
     // ADR-023, altı şart — biri eksikse hicbir sey basilmaz.
     if (this.deps.isPaused()) return this.#stopAndHide(ts, 'kullanici duraklatti')
@@ -129,37 +150,42 @@ export class TurnMachine {
     const cfg = this.deps.config()
     if (!cfg.renderEnabled) return this.#stopAndHide(ts, 'uzaktan kapatildi')
     if (!cfg.surfaces.statusline) return this.#stopAndHide(ts, 'statusline yuzeyi kapali')
-    if (this.#phase === 'idle') return HIDDEN('idle', 'aktif tur yok')
+
+    // Karar BU OTURUMUN durumuna gore verilir.
+    //
+    // Makine genelindeki duruma bakmak su hataya yol aciyordu: bir oturum
+    // tur icindeyken, bostaki diger oturumlarda da reklam goruntuleniyordu.
+    // Kullanicinin bakis acisindan reklam "hic kapanmiyor" gorunuyordu.
+    const st = this.#sessions.get(sessionId)
+    if (!st || st.phase === 'idle') return HIDDEN('idle', 'bu oturumda aktif tur yok')
 
     // ADR-012: mutex baskasindaysa satir yine GOSTERILIR (kullanici deneyimi
-    // tutarli kalsin) ama SAYILMAZ.
+    // tutarli kalsin) ama SAYILMAZ. Bu oturumun da tur icinde olmasi sart —
+    // yukarida kontrol edildi.
     const counts = this.#activeSession === sessionId
 
+    if (!counts) {
+      // Sayan oturumun reklamini goster; yoksa siradakini al.
+      const ad = this.#show?.ad ?? this.deps.nextAd()
+      return ad
+        ? { ad, phase: st.phase, reason: 'baska oturum sayiyor' }
+        : HIDDEN(st.phase, 'reklam yok')
+    }
+
     if (this.#show === null) {
-      if (!counts) {
-        const ad = this.deps.nextAd()
-        return ad ? { ad, phase: this.#phase, reason: 'baska oturum sayiyor' }
-                  : HIDDEN(this.#phase, 'reklam yok')
-      }
       this.#startShow(ts)
-      if (this.#show === null) return HIDDEN(this.#phase, 'reklam yok')
+      if (this.#show === null) return HIDDEN(st.phase, 'reklam yok')
     }
 
-    if (counts) {
-      this.#show.lastSeenAt = ts
-      // ADR-022: rotasyon suresi dolduysa mevcut gosterimi kapat, yenisini ac.
-      if (ts - this.#show.startedAt >= cfg.rotateMs) {
-        this.#closeShow(ts)
-        this.#startShow(ts)
-        if (this.#show === null) return HIDDEN(this.#phase, 'reklam yok')
-      }
+    this.#show.lastSeenAt = ts
+    // ADR-022: rotasyon suresi dolduysa mevcut gosterimi kapat, yenisini ac.
+    if (ts - this.#show.startedAt >= cfg.rotateMs) {
+      this.#closeShow(ts)
+      this.#startShow(ts)
+      if (this.#show === null) return HIDDEN(st.phase, 'reklam yok')
     }
 
-    return {
-      ad: this.#show.ad,
-      phase: this.#phase,
-      reason: counts ? null : 'baska oturum sayiyor',
-    }
+    return { ad: this.#show.ad, phase: st.phase, reason: null }
   }
 
   /** Kuyruga yazilmak uzere tamamlanmis gosterimleri alir ve listeyi bosaltir. */
@@ -169,11 +195,10 @@ export class TurnMachine {
 
   /** Oturum kapandi — mutex serbest kalmali, yoksa makine kilitlenir. */
   onSessionEnd(sessionId: string, ts: number = this.deps.clock.now()): void {
-    this.#openTurns.delete(sessionId)
+    this.#sessions.delete(sessionId)
     if (this.#activeSession === sessionId) {
       this.#closeShow(ts)
-      this.#activeSession = this.#openTurns.values().next().value ?? null
-      this.#phase = this.#activeSession ? 'showing' : 'idle'
+      this.#activeSession = this.#nextMutexHolder()
     }
   }
 
@@ -215,18 +240,27 @@ export class TurnMachine {
     })
   }
 
-  #expireCooldown(ts: number): void {
-    if (this.#phase === 'cooldown' && ts >= this.#cooldownUntil) {
-      this.#closeShow(ts)
-      this.#phase = 'idle'
-      this.#activeSession = this.#openTurns.values().next().value ?? null
-      if (this.#activeSession) this.#phase = 'showing'
+  /** Toleransi dolan her oturum bosa duser. */
+  #expireCooldowns(ts: number): void {
+    for (const [sid, st] of this.#sessions) {
+      if (st.phase !== 'cooldown' || ts < st.cooldownUntil) continue
+      st.phase = 'idle'
+      if (this.#activeSession === sid) {
+        this.#closeShow(ts)
+        // Mutex bosaldi — bekleyen baska oturum varsa ona gecer.
+        this.#activeSession = this.#nextMutexHolder()
+      }
     }
+  }
+
+  /** Tur icinde olan bir sonraki oturum. Yoksa null. */
+  #nextMutexHolder(): string | null {
+    for (const [sid, st] of this.#sessions) if (st.phase !== 'idle') return sid
+    return null
   }
 
   #stopAndHide(ts: number, reason: string): RenderDecision {
     this.#closeShow(ts)
-    this.#phase = 'idle'
     return HIDDEN('idle', reason)
   }
 }

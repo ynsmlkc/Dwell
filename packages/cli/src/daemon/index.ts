@@ -121,7 +121,7 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
             uptimeMs: clock.now() - started,
             phase: machine.phase,
             activeSession: machine.activeSession,
-            openTurns: machine.activeSession ? 1 : 0,
+            openTurns: machine.openTurns,
             queuedImpressions: queue.size(),
             adsCached: ads.length,
             renderEnabled: config.renderEnabled,
