@@ -59,6 +59,8 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
 
   const ads = [...(opts.ads ?? [])]
   let adCursor = 0
+  /** Siradaki reklami TUKETMEDEN gosterir — spinner on yuklemesi icin. */
+  const peekAd = (): AdPayload | null => (ads.length === 0 ? null : ads[adCursor % ads.length]!)
   let paused = false
   let lastError: string | null = null
   const queue = new ImpressionQueue({
@@ -127,7 +129,19 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
       case 'hook': {
         applyHook(machine, req.event, req.session, clock.now())
         drain()
-        spinner?.sync(machine.currentAd?.creative.brand ?? null)
+
+        // OLCULDU (2026-08-14): Claude Code `spinnerVerbs`'u TUR BASINDA
+        // okuyor. Tur icinde dosyayi degistirmek o turu etkilemiyor; bir
+        // sonraki prompt'ta yeni deger geciyor.
+        //
+        // Bu yuzden tur BITER BITMEZ siradaki reklam yaziliyor. Aksi halde
+        // dosyada hala biten turun reklami durur ve bir sonraki tur onu
+        // yakalar — surekli BIR TUR GERIDEN geliriz.
+        spinner?.sync(
+          req.event === 'Stop'
+            ? peekAd()?.creative.brand ?? null
+            : machine.currentAd?.creative.brand ?? null,
+        )
         return { t: 'ok' }
       }
 

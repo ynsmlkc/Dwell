@@ -16,7 +16,7 @@ import { join, resolve } from 'node:path'
 import { startDaemon, type Daemon } from '../src/daemon/index.js'
 import type { AdPayload } from '@dwell/protocol'
 
-const SHIM = resolve(import.meta.dirname, '../src/shim/statusline.ts')
+const SHIM = resolve(import.meta.dirname, '../dist/statusline.mjs')
 
 let daemon: Daemon | null = null
 let dir = ''
@@ -43,7 +43,7 @@ const AD: AdPayload = {
  */
 async function runShim(socket: string, session = 's1', columns = 120, input?: string) {
   const t0 = performance.now()
-  const child = run(process.execPath, ['--experimental-strip-types', SHIM], {
+  const child = run(process.execPath, [SHIM], {
     env: {
       ...process.env, DWELL_SOCKET: socket, COLUMNS: String(columns),
       // Testte butce acikca yukseltiliyor: buradaki amac DOGRULUK, zamanlama

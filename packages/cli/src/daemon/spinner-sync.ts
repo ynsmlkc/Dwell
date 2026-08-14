@@ -1,18 +1,25 @@
 /**
  * Spinner katmanini aktif reklamla senkronlar — ADR-001.
  *
- * OLCULDU (2026-08-14): Claude Code `spinnerVerbs`'u OTURUM BASINDA okuyup
- * SABITLIYOR. Dosyayi sonradan degistirmek calisan oturumu etkilemiyor.
- * Kanit: dosyada `["✶ Resend"]` yazarken ekranda `Percolating…` (Claude'un
- * varsayilan kelimelerinden biri) goruntulendi.
+ * OLCULDU (2026-08-14, temiz kosulda — tek yazar):
+ * Claude Code `spinnerVerbs`'u **TUR BASINDA** okuyor. Tur ICINDE dosyayi
+ * degistirmek o turu etkilemiyor; deger bir sonraki prompt'ta geciyor.
+ *
+ * Yontem: rakip urun ayni alani 7-37 saniyede bir yazarken ekran izlendi.
+ * Dosya surekli degisti, spinner tur boyunca SABIT kaldi, sonraki
+ * prompt'ta degisti. Ayni sinir rakipte de var.
+ *
+ * (Onceki olcum "oturum basinda sabitliyor" diyordu ve YANLISTI: o sirada
+ * iki program ayni alana yaziyordu, hangi degerin ne zaman gecerli oldugu
+ * ayirt edilemiyordu.)
  *
  * Sonuclari:
- *   • Oturum ICINDE rotasyon IMKANSIZ — bir oturum boyunca tek reklam
- *   • Liste her zaman DOLU tutulur; bosaltmak yeni acilan oturumlarin
- *     varsayilanlara dusmesine yol acar
+ *   • Tur ICINDE rotasyon imkansiz — bir tur boyunca tek reklam
+ *   • Tur BASINA farkli reklam MUMKUN; deger tur bitiminde onceden yazilir
+ *   • Liste her zaman DOLU tutulur; bosaltmak yeni turlarin varsayilanlara
+ *     dusmesine yol acar
  *   • Spinner dogal olarak yalnizca model calisirken gorunur, yani ADR-023
- *     icin ayrica temizlemeye gerek yok — yuzeyin kendisi zaten bekleme
- *     aninda aktif
+ *     icin ayrica temizlemeye gerek yok
  *
  * Bu yuzden spinner yalnizca bir GORUNURLUK katmanidir; sayim ve
  * faturalandirma tamamen `statusLine`'a dayanir.

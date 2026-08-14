@@ -15,6 +15,8 @@
  */
 
 import { connect } from 'node:net'
+import { writeSync } from 'node:fs'
+import { termShape } from './term-shape.js'
 
 const SOCKET = process.env['DWELL_SOCKET']
   ?? `${process.env['DWELL_HOME'] ?? `${process.env['HOME']}/.dwell`}/dwelld.sock`
@@ -51,7 +53,7 @@ function main(): void {
     sock.setTimeout(BUDGET_MS)
 
     sock.on('connect', () => {
-      sock.write(JSON.stringify({ t: 'tick', session, columns }) + '\n')
+      sock.write(JSON.stringify({ t: 'tick', session, columns, shape: termShape() }) + '\n')
     })
 
     let buf = ''
@@ -64,7 +66,17 @@ function main(): void {
         const res = JSON.parse(buf.slice(0, nl)) as { t?: string; line?: string }
         // Bos satir da gecerli bir cevaptir: "su an gosterme."
         if (res.t === 'render' && typeof res.line === 'string' && res.line !== '') {
-          process.stdout.write(res.line)
+          // `writeSync(1, ...)` — `process.stdout.write` DEGIL.
+          //
+          // statusLine ciktisi her zaman bir pipe'a gider ve pipe uzerinde
+          // `process.stdout.write` ASENKRONDUR. Hemen ardindan gelen
+          // `process.exit()` bekleyen chunk'lari duserir.
+          //
+          // Kisa satirlar pipe buffer'ina sigdigi icin pratikte calisir;
+          // uzun bir satirda (genis terminal + uzun URL) YUK ALTINDA
+          // RASTGELE kaybolur. Ayiklanmasi en zor hata sinifi: her seferinde
+          // degil, bazen.
+          writeSync(1, res.line)
         }
       } catch { /* bozuk cevap → sessizlik */ }
       sock.destroy()

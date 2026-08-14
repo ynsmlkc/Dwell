@@ -7,6 +7,7 @@
  */
 
 import { homedir } from 'node:os'
+import type { TermShape } from './shim/term-shape.js'
 import { join } from 'node:path'
 
 export const DWELL_HOME = process.env['DWELL_HOME'] ?? join(homedir(), '.dwell')
@@ -18,8 +19,14 @@ export const SHIM_BUDGET_MS = 50
 /* ─────────────────────────── istekler ─────────────────────────── */
 
 export type Request =
-  /** statusLine tikladi: hem render karari iste hem zamani ilerlet. */
-  | { readonly t: 'tick'; readonly session: string; readonly columns: number }
+  /**
+   * statusLine tikladi: hem render karari iste hem zamani ilerlet.
+   *
+   * `shape` SHIM'DEN gelir cunku terminal kimligi yalnizca orada var —
+   * shim terminalin icinde calisir, daemon calismaz.
+   */
+  | { readonly t: 'tick'; readonly session: string; readonly columns: number
+      readonly shape?: TermShape }
   /** Hook olayi bildir. */
   | { readonly t: 'hook'; readonly event: HookEvent; readonly session: string; readonly promptId?: string }
   /** Saglik ve teshis — `dwell doctor` / `dwell status`. */
@@ -58,6 +65,8 @@ export interface HealthInfo {
   readonly lastServerContactMs: number | null
   readonly lastError: string | null
 }
+
+export type { TermShape }
 
 export const encode = (v: Request | Response): string => JSON.stringify(v) + '\n'
 

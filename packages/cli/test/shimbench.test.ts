@@ -22,7 +22,6 @@ describe('shim maliyeti', () => {
     daemon.hook('UserPromptSubmit','s1')
 
     const variants: [string, string[]][] = [
-      ['ts-strip', ['--experimental-strip-types', resolve(import.meta.dirname, '../src/shim/statusline.ts')]],
       ['derlenmis', [resolve(import.meta.dirname, '../dist/statusline.mjs')]],
     ]
     for (const [name, args] of variants) {
