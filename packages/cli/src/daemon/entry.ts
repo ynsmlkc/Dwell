@@ -26,6 +26,7 @@ const log = (m: string): void => {
 
 const daemon = await startDaemon({
   ads: DEV_ADS,
+  syncSpinner: true,
   config: {
     ...FALLBACK_CONFIG,
     renderEnabled: true,

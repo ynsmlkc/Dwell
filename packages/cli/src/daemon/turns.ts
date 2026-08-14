@@ -97,6 +97,15 @@ export class TurnMachine {
     return (this.#activeSession && this.#sessions.get(this.#activeSession)?.phase) || 'idle'
   }
   get activeSession(): string | null { return this.#activeSession }
+  /**
+   * Su an SAYILAN gosterimdeki reklam. Yoksa null.
+   *
+   * Spinner katmani bunu kullanir: `spinnerVerbs` tek bir dosyada, TUM
+   * oturumlar icin ortaktir. Oturum basina karar veremeyiz — bostaki bir
+   * oturumun tick'i, calisan oturumun reklamini silerdi.
+   */
+  get currentAd(): AdPayload | null { return this.#show?.ad ?? null }
+
   /** Su an tur icinde olan oturum sayisi. */
   get openTurns(): number {
     let n = 0

@@ -11,6 +11,7 @@ import type { AdPayload, RemoteConfig, Clock } from '@dwell/protocol'
 import { TurnMachine, type CompletedImpression } from './turns.js'
 import { startSocketServer, type SocketServer } from './server.js'
 import { ImpressionQueue } from './queue.js'
+import { SpinnerSync } from './spinner-sync.js'
 import { SOCKET_PATH, DWELL_HOME, type Request, type Response, type HookEvent } from '../ipc.js'
 
 export interface DaemonOptions {
@@ -21,6 +22,10 @@ export interface DaemonOptions {
   readonly ads?: readonly AdPayload[]
   /** Kuyrugun yazilacagi dizin. Varsayilan `~/.dwell`. */
   readonly dataDir?: string
+  /** Spinner katmanini aktif reklamla senkronla (ADR-001). */
+  readonly syncSpinner?: boolean
+  /** Test icin: settings.json yolu. */
+  readonly settingsPath?: string
   readonly authenticated?: boolean
   readonly onImpression?: (imp: CompletedImpression) => void
   readonly onError?: (e: unknown) => void
@@ -64,6 +69,13 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
     },
   })
 
+  const spinner = opts.syncSpinner
+    ? new SpinnerSync({
+        ...(opts.settingsPath ? { path: opts.settingsPath } : {}),
+        onError: (e) => { lastError = e instanceof Error ? e.message : String(e) },
+      })
+    : null
+
   const machine = new TurnMachine({
     clock,
     ids: cryptoIdGenerator(clock),
@@ -93,6 +105,12 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
       case 'tick': {
         const d = machine.onTick(req.session, clock.now())
         drain()
+        // Spinner GLOBAL bir ayardir — tek dosya, tum oturumlar.
+        //
+        // Bu yuzden istegi yapan oturumun sonucuna DEGIL, sayilan gosterime
+        // bakilir. Aksi halde bostaki bir oturumun tick'i, calisan oturumun
+        // reklamini siler ve spinner varsayilanlara doner.
+        spinner?.sync(machine.currentAd?.creative.brand ?? null)
         if (!d.ad) return { t: 'render', line: '', phase: d.phase, reason: d.reason }
         // Kirli kreatif gelirse renderAdLine firlatir → hicbir sey basilmaz
         // (ADR-007 fail-closed). Daemon ayakta kalir.
@@ -109,6 +127,7 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
       case 'hook': {
         applyHook(machine, req.event, req.session, clock.now())
         drain()
+        spinner?.sync(machine.currentAd?.creative.brand ?? null)
         return { t: 'ok' }
       }
 
@@ -148,7 +167,7 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
   return {
     impressions: () => queue.pending(),
     setPaused: (v) => { paused = v },
-    stop: () => server.close(),
+    stop: async () => { spinner?.clear(); await server.close() },
     phase: () => machine.phase,
     tick: (session, columns = 80) => handle({ t: 'tick', session, columns }),
     hook: (event, session) => { handle({ t: 'hook', event, session }) },
