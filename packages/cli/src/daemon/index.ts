@@ -117,6 +117,7 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
           t: 'health',
           info: {
             version: VERSION,
+            pid: process.pid,
             uptimeMs: clock.now() - started,
             phase: machine.phase,
             activeSession: machine.activeSession,

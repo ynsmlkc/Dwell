@@ -69,6 +69,19 @@ describe('kurulum', () => {
     expect(JSON.stringify(list)).toContain('/benim/script.sh')
   })
 
+  it('surum yukseltmesinde eski hook yolu TAZELENIR', () => {
+    // "Zaten var, atla" yetmez: ikili yolu degisince eski komut oldugu
+    // yerde kalir ve hook'lar olu bir dosyayi cagirir. Kullanici "kuruldu"
+    // gorur ama hicbir sey calismaz.
+    install({ ...OPTS, hookCommand: '/eski/yol/dwell-hook' }, path)
+    install(OPTS, path)
+
+    const cmd = read().hooks!['Stop']![0]!.hooks[0]!.command
+    expect(cmd).toContain(OPTS.hookCommand)
+    expect(cmd).not.toContain('/eski/yol')
+    expect(read().hooks!['Stop'], 'yinelenmemeli').toHaveLength(1)
+  })
+
   it('iki kez kurmak yinelenen hook uretmez', () => {
     install(OPTS, path)
     install(OPTS, path)

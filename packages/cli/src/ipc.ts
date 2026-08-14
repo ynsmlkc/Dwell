@@ -44,6 +44,8 @@ export type Response =
 
 export interface HealthInfo {
   readonly version: string
+  /** Daemon'in KENDI bildirdigi pid. Pidfile'a guvenilmez (pid geri donusumlu). */
+  readonly pid: number
   readonly uptimeMs: number
   readonly phase: string
   readonly activeSession: string | null

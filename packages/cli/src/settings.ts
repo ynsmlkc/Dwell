@@ -137,14 +137,25 @@ export function install(opts: InstallOptions, path = SETTINGS_PATH): InstallResu
     }
   }
 
-  // hook'lar — mevcutlari KORUYARAK ekle
+  // hook'lar — kullanicininkileri KORUYARAK, bizimkileri TAZELEYEREK.
+  //
+  // "Zaten var, atla" YETMEZ: surum yukseltmesinde ikili yolu degisir ve
+  // eski komut oldugu yerde kalir. Kullanici `dwell init` calistirir,
+  // "kuruldu" gorur, ama hook'lar olu bir dosyayi cagirmaya devam eder.
   settings.hooks ??= {}
   for (const event of TURN_HOOKS) {
-    const list = (settings.hooks[event] ??= [])
-    const already = list.some((h) => h[MARKER] === true)
-    if (already) continue
-    list.push({ matcher: '', hooks: [{ type: 'command', command: `${opts.hookCommand} ${event}` }], [MARKER]: true })
-    changed.push(`hooks.${event}`)
+    const list: HookEntry[] = (settings.hooks[event] ??= [])
+    const wanted = `${opts.hookCommand} ${event}`
+    const mine = list.findIndex((h) => h[MARKER] === true)
+    const entry: HookEntry = { matcher: '', hooks: [{ type: 'command', command: wanted }], [MARKER]: true }
+
+    if (mine === -1) {
+      list.push(entry)
+      changed.push(`hooks.${event}`)
+    } else if (list[mine]!.hooks[0]?.command !== wanted) {
+      list[mine] = entry
+      changed.push(`hooks.${event} (guncellendi)`)
+    }
   }
 
   writeSettings(settings, path)
