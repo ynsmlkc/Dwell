@@ -136,7 +136,23 @@ Uygulamanın mantığı: `spinnerVerbs` yoksa varsayılan liste; `mode: "replace
 - `spinnerVerbs` **statik bir listedir.** Claude Code onu `settings.json`'dan okuyup rastgele seçer. Bize **hiçbir geri bildirim gelmez**: hangi kelime ne zaman, kaç saniye gösterildi bilinemez. Reklamı değiştirmek `settings.json`'ı yeniden yazmayı gerektirir.
 - `statusLine` **bir komuttur.** Her tetiklendiğinde bizim shim'imiz çalışır. Gösterildiğini biliriz, süreyi sayabiliriz, her seferinde taze reklam servis edebiliriz.
 
-**Dolayısıyla 10 saniye kuralı, gösterim sayımı ve reklam seçimi tamamen `statusLine`'a dayanır.** `spinnerVerbs` yalnızca görünürlük eklentisidir; daemon periyodik olarak `settings.json`'daki verb listesini aktif reklamla tazeler. Faturalama asla spinner'a dayandırılmaz.
+**Dolayısıyla 10 saniye kuralı, gösterim sayımı ve reklam seçimi tamamen `statusLine`'a dayanır.** `spinnerVerbs` yalnızca görünürlük eklentisidir. Faturalama asla spinner'a dayandırılmaz.
+
+**Spinner'ın ölçülmüş sınırı (2026-08-14, temiz koşulda):** Claude Code `spinnerVerbs`'ü **tur başında** okur. Tur içinde dosyayı değiştirmek o turu etkilemez; değer bir sonraki prompt'ta geçer.
+
+Yöntem: rakip ürün aynı alanı 7-37 saniyede bir yazarken ekran izlendi. Dosya sürekli değişti, spinner tur boyunca sabit kaldı, sonraki prompt'ta değişti. **Aynı sınır rakipte de var** — saniyede bir yazmalarına rağmen tur içinde döndüremiyorlar.
+
+| | statusLine | spinnerVerbs |
+|---|---|---|
+| Tur **içinde** rotasyon | ✅ 20 saniyede bir | ❌ imkânsız |
+| Tur **başına** farklı reklam | ✅ | ✅ |
+| Gösterim sayılır | ✅ | ❌ |
+
+Bunun kod karşılığı: sıradaki reklam **tur biter bitmez** yazılır. Tur içinde güncellemek işe yaramaz — dosyada biten turun reklamı kalır ve bir sonraki tur onu yakalar, yani sürekli bir tur geriden gelinir.
+
+Liste **asla boşaltılmaz**: boş liste Claude Code'u kendi varsayılan kelimelerine düşürür (`mode: "replace"` ama liste boşsa varsayılanlar).
+
+> **Bir önceki ölçüm ("oturum başında sabitliyor") yanlıştı** ve nedeni öğretici: o sırada makinede rakip bir ürün de aynı alana yazıyordu. **Aynı yüzeye yazan başka bir yazılım varken yapılan ölçüm geçersizdir.** Tek yazar kalmadan tekrar edilmeli.
 
 **`mode` seçimi bir ürün kararıdır, Kıvılcım 1'de test edilir.** `append` reklamı 100+ varsayılan kelimeyle karıştırır — ne zaman görüneceği belirsizleşir ve reklamverene ne satıldığı bulanıklaşır. `replace` Claude Code'un kişiliğini tamamen siler; kullanıcının buna tepkisi bilinmiyor.
 
@@ -149,7 +165,7 @@ Uygulamanın mantığı: `spinnerVerbs` yoksa varsayılan liste; `mode: "replace
 | PTY wrapper (`dwell run claude`), stdout'a satır enjeksiyonu | Claude Code full-screen bir TUI; ekranı cursor adresleme ve bölgesel redraw ile çiziyor. Ham byte akışına satır enjekte etmek uygulamanın ekran modeliyle gerçek terminali ayrıştırır → görsel bozulma. Doğru yapmak için headless terminal emülatörü (`@xterm/headless`) + kompozitleme + SIGWINCH/alternate screen/bracketed paste proxy'lemesi gerekir; pratikte mini bir tmux yazmak demek. Ayrıca her Claude Code sürümünde kırılır. |
 | tmux `status-right` + `capture-pane` polling | Bozulma riski yok ama kullanıcıya tmux şartı koşuyor, kitleyi daraltıyor. Sonraki bir adapter olabilir. |
 | Terminal emulator eklentisi (iTerm2, WezTerm) | Platform başına ayrı iş, dağıtım maliyeti yüksek. |
-| Yalnızca `spinnerVerbs` kullanmak (statusLine olmadan) | En görünür yüzey, ama **ölçüm imkânsız**: gösterildiğine dair sinyal gelmez, süre bilinmez, reklam dinamik değişemez. Faturalanabilir bir envanter kurulamaz. Görünürlük katmanı olarak kalır, omurga olamaz. |
+| Yalnızca `spinnerVerbs` kullanmak (statusLine olmadan) | En görünür yüzey, ama **ölçüm imkânsız** ve tur içinde rotasyon yok: gösterildiğine dair sinyal gelmez, süre bilinmez, reklam dinamik değişemez. Faturalanabilir bir envanter kurulamaz. Görünürlük katmanı olarak kalır, omurga olamaz. |
 | Claude Code'un çizim koduna yama (referans üründe gözlenen yaklaşım) | Her sürümde kırılır ve kullanıcının kurulu yazılımını değiştirir. Resmî ayarlar aynı sonucu verirken bu riski almanın gerekçesi yok. **"Claude Code'u yamalamıyoruz, desteklenen uzantı noktalarını kullanıyoruz" bir satış argümanıdır** — güvenlik hassasiyeti yüksek bir kitleye satıyoruz. |
 
 **Bu kararın üç problemi aynı anda çözmesi:**
@@ -254,6 +270,12 @@ Shim `@dwell/protocol` **import etmez**; zod'u her tıkta yüklemek israf olur. 
 Daemon ölüyken eski reklamı göstermek de kazanç değil kayıptır: gösterim sayılmadığı için publisher kazanmaz, reklamveren faturalanmaz, geriye yalnızca kullanıcıyı bedava rahatsız etmek kalır.
 
 **Gecikme ileride de bu kararı değiştirmez:** 27 ms'in ~15 ms'i Node'un başlangıcı. Dosyaya geçmek o maliyeti kaldırmaz, yani dosya hiçbir zaman 20 ms'in altına inemez. Gerçekten daha hızlısı gerekirse çözüm dosya değil, derlenmiş binary (~3 ms) olur.
+
+**Çıktı `writeSync(1, ...)` ile basılır, `process.stdout.write` ile DEĞİL.** statusLine çıktısı her zaman bir pipe'a gider ve pipe üzerinde `process.stdout.write` asenkrondur; hemen ardından gelen `process.exit()` bekleyen chunk'ları düşürür. Kısa satırlar pipe buffer'ına sığdığı için pratikte çalışır, uzun satırda (geniş terminal + uzun URL) **yük altında rastgele** kaybolur — ayıklanması en zor hata sınıfı.
+
+**Terminal yeteneği shim'de tespit edilir, karar daemon'da verilir.** Terminalin kimliği yalnızca shim'in env'inde vardır; shim terminalin içinde çalışır, daemon çalışmaz. Bu yüzden shim pasif bir env parmak izi çıkarıp tick payload'ına `shape` (`osc8` / `plain` / `hybrid`) koyar, satırı yine daemon kurar. Sıralama kritiktir: **TMUX her şeyin önünde** (`allow-passthrough` olmadan OSC 8'i yutar), **SSH ikinci** (env uzakta, tıklayan terminal yerelde), `WT_SESSION` en sonda (sızıntıya açık).
+
+> **Aktif TTY sorgusu yasak.** Terminal yeteneğini `XTVERSION` / `DA` gibi escape sorgularıyla öğrenmek cazip ama yapılamaz: cevap TTY'nin input stream'ine düşer ve orayı Claude Code'un TUI'si okur — kullanıcının terminaline çöp enjekte edilir. Yalnızca pasif env okuması.
 
 **Katı kurallar:**
 - Shim'in bütçesi **< 200ms** (ölçümle belirlendi, yukarı bkz.). Aşarsa boş döner.
