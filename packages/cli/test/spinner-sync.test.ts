@@ -52,11 +52,22 @@ describe('spinner senkronu', () => {
     expect(readFileSync(path, 'utf8')).toContain('ELLE-DEGISTIRILDI')
   })
 
-  it('reklam yoksa spinner temizlenir', () => {
+  it('reklam yokken liste BOSALTILMAZ — yeni oturumlar varsayilanlara dusmesin', () => {
+    // Olculdu: Claude Code spinnerVerbs'u oturum basinda okuyup sabitliyor.
+    // Liste bosken acilan bir oturum varsayilan kelimelere duser ve o oturum
+    // boyunca oyle kalir. Dolu birakmak en azindan bir reklam yakalatir.
     write({ spinnerVerbs: ours })
     const s = new SpinnerSync({ path })
     s.sync('Firecrawl')
     s.sync(null)
+    expect(read().spinnerVerbs?.verbs).toEqual(['✶ Firecrawl'])
+  })
+
+  it('yalnizca kaldirma listeyi bosaltir', () => {
+    write({ spinnerVerbs: ours })
+    const s = new SpinnerSync({ path })
+    s.sync('Firecrawl')
+    s.clear()
     expect(read().spinnerVerbs?.verbs).toEqual([])
   })
 })

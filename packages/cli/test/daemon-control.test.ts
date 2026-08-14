@@ -101,3 +101,32 @@ describe('canlilik kontrolu', () => {
     expect(await dc.isAlive(join(dir, 'yok.sock'), 300)).toBe(false)
   })
 })
+
+describe('cozulmeyen promise — sessiz cikis', () => {
+  it('sunucu cevap vermeden kapanirsa ask() null DONER, asilmaz', async () => {
+    // Gercek belirti: `dwell uninstall` banner'i basip duruyordu, ayarlar
+    // silinmiyordu, cikis kodu 0'di. Ucte bir tekrarlanan bir yaristi.
+    //
+    // Sebep: daemon'a SIGTERM'den sonra baglanti kuruluyor ama daemon cevap
+    // veremeden soketi kapatiyor. O durumda 'error' ateslenmez, yalnizca
+    // 'close' gelir. Dinlenmezse promise cozulmez ve Node isini bitirmeden
+    // kod 0 ile cikar.
+    const dc = await fresh()
+    const { createServer } = await import('node:net')
+    const { mkdirSync } = await import('node:fs')
+    mkdirSync(join(dir, '.dwell'), { recursive: true })
+    const sockPath = join(dir, '.dwell', 'sessiz.sock')
+
+    // Baglantiyi kabul edip HICBIR SEY yazmadan kapatan sunucu.
+    const srv = createServer((c) => c.destroy())
+    await new Promise<void>((r) => srv.listen(sockPath, r))
+
+    const result = await Promise.race([
+      dc.ask({ t: 'health' }, sockPath, 5_000),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('ASILDI')), 2_000)),
+    ])
+    expect(result).toBeNull()
+
+    await new Promise<void>((r) => srv.close(() => r()))
+  })
+})

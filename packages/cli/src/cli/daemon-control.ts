@@ -38,9 +38,30 @@ export async function isAlive(socketPath = defaultSocket(), timeoutMs = 1_000): 
 export function ask(req: Request, socketPath = defaultSocket(), timeoutMs = 2_000): Promise<Response | null> {
   return new Promise((resolve) => {
     const sock = connect(socketPath)
-    const done = (v: Response | null) => { sock.destroy(); resolve(v) }
+    let settled = false
+    const done = (v: Response | null) => {
+      if (settled) return
+      settled = true
+      sock.destroy()
+      resolve(v)
+    }
+
     sock.setTimeout(timeoutMs, () => done(null))
     sock.on('error', () => done(null))
+
+    // 'close' ve 'end' ELE ALINMAK ZORUNDA.
+    //
+    // Daemon'a SIGTERM gonderdikten hemen sonra baglanti kurulabiliyor ama
+    // daemon cevap veremeden soketi kapatiyor. O durumda 'error' ATESLENMEZ,
+    // yalnizca 'close' gelir. Dinlemezsek promise hicbir zaman cozulmez;
+    // soket de kapali oldugu icin event loop'u tutan bir sey kalmaz ve Node
+    // ISINI BITIRMEDEN, kod 0 ile sessizce cikar.
+    //
+    // Belirtisi: `dwell uninstall` banner'i basip duruyordu, ayarlar
+    // silinmiyordu, cikis kodu 0'di. Ucte bir tekrarlanan bir yaristi.
+    sock.on('close', () => done(null))
+    sock.on('end', () => done(null))
+
     sock.on('connect', () => sock.write(encode(req)))
     let buf = ''
     sock.on('data', (d) => {
