@@ -241,8 +241,22 @@ Günlük maliyet: 13.733 çağrı × 22 ms ≈ **5 dakika CPU/gün**. Kabul edil
 
 Shim `@dwell/protocol` **import etmez**; zod'u her tıkta yüklemek israf olur. Yalnızca `node:net`. Bütün iş daemon'da.
 
+**Reddedilen alternatif — dosyadan okumak.** Shim, daemon'a bağlanmak yerine önceden yazılmış bir dosyayı okuyabilirdi (referans üründe gözlenen yaklaşım: `~/.vibe-ads/cli-ad.json`). Reddedildi:
+
+| | Dosya | Socket |
+|---|---|---|
+| Gecikme | ~22 ms | 27 ms |
+| Daemon'a "gösterildi" sinyali | **yok** | var |
+| Daemon ölüyken | eski reklam görünür | hiçbir şey görünmez |
+
+**Belirleyici olan gecikme değil, ölçüm.** Faturalandırmanın tamamı "shim çalıştıysa satır basılmıştır" kuralına dayanıyor; dosya okuma tek yönlüdür ve daemon'a hiçbir sinyal göndermez. Gösterimi sayamazsan fatura kesemezsin.
+
+Daemon ölüyken eski reklamı göstermek de kazanç değil kayıptır: gösterim sayılmadığı için publisher kazanmaz, reklamveren faturalanmaz, geriye yalnızca kullanıcıyı bedava rahatsız etmek kalır.
+
+**Gecikme ileride de bu kararı değiştirmez:** 27 ms'in ~15 ms'i Node'un başlangıcı. Dosyaya geçmek o maliyeti kaldırmaz, yani dosya hiçbir zaman 20 ms'in altına inemez. Gerçekten daha hızlısı gerekirse çözüm dosya değil, derlenmiş binary (~3 ms) olur.
+
 **Katı kurallar:**
-- Shim'in bütçesi **< 50ms**. Aşarsa boş döner.
+- Shim'in bütçesi **< 200ms** (ölçümle belirlendi, yukarı bkz.). Aşarsa boş döner.
 - Daemon'a bağlanamazsa shim **hiçbir şey basmaz** (hata mesajı da basmaz).
 - Reklam sunucusu erişilemezse cache'ten servis edilir; cache boşsa satır gösterilmez.
 - Gösterim olayları diskte kuyruklanır, periyodik olarak toplu gönderilir (offline dayanıklılık).
