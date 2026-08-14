@@ -200,31 +200,51 @@ export function uninstall(path = SETTINGS_PATH, now: NowFn = Date.now): { remove
  * periyodik olarak kendi ayarini geri koyabiliyor — kullanici "Dwell
  * calismiyor" der ve sebebini bilemez.
  */
-export function diagnose(expectedCommand: string, path = SETTINGS_PATH): {
+export interface Diagnosis {
   installed: boolean
   hijacked: boolean
   detail: string
-} {
-  if (!existsSync(path)) return { installed: false, hijacked: false, detail: 'settings.json yok' }
+  /**
+   * `spinnerVerbs` baska bir araca mi ait?
+   *
+   * SpinnerSync bu durumda SESSIZCE devre disi kalir — kullanicinin ayarini
+   * ezmeme kurali geregi dogru davranis, ama "spinner calismiyor" diye
+   * debug edilirse yanlis yere bakilir. Bu yuzden acikca raporlanir.
+   */
+  spinnerOwner: 'bizim' | 'baskasinin' | 'yok'
+  spinnerDetail: string | null
+}
+
+export function diagnose(expectedCommand: string, path = SETTINGS_PATH): Diagnosis {
+  const none = { spinnerOwner: 'yok' as const, spinnerDetail: null }
+  if (!existsSync(path)) return { installed: false, hijacked: false, detail: 'settings.json yok', ...none }
 
   let settings: ClaudeSettings
   try { settings = readSettings(path) } catch (e) {
-    return { installed: false, hijacked: false, detail: String(e instanceof Error ? e.message : e) }
+    return { installed: false, hijacked: false, detail: String(e instanceof Error ? e.message : e), ...none }
   }
+
+  const sv = settings.spinnerVerbs
+  const spinner = sv
+    ? sv[MARKER] === true
+      ? { spinnerOwner: 'bizim' as const, spinnerDetail: (sv.verbs ?? []).join(', ') || 'liste bos' }
+      : { spinnerOwner: 'baskasinin' as const,
+          spinnerDetail: `baska araca ait, senkron kapali: ${(sv.verbs ?? []).join(', ').slice(0, 40)}` }
+    : none
 
   const sl = settings.statusLine
-  if (!sl) return { installed: false, hijacked: false, detail: 'statusLine tanimli degil' }
+  if (!sl) return { installed: false, hijacked: false, detail: 'statusLine tanimli degil', ...spinner }
 
   if (sl[MARKER] && sl.command === expectedCommand) {
-    return { installed: true, hijacked: false, detail: 'kurulum saglam' }
+    return { installed: true, hijacked: false, detail: 'kurulum saglam', ...spinner }
   }
   if (sl[MARKER] && sl.command !== expectedCommand) {
-    return { installed: false, hijacked: false, detail: 'eski surumden kalma kurulum — `dwell init` tekrar calistir' }
+    return { installed: false, hijacked: false, detail: 'eski surumden kalma kurulum — `dwell init` tekrar calistir', ...spinner }
   }
   return {
-    installed: false,
-    hijacked: true,
+    installed: false, hijacked: true,
     detail: `statusLine baska bir araca ait: ${sl.command.slice(0, 60)}`,
+    ...spinner,
   }
 }
 

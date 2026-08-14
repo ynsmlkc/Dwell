@@ -118,10 +118,20 @@ async function cmdDoctor(): Promise<void> {
     ['socket', existsSync(SOCKET_PATH), SOCKET_PATH],
     ['shim', existsSync(shimPath()), shimPath().endsWith('.ts')
       ? 'TypeScript kaynagi — derlenmis surum daha hizli' : 'derlenmis'],
+    ['spinner', d.spinnerOwner !== 'baskasinin', d.spinnerDetail ?? 'kurulu degil'],
   ]
 
   for (const [name, good, detail] of checks) {
     out(`  ${good ? green('✓') : red('✗')} ${bold(name.padEnd(14))} ${dim(detail)}`)
+  }
+
+  if (d.spinnerOwner === 'baskasinin') {
+    out()
+    warn('spinnerVerbs BASKA BIR ARACA ait — spinner senkronu sessizce kapali.')
+    info('Kullanicinin ayarini ezmeme kurali geregi dokunmuyoruz. Ayni yuzeyi')
+    info('kullanan baska bir eklenti kurulu olabilir; bazilari saniyeler icinde')
+    info('kendi degerini geri yaziyor, yani `--force` de kalici olmaz.')
+    info('Once o araci kaldir, sonra `dwell init --spinner`.')
   }
 
   if (d.hijacked) {
