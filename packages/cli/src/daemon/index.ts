@@ -107,12 +107,7 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
       case 'tick': {
         const d = machine.onTick(req.session, clock.now())
         drain()
-        // Spinner GLOBAL bir ayardir — tek dosya, tum oturumlar.
-        //
-        // Bu yuzden istegi yapan oturumun sonucuna DEGIL, sayilan gosterime
-        // bakilir. Aksi halde bostaki bir oturumun tick'i, calisan oturumun
-        // reklamini siler ve spinner varsayilanlara doner.
-        spinner?.sync(machine.currentAd?.creative.brand ?? null)
+        // Spinner'a BURADA DOKUNULMAZ — bkz. `hook` dalindaki aciklama.
         if (!d.ad) return { t: 'render', line: '', phase: d.phase, reason: d.reason }
         // Kirli kreatif gelirse renderAdLine firlatir → hicbir sey basilmaz
         // (ADR-007 fail-closed). Daemon ayakta kalir.
@@ -130,18 +125,18 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
         applyHook(machine, req.event, req.session, clock.now())
         drain()
 
-        // OLCULDU (2026-08-14): Claude Code `spinnerVerbs`'u TUR BASINDA
-        // okuyor. Tur icinde dosyayi degistirmek o turu etkilemiyor; bir
-        // sonraki prompt'ta yeni deger geciyor.
+        // Spinner YALNIZCA burada, yalnizca tur bitiminde yazilir.
         //
-        // Bu yuzden tur BITER BITMEZ siradaki reklam yaziliyor. Aksi halde
-        // dosyada hala biten turun reklami durur ve bir sonraki tur onu
-        // yakalar — surekli BIR TUR GERIDEN geliriz.
-        spinner?.sync(
-          req.event === 'Stop'
-            ? peekAd()?.creative.brand ?? null
-            : machine.currentAd?.creative.brand ?? null,
-        )
+        // OLCULDU (2026-08-14): Claude Code `spinnerVerbs`'u TUR BASINDA
+        // okuyor. Tur icinde yazmak o turu etkilemez — ama dosyayi ekranda
+        // gorunenden FARKLI hale getirir ve hata ayiklamayi yaniltir.
+        //
+        // Kural: dosyadaki deger, o an ekranda ne yaziyorsa o olmali.
+        //   tur N-1 bitti  → siradaki reklam yazilir  (Y)
+        //   tur N basladi  → Claude Y'yi okur, ekranda Y   → dosya = ekran ✓
+        //   tur N suruyor  → DOKUNULMAZ                    → dosya = ekran ✓
+        //   tur N bitti    → siradaki yazilir (Z)
+        if (req.event === 'Stop') spinner?.sync(peekAd()?.creative.brand ?? null)
         return { t: 'ok' }
       }
 
@@ -177,6 +172,10 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
     lastError = e instanceof Error ? e.message : String(e)
     throw e
   }
+
+  // Ilk reklami hemen yaz: kurulumdan sonraki ILK tur, `dwell init`'in
+  // koydugu yer tutucuyu degil gercek bir reklami gormeli.
+  spinner?.sync(peekAd()?.creative.brand ?? null)
 
   return {
     impressions: () => queue.pending(),

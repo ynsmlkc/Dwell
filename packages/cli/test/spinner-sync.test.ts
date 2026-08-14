@@ -152,3 +152,65 @@ describe('cok oturum — spinner GLOBAL bir ayardir', () => {
     rmSync(tmp, { recursive: true, force: true })
   })
 })
+
+describe('tur basina rotasyon — yalnizca tur bitiminde yazilir', () => {
+  async function daemonWith(settings: string) {
+    const { startDaemon } = await import('../src/daemon/index.js')
+    const { mkdtempSync: mk } = await import('node:fs')
+    const tmp = mk(join(tmpdir(), 'dwell-turn-'))
+    writeFileSync(settings, JSON.stringify({ spinnerVerbs: ours }))
+    const ad = (b: string) => ({ campaignId: b, nonce: '0'.repeat(32), nonceExpiresAt: 9e12,
+      creative: { brand: b, text: 'metin' } })
+    const d = await startDaemon({
+      socketPath: join(tmp, 'd.sock'), dataDir: tmp, settingsPath: settings, syncSpinner: true,
+      ads: [ad('Bir'), ad('Iki'), ad('Uc')],
+    })
+    return { d, tmp }
+  }
+
+  it('tur ICINDE spinner sabit kalir — dosya ekranda gorunenle ayni', () => {
+    // Tur icinde yazmak o turu etkilemez (CC tur basinda okuyor) ama dosyayi
+    // ekrandan farkli hale getirir ve hata ayiklamayi yaniltir.
+    const dir2 = mkdtempSync(join(tmpdir(), 'dwell-t1-'))
+    const set = join(dir2, 'settings.json')
+    return daemonWith(set).then(async ({ d, tmp }) => {
+      const read = () => JSON.parse(readFileSync(set, 'utf8')).spinnerVerbs.verbs[0]
+      d.hook('UserPromptSubmit', 's1')
+      const basta = read()
+      d.tick('s1'); d.tick('s1'); d.tick('s1')
+      expect(read(), 'tur icinde degismemeli').toBe(basta)
+      await d.stop()
+      rmSync(tmp, { recursive: true, force: true }); rmSync(dir2, { recursive: true, force: true })
+    })
+  })
+
+  it('tur BITINCE siradaki reklam on yuklenir', async () => {
+    const dir2 = mkdtempSync(join(tmpdir(), 'dwell-t2-'))
+    const set = join(dir2, 'settings.json')
+    const { d, tmp } = await daemonWith(set)
+    const read = () => JSON.parse(readFileSync(set, 'utf8')).spinnerVerbs.verbs[0]
+
+    d.hook('UserPromptSubmit', 's1')
+    d.tick('s1')
+    const tur1 = read()
+
+    d.hook('Stop', 's1')
+    expect(read(), 'Stop siradakini yazmali').not.toBe(tur1)
+
+    // Tolerans boyunca gelen tick'ler on yuklemeyi EZMEMELI.
+    d.tick('s1'); d.tick('s1')
+    expect(read(), 'tick on yuklemeyi ezmemeli').not.toBe(tur1)
+
+    await d.stop()
+    rmSync(tmp, { recursive: true, force: true }); rmSync(dir2, { recursive: true, force: true })
+  })
+
+  it('daemon acilirken ilk reklami yazar — ilk tur yer tutucu gormez', async () => {
+    const dir2 = mkdtempSync(join(tmpdir(), 'dwell-t3-'))
+    const set = join(dir2, 'settings.json')
+    const { d, tmp } = await daemonWith(set)
+    expect(JSON.parse(readFileSync(set, 'utf8')).spinnerVerbs.verbs[0]).toBe('✶ Bir')
+    await d.stop()
+    rmSync(tmp, { recursive: true, force: true }); rmSync(dir2, { recursive: true, force: true })
+  })
+})
