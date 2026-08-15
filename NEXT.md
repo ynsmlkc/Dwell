@@ -21,19 +21,27 @@ Uçtan uca doğrulanmış: `dwell init` → reklam ekranda → tur sayılıyor �
 
 ---
 
-## 1 — Sunucu bağlantısı ⭐ önce bu
+## 1 — Sunucu bağlantısı ✅ bitti (2026-08-15)
 
-Omurganın tek kopuk halkası. Sunucu kodu yazılı ve testli (101 test), sadece daemon ona bağlı değil.
+- [x] `packages/server/src/main.ts` + `pnpm dev` — bellekte defter, üç kampanya, doğrulama job'ı
+- [x] Daemon HTTP istemcisi: reklam prefetch, kuyruk boşaltma, config polling
+- [x] Ağ yokken önbellekten servis, kuyruk büyümeye devam
 
-- [ ] Sunucuyu ayağa kaldıran giriş noktası (`packages/server/src/main.ts` + `pnpm dev`)
-- [ ] Daemon'da HTTP istemcisi: `POST /v1/ads/next` ile reklam çek, önbelleğe al
-- [ ] Kuyruğu boşalt: `POST /v1/impressions`, kabul edilenleri `markSent`
-- [ ] `GET /v1/config` periyodik çekim → kill switch ve `minClientVersion` canlı
-- [ ] Ağ yokken davranış: mevcut önbellekten servis, kuyruk büyümeye devam
+Doğrulandı:
 
-**Bitti kriteri:** Daemon'ı sunucuya bağla, bir tur çevir, sunucu tarafında `pending` gösterimi gör. Sunucuyu kapat — istemci sessizce çalışmaya devam etsin, kuyruk büyüsün, sunucu dönünce boşalsın.
+```
+1. SUNUCU AÇIK    gösterim gitti → sunucu bakiyesi arttı
+2. SUNUCU KAPALI  reklam önbellekten geldi, kuyruk 1→3 büyüdü, hata gösterilmedi
+3. SUNUCU DÖNDÜ   kuyruk boşaldı, 3/3 işaretlendi
+```
 
-Bunun sonunda ilk defa **iki taraflı** bir sistem olur.
+Yolda çıkan iki düzeltme: `EPIPE` gürültüsü (shim cevabını alıp soketi kapatıyor,
+sunucunun yazma denemesi hata sayılıyordu) ve kapanışta makinede asılı kalan
+gösterimin diske alınması (terminal tur biter bitmez kapanırsa o gösterim
+kayboluyordu).
+
+**Kalan:** publisher kimliği. Şu an tek bir geliştirme token'ı var, gösterimler
+sabit bir hesaba yazılıyor. Sıradaki madde bunu çözüyor.
 
 ---
 

@@ -5,13 +5,17 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dev": "node build.mjs && node dist/server.mjs",
+    "build": "node build.mjs"
   },
   "dependencies": {
     "@dwell/protocol": "workspace:*",
+    "@hono/node-server": "^2.1.1",
     "hono": "^4.13.1"
   },
   "devDependencies": {
-    "@types/node": "^26.2.0"
+    "@types/node": "^26.2.0",
+    "esbuild": "^0.28.2"
   }
 }

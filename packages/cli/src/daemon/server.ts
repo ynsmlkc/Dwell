@@ -44,7 +44,13 @@ export async function startSocketServer(
   const server: Server = createServer((sock: Socket) => {
     live++
     sock.on('close', () => { live-- })
-    sock.on('error', onError)
+    sock.on('error', (e: NodeJS.ErrnoException) => {
+      // EPIPE / ECONNRESET beklenen durumdur, hata degil: shim cevabini alir
+      // almaz soketi kapatir (butcesi 200 ms). Bunlari `lastError`'a yazmak
+      // `dwell doctor`'i her tikta yaniltir.
+      if (e.code === 'EPIPE' || e.code === 'ECONNRESET') return
+      onError(e)
+    })
     sock.setNoDelay(true)
     // Shim'in butcesi 50ms; tembel baglanti tutmayalim.
     sock.setTimeout(5_000, () => sock.destroy())
@@ -66,7 +72,11 @@ export async function startSocketServer(
         // Bu yol her saniye kat ediliyor — tek bir senkron hata her seyi
         // durdurmamali.
         void (async () => handle(req))()
-          .then((res) => { if (!sock.destroyed) sock.write(encode(res)) })
+          .then((res) => {
+            // `destroyed` kontrolu ile write arasinda yaris var; hata
+            // geri cagrimi yutuluyor cunku soket zaten kapanmis olabilir.
+            if (!sock.destroyed) sock.write(encode(res), () => {})
+          })
           .catch((e) => {
             onError(e)
             if (!sock.destroyed) sock.write(encode({ t: 'error', code: 'DWL_9001' }))

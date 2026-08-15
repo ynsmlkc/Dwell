@@ -24,9 +24,14 @@ const log = (m: string): void => {
   process.stdout.write(`${new Date().toISOString()} ${m}\n`)
 }
 
+const SERVER = process.env['DWELL_SERVER'] ?? ''
+const TOKEN = process.env['DWELL_TOKEN'] ?? ''
+
 const daemon = await startDaemon({
-  ads: DEV_ADS,
+  // Sunucu adresi verilmisse oradan, yoksa yerel listeden (gelistirme).
+  ...(SERVER ? { serverUrl: SERVER, token: TOKEN } : { ads: DEV_ADS }),
   syncSpinner: true,
+  onLog: log,
   config: {
     ...FALLBACK_CONFIG,
     renderEnabled: true,
@@ -42,7 +47,7 @@ const daemon = await startDaemon({
   onError: (e) => log(`hata: ${e instanceof Error ? e.message : String(e)}`),
 })
 
-log('dwelld basladi')
+log(SERVER ? `dwelld basladi — sunucu: ${SERVER}` : 'dwelld basladi — yerel reklamlar (sunucu yok)')
 
 // Temiz kapanis: soket dosyasi geride kalmasin, yoksa bir sonraki baslatma
 // "zaten calisiyor" sanir.

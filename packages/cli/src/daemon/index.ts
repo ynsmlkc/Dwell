@@ -12,6 +12,7 @@ import { TurnMachine, type CompletedImpression } from './turns.js'
 import { startSocketServer, type SocketServer } from './server.js'
 import { ImpressionQueue } from './queue.js'
 import { SpinnerSync } from './spinner-sync.js'
+import { ServerSync } from './sync.js'
 import { SOCKET_PATH, DWELL_HOME, type Request, type Response, type HookEvent } from '../ipc.js'
 
 export interface DaemonOptions {
@@ -26,9 +27,15 @@ export interface DaemonOptions {
   readonly syncSpinner?: boolean
   /** Test icin: settings.json yolu. */
   readonly settingsPath?: string
+  /** Sunucu adresi. Verilmezse daemon offline calisir (gelistirme). */
+  readonly serverUrl?: string
+  readonly token?: string
+  readonly clientVersion?: string
+  readonly fetchImpl?: typeof fetch
   readonly authenticated?: boolean
   readonly onImpression?: (imp: CompletedImpression) => void
   readonly onError?: (e: unknown) => void
+  readonly onLog?: (m: string) => void
 }
 
 export interface Daemon {
@@ -61,6 +68,9 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
   let adCursor = 0
   /** Siradaki reklami TUKETMEDEN gosterir — spinner on yuklemesi icin. */
   const peekAd = (): AdPayload | null => (ads.length === 0 ? null : ads[adCursor % ads.length]!)
+  /** Spinner on yuklemesi: sunucu modunda siradaki reklami TUKETIR (spinner
+   *  sayilmadigi icin bir reklamin harcanmasi sorun degil), yerelde peek. */
+  const spinnerAd = (): AdPayload | null => (sync ? sync.nextAd() : peekAd())
   let paused = false
   let lastError: string | null = null
   const queue = new ImpressionQueue({
@@ -78,14 +88,31 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
       })
     : null
 
+  let currentConfig = config
+  const sync = opts.serverUrl
+    ? new ServerSync({
+        baseUrl: opts.serverUrl,
+        token: opts.token ?? '',
+        clientVersion: opts.clientVersion ?? VERSION,
+        queue,
+        config: () => currentConfig,
+        setConfig: (c) => { currentConfig = c },
+        onLog: (m) => opts.onLog?.(m),
+        ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}),
+      })
+    : null
+
   const machine = new TurnMachine({
     clock,
     ids: cryptoIdGenerator(clock),
-    config: () => config,
+    config: () => currentConfig,
     isPaused: () => paused,
     isAuthenticated: () => opts.authenticated ?? true,
+    // Sunucu bagliysa ondan; degilse yerel listeden (gelistirme).
     // ADR-022: ayni reklam tur icinde ardisik tekrar etmesin diye sirayla dolas.
-    nextAd: () => (ads.length === 0 ? null : ads[adCursor++ % ads.length]!),
+    nextAd: () => sync
+      ? sync.nextAd()
+      : (ads.length === 0 ? null : ads[adCursor++ % ads.length]!),
   })
 
   /**
@@ -136,7 +163,7 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
         //   tur N basladi  → Claude Y'yi okur, ekranda Y   → dosya = ekran ✓
         //   tur N suruyor  → DOKUNULMAZ                    → dosya = ekran ✓
         //   tur N bitti    → siradaki yazilir (Z)
-        if (req.event === 'Stop') spinner?.sync(peekAd()?.creative.brand ?? null)
+        if (req.event === 'Stop') spinner?.sync(spinnerAd()?.creative.brand ?? null)
         return { t: 'ok' }
       }
 
@@ -151,12 +178,12 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
             activeSession: machine.activeSession,
             openTurns: machine.openTurns,
             queuedImpressions: queue.size(),
-            adsCached: ads.length,
-            renderEnabled: config.renderEnabled,
+            adsCached: sync ? sync.state().adsCached : ads.length,
+            renderEnabled: currentConfig.renderEnabled,
             authenticated: opts.authenticated ?? true,
             paused,
-            lastServerContactMs: null,
-            lastError,
+            lastServerContactMs: sync?.state().lastContactMs ?? null,
+            lastError: sync?.state().lastError ?? lastError,
           },
         }
     }
@@ -173,14 +200,30 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
     throw e
   }
 
+  sync?.start()
+
   // Ilk reklami hemen yaz: kurulumdan sonraki ILK tur, `dwell init`'in
   // koydugu yer tutucuyu degil gercek bir reklami gormeli.
-  spinner?.sync(peekAd()?.creative.brand ?? null)
+  spinner?.sync(spinnerAd()?.creative.brand ?? null)
 
   return {
     impressions: () => queue.pending(),
     setPaused: (v) => { paused = v },
-    stop: async () => { spinner?.clear(); await server.close() },
+    stop: async () => {
+      // Makinede ASILI KALAN gosterimi once diske al.
+      //
+      // Gosterim yalnizca tick geldiginde kapanir. Kullanici tur biter bitmez
+      // terminali kapatirsa son gosterim makinede kalir ve kaybolur —
+      // kazanilmis bir gosterim, hicbir yerde izi olmadan.
+      machine.onSessionEnd(machine.activeSession ?? '', clock.now())
+      drain()
+
+      // Sonra son bir gonderim denenir; basarisiz olursa kuyruk diskte kalir
+      // ve bir sonraki acilista gonderilir.
+      if (sync) { await sync.flushNow(); sync.stop() }
+      spinner?.clear()
+      await server.close()
+    },
     phase: () => machine.phase,
     tick: (session, columns = 80) => handle({ t: 'tick', session, columns }),
     hook: (event, session) => { handle({ t: 'hook', event, session }) },
