@@ -12,7 +12,9 @@
   "dependencies": {
     "@dwell/protocol": "workspace:*",
     "@hono/node-server": "^2.1.1",
-    "hono": "^4.13.1"
+    "hono": "^4.13.1",
+    "@dwell/payments": "workspace:*",
+    "@stellar/stellar-sdk": "^14.6.1"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

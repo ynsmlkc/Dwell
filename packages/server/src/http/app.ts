@@ -21,6 +21,7 @@ import type { Pipeline } from '../pipeline.js'
 import type { Ledger } from '../ledger/ledger.js'
 import { accountId } from '../ledger/accounts.js'
 import { TokenStore, bearerToken, type AuthContext } from './auth.js'
+import type { WalletAuth } from './wallet-auth.js'
 import { compareVersions } from '../impressions/ingest.js'
 
 export interface AppDeps {
@@ -34,6 +35,8 @@ export interface AppDeps {
   readonly ipSalt: string
   readonly payoutThreshold: Stroops
   readonly explorerBase?: string
+  /** Cuzdanla giris. Verilmezse `/v1/auth/*` uclari acilmaz. */
+  readonly walletAuth?: WalletAuth
 }
 
 type Vars = { auth: AuthContext }
@@ -101,6 +104,50 @@ export function createApp(deps: AppDeps) {
    * Token'i bozulmus bir istemcinin de susturulabilmesi gerekiyor.
    */
   app.get('/v1/config', (c) => c.json(remoteConfigSchema.parse(deps.config())))
+
+  /* ─────────────────── cuzdanla giris ─────────────────── */
+
+  /**
+   * ADR-010 (revize) — kimlik cuzdandir.
+   *
+   * Bu iki uc YETKI ISTEMEZ; yetkinin kendisi burada uretiliyor. Guvenlik
+   * imzadan gelir: kullanici challenge'i yalnizca ozel anahtariyla
+   * imzalayabilir, biz de o anahtari hicbir zaman gormeyiz.
+   */
+  if (deps.walletAuth) {
+    const wa = deps.walletAuth
+
+    app.post('/v1/auth/challenge', async (c) => {
+      const body = await c.req.json().catch(() => null)
+      const address = typeof body?.address === 'string' ? body.address.trim() : ''
+
+      const r = wa.challenge(address)
+      if (!r.ok) return c.json(err('DWL_4001', r.reason), 400)
+
+      return c.json({
+        transaction: r.xdr,                       // SEP-10 alan adi: `transaction`
+        network_passphrase: r.networkPassphrase,
+        expiresAt: r.expiresAt,
+      })
+    })
+
+    app.post('/v1/auth/verify', async (c) => {
+      const body = await c.req.json().catch(() => null)
+      const address = typeof body?.address === 'string' ? body.address.trim() : ''
+      const signed = typeof body?.transaction === 'string' ? body.transaction : ''
+      if (!address || !signed) {
+        return c.json(err('DWL_9001', '`address` ve `transaction` gerekli'), 400)
+      }
+
+      const r = await wa.verify(address, signed)
+      // 401: imza gecerli degil. Bu bir sunucu hatasi degil, kimlik reddi.
+      if (!r.ok) return c.json(err('DWL_2002', r.detail ? `${r.reason}: ${r.detail}` : r.reason), 401)
+
+      // Ham token YALNIZCA burada gorunur. Tekrar okunamaz — kaybedilirse
+      // yeniden giris yapilir. Sunucuda yalnizca hash'i var.
+      return c.json({ token: r.token, tokenId: r.tokenId, publisherId: r.publisherId })
+    })
+  }
 
   app.post('/v1/ads/next', requireVersion, requireScope('report:impressions'), (c) => {
     const { publisherId } = c.get('auth')

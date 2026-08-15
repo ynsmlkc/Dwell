@@ -9,6 +9,7 @@
 import { startDaemon } from './index.js'
 import { FALLBACK_CONFIG } from '@dwell/protocol'
 import type { AdPayload } from '@dwell/protocol'
+import { loadCredentials, shortAddress } from '../credentials.js'
 
 /** Gelistirme reklamlari. Uretimde `/v1/ads/next`'ten gelecek. */
 const DEV_ADS: AdPayload[] = [
@@ -24,8 +25,12 @@ const log = (m: string): void => {
   process.stdout.write(`${new Date().toISOString()} ${m}\n`)
 }
 
-const SERVER = process.env['DWELL_SERVER'] ?? ''
-const TOKEN = process.env['DWELL_TOKEN'] ?? ''
+// Once ortam degiskeni (gelistirme, CI), sonra `dwell login`'in yazdigi dosya.
+// Ortamin oncelikli olmasi bilincli: bir seyi test ederken kayitli kimligi
+// gecici olarak devre disi birakabilmek gerekiyor.
+const creds = loadCredentials()
+const SERVER = process.env['DWELL_SERVER'] ?? creds?.serverUrl ?? ''
+const TOKEN = process.env['DWELL_TOKEN'] ?? creds?.token ?? ''
 
 const daemon = await startDaemon({
   // Sunucu adresi verilmisse oradan, yoksa yerel listeden (gelistirme).
@@ -47,7 +52,12 @@ const daemon = await startDaemon({
   onError: (e) => log(`hata: ${e instanceof Error ? e.message : String(e)}`),
 })
 
-log(SERVER ? `dwelld basladi — sunucu: ${SERVER}` : 'dwelld basladi — yerel reklamlar (sunucu yok)')
+log(
+  SERVER
+    ? `dwelld basladi — sunucu: ${SERVER}` +
+      (creds ? ` · cuzdan: ${shortAddress(creds.publisherId)}` : ' · token: ortamdan')
+    : 'dwelld basladi — yerel reklamlar (sunucu yok, `dwell login` ile bagla)',
+)
 
 // Temiz kapanis: soket dosyasi geride kalmasin, yoksa bir sonraki baslatma
 // "zaten calisiyor" sanir.

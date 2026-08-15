@@ -15,6 +15,8 @@ import { systemClock, cryptoIdGenerator, stroops, FALLBACK_CONFIG } from '@dwell
 import type { RemoteConfig } from '@dwell/protocol'
 import { createApp } from './http/app.js'
 import { TokenStore, hashToken } from './http/auth.js'
+import { WalletAuth, serverKeypair, horizonSigners } from './http/wallet-auth.js'
+import { Sep10, NETWORKS } from '@dwell/payments'
 import { Pipeline } from './pipeline.js'
 import { Ledger } from './ledger/ledger.js'
 import { MemoryLedgerStore } from './ledger/memory-store.js'
@@ -90,6 +92,34 @@ const pipeline = new Pipeline({
 })
 
 const tokens = new TokenStore()
+
+/* ─────────────────── cuzdanla giris ─────────────────── */
+
+const HORIZON = process.env['DWELL_HORIZON'] ?? 'https://horizon-testnet.stellar.org'
+const HOME_DOMAIN = process.env['DWELL_HOME_DOMAIN'] ?? `${HOST}:${PORT}`
+
+const sep10Keypair = serverKeypair()
+const walletAuth = new WalletAuth({
+  clock, ids,
+  sep10: new Sep10({
+    serverKeypair: sep10Keypair,
+    homeDomain: HOME_DOMAIN,
+    webAuthDomain: HOME_DOMAIN,
+    networkPassphrase: NETWORKS.testnet,
+  }, clock),
+  loadSigners: horizonSigners(HORIZON),
+  hashToken,
+  issueToken: ({ publisherId, tokenHash, scopes }) => {
+    const tokenId = ids.impressionId()
+    tokens.add({
+      id: tokenId, publisherId, tokenHash, scopes,
+      clientVersion: null, revokedAt: null, lastSeenAt: null,
+    })
+    log(`giris: ${publisherId.slice(0, 8)}…${publisherId.slice(-4)}`)
+    return { tokenId }
+  },
+})
+
 tokens.add({
   id: 'dev-token', publisherId: DEV_PUBLISHER, tokenHash: hashToken(DEV_TOKEN),
   scopes: ['report:impressions', 'read:balance'],
@@ -113,6 +143,7 @@ setInterval(() => {
 const app = createApp({
   clock, ids, pipeline, ledger, tokens,
   config: () => config,
+  walletAuth,
   ipSalt: process.env['DWELL_IP_SALT'] ?? 'dev-salt-degistir',
   payoutThreshold: stroops(10_000_000n),        // $1
 })
@@ -122,4 +153,5 @@ serve({ fetch: app.fetch, port: PORT, hostname: HOST }, (info) => {
   log(`dwell sunucusu http://${HOST}:${info.port}`)
   log(`${campaigns.length} kampanya · reklamveren bakiyesi ${bakiye} stroop`)
   log(`gelistirme token'i: ${DEV_TOKEN}`)
+  log(`SEP-10 imzalama anahtari: ${sep10Keypair.publicKey()}`)
 })

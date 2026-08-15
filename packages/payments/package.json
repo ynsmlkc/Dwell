@@ -3,10 +3,20 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "@dwell/protocol": "workspace:*",
     "@stellar/stellar-sdk": "^14.6.1"
   },
-  "devDependencies": { "@types/node": "^26.2.0" }
+  "devDependencies": {
+    "@types/node": "^26.2.0"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  }
 }

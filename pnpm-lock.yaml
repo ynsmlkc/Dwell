@@ -49,12 +49,18 @@ importers:
 
   packages/server:
     dependencies:
+      '@dwell/payments':
+        specifier: workspace:*
+        version: link:../payments
       '@dwell/protocol':
         specifier: workspace:*
         version: link:../protocol
       '@hono/node-server':
         specifier: ^2.1.1
         version: 2.1.1(hono@4.13.1)
+      '@stellar/stellar-sdk':
+        specifier: ^14.6.1
+        version: 14.6.1
       hono:
         specifier: ^4.13.1
         version: 4.13.1

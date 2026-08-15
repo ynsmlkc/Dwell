@@ -385,6 +385,42 @@ GitHub seçilmesinin sebebi: hedef kitle zaten sahip (ek sürtünme yok), ama he
 | E-posta + şifre | Sybil maliyeti sıfıra yakın; tek başına hiçbir sürtünme yaratmaz |
 | Cüzdan adresiyle giriş | Stellar adresi üretmek bedava ve anlık — sybil maliyeti tam sıfır. Cüzdan ödeme hedefidir, kimlik değil. |
 
+---
+
+> ## ⟳ Bu karar değişti — 2026-08-15
+>
+> **Yeni karar: kimlik cüzdandır.** `dwell login` SEP-10 ile cüzdanı doğrular; `publisherId` adresin kendisidir. GitHub kaldırıldı.
+>
+> Yukarıdaki gerekçe silinmedi çünkü bir kısmı hâlâ doğru; ama iki noktada eskidi.
+>
+> **1. "Cüzdanla giriş yazılacak iş" argümanı düştü.** O karar alındığında cüzdan doğrulaması sıfırdan yazılacak bir işti. SEP-10 artık yazılı ve testli (14 test), adres doğrulaması yazılı (19 test), 72 saatlik değişiklik beklemesi yazılı. GitHub device flow ise hâlâ sıfır. Maliyet karşılaştırması tersine döndü.
+>
+> **2. "Sybil maliyeti tam sıfır" ifadesi eksikti.** Keypair üretmek bedava, doğru. Ama **ödenebilir** bir adres öyle değil: hesabın zincirde var olması (1 XLM) ve USDC trustline'ı (0.5 XLM) gerekiyor — ve bunu ADR-020 zaten şart koşuyor. Yani ~1.5 XLM. Az, ama sıfır değil.
+>
+> **Asıl düzeltme daha derinde: sybil'i kimlik yöntemi çözmüyor.**
+>
+> "Kullanıcı 10 cüzdan bağlasa 10 kat kazanır mı?" sorusunun cevabı **hayır** — ve sebebi cüzdanın pahalı olması değil, **ADR-012**: makine başına aynı anda tek gösterim sayılır. Gösterim sayısı cüzdan sayısına değil, gerçek tur sayısına bağlıdır. Bir makinede günde 100 tur varsa, 10 cüzdan bağlamak 1000 tur yaratmaz; aynı kazancı 10'a böler.
+>
+> Gerçek saldırı cüzdan çoğaltmak değil **makine çoğaltmaktır**, ve oradaki maliyet VM + Claude Code aboneliği + inandırıcı tur ritmidir (§14).
+>
+> GitHub da bu tabloyu değiştirmiyordu: §15.6 zaten "yaşlı GitHub hesabı satın alınabilen bir emtiadır, sürtünme yaratır çözmez" diyor. İki yöntem de sürtünme; ikisi de duvar değil.
+>
+> **Savunma sırası (kimlik yönteminden bağımsız):**
+>
+> | # | Katman | Durum |
+> |---|---|---|
+> | 1 | Makine başına tek gösterim (ADR-012) | ✅ yazılı, testli |
+> | 2 | Günlük tavan | ✅ yazılı |
+> | 3 | İlk ödeme kapısı (§13.1) | ⬜ rakamlar bekliyor |
+> | 4 | Aynı IP'den çok hesap | ⬜ **bilerek ertelendi** |
+> | 5 | Tur ritmi anomalisi | ✅ yazılı, testli |
+>
+> **4. madde neden ertelendi:** eşiği gerçek kullanıcı dağılımını görmeden koymak, çalıştığını sandığın ama çalışmayan bir savunma yazmaktır. Aynı IP'yi paylaşan gerçek kullanıcılar var (ofis, üniversite, ev). Ayrıca `projectKey` bu iş için **kullanılamaz**: her makinedeki yerel tuzla türetildiği için, aynı makinede ayrı dizinlerle çalışan iki daemon farklı anahtar üretir. Elde yalnızca IP kalıyor.
+>
+> **Yeni kararın bedeli — hesap kurtarma yok.** Cüzdanını kaybeden kullanıcı birikmiş bakiyesini de kaybeder. GitHub'da "şifremi unuttum" vardı, cüzdanda yok. Bu kurulumda **açıkça** söylenecek.
+>
+> **GitHub silinmedi, teşvike dönüştü.** İleride "GitHub bağlayan hesabın tavanı yükselir" şeklinde bir güven sinyali olarak eklenebilir. Zorunlu değil, ödül.
+
 ### ADR-011 — Gelir paylaşımı %50/50 ve fiyat gösterim anında dondurulur
 
 **Karar:** Publisher payı **%50** (`rev_share_bps = 5000`, kampanya bazında override edilebilir alan olarak tutulur ama MVP'de sabit). Gösterim kaydedildiği anda geçerli birim fiyat `impressions.rate_micros` olarak satıra **dondurulur** ve bir daha değişmez.

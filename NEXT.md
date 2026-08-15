@@ -45,15 +45,35 @@ sabit bir hesaba yazılıyor. Sıradaki madde bunu çözüyor.
 
 ---
 
-## 2 — Kimlik ve cüzdan
+## 2 — Kimlik ve cüzdan ◐ büyük kısmı bitti (2026-08-15)
 
-Kimse giriş yapmadığı için gösterimler kimseye yazılmıyor.
+Kimlik **cüzdandır** (ADR-010 revizyonu). GitHub yok: `publisherId` doğrudan
+Stellar adresinin kendisi.
 
-- [ ] GitHub device flow (`dwell login`) — tarayıcı yönlendirmesi olmadan CLI'dan
-- [ ] Device token + kapsam (`report:impressions`, `read:balance`) — sunucu tarafı hazır
-- [ ] Cüzdan bağlama tarayıcı sayfası: SEP-10 + Freighter/LOBSTR
-- [ ] Aynı sayfada sponsorlu trustline butonu (ADR-020)
+- [x] `dwell login` — 127.0.0.1'de tek kullanımlık sayfa, Freighter ile imza
+- [x] `/v1/auth/challenge` + `/v1/auth/verify` — SEP-10, tek kullanımlık, multisig eşiği
+- [x] Device token + kapsam (`report:impressions`, `read:balance`)
+- [x] `~/.dwell/credentials.json` 0600 · `dwell whoami` · `dwell logout`
+- [x] Daemon kimliği dosyadan okuyor
+- [ ] Sponsorlu trustline butonu (ADR-020)
 - [ ] `dwell balance` — bekleyen / ödenebilir / ödenmiş + stellar.expert linkleri
+- [ ] Token iptal ucu — `logout` şu an yalnızca yerel dosyayı siliyor
+
+Gerçek testnet'e karşı doğrulandı (friendbot'la fonlanmış hesap, Horizon'dan
+signer okuma dahil):
+
+```
+challenge → Freighter imzası → verify → token
+token ile /v1/ads/next 200 · /v1/me/balance 200 · publisherId = adres
+REPLAY (aynı imza ikinci kez)        → 401
+SAHTE İMZA (başkasının adresi)       → 401
+```
+
+Yolda kapatılan bir açık: `verify` içinde Horizon hatası yutulup master key'e
+düşülüyordu. Master ağırlığı 0'a çekilmiş multisig bir hesapta bu, atılmış bir
+anahtarla giriş demekti — "hesap yok" ile "göremiyorum" aynı sayılamaz. Artık
+zincire ulaşılamıyorsa giriş başarısız oluyor; girişi tekrarlamak bedava,
+yanlış kimlik bağlamak geri alınamaz.
 
 **Bitti kriteri:** İki farklı makinede iki hesap, gösterimler doğru hesaba yazılıyor.
 
