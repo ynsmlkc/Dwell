@@ -11,11 +11,12 @@
  * cagrisini bloklayabilir — ve bu aninda uninstall sebebidir. Daemon yoksa,
  * socket bozuksa, JSON bozuksa: sessizce cik.
  */
+import { socketPathFor } from '../ipc.js'
 
 import { connect } from 'node:net'
 
 const SOCKET = process.env['DWELL_SOCKET']
-  ?? `${process.env['DWELL_HOME'] ?? `${process.env['HOME']}/.dwell`}/dwelld.sock`
+  ?? socketPathFor(process.env['DWELL_HOME'] ?? `${process.env['HOME']}/.dwell`)
 const BUDGET_MS = Number(process.env['DWELL_HOOK_BUDGET_MS'] ?? 300) || 300
 
 const quit = (): never => process.exit(0)

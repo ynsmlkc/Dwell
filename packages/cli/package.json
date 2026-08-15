@@ -1,22 +1,47 @@
 {
-  "name": "@dwell/cli",
-  "version": "0.0.0",
-  "private": true,
+  "name": "dwell-cli",
+  "version": "0.1.0",
+  "description": "AI kodlama araclarinin bekleme anlarini kazanca cevirir. Terminal reklamlari, Stellar uzerinden USDC odemesi.",
+  "keywords": [
+    "claude-code",
+    "statusline",
+    "ads",
+    "stellar",
+    "usdc",
+    "cli",
+    "terminal"
+  ],
+  "license": "MIT",
+  "author": "ynsmlkc",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ynsmlkc/Dwell.git"
+  },
+  "homepage": "https://github.com/ynsmlkc/Dwell#readme",
+  "bugs": {
+    "url": "https://github.com/ynsmlkc/Dwell/issues"
+  },
   "type": "module",
+  "bin": {
+    "dwell": "./dist/dwell.mjs"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "build": "node build.mjs"
-  },
-  "dependencies": {
-    "@dwell/protocol": "workspace:*"
+    "build": "node build.mjs",
+    "prepack": "node build.mjs"
   },
   "devDependencies": {
+    "@dwell/protocol": "workspace:*",
     "@types/node": "^26.2.0",
     "esbuild": "^0.28.2"
-  },
-  "bin": {
-    "dwell": "./dist/dwell.mjs"
   }
 }

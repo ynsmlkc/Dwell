@@ -15,6 +15,7 @@ import * as daemon from './daemon-control.js'
 import { out, ok, warn, info, fail, rows, dim, bold, green, yellow, red, orange, banner, usdc } from './output.js'
 import { cmdLogin, cmdLogout, cmdWhoami } from './login.js'
 import { cmdBalance } from './balance.js'
+import { loadCredentials } from '../credentials.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -95,7 +96,20 @@ async function cmdInit(argv: string[]): Promise<void> {
     ok(`daemon calisiyor (pid ${started.pid})`)
   }
 
-  // 4. Ne degistigini SOYLE — kullanicidan bir sey aldik.
+  // 4. Giris yapilmadiysa BUNU SOYLE.
+  //
+  // Sunucu bagli degilken daemon icine gomulu ornek reklamlari gosteriyor.
+  // Ekranda her sey calisiyor gorunuyor ama hicbir gosterim hicbir yere
+  // yazilmiyor. Bunu sessiz gecmek, kullaniciyi kazandigini SANARAK
+  // beklemeye birakmak olurdu.
+  if (!loadCredentials()) {
+    out()
+    warn(`${bold('demo modu')} — cuzdan bagli degil, ${bold('kazanc yok')}`)
+    info(dim('gosterdigin reklamlar ornek; hicbir yere kaydedilmiyor'))
+    info(`gercekten kazanmak icin: ${bold('dwell login')}`)
+  }
+
+  // 5. Ne degistigini SOYLE — kullanicidan bir sey aldik.
   out()
   out(`  ${bold('Bilmen gerekenler')}`)
   info('• Claude Code, alt satirdaki bazi klavye ipuclarini artik gostermiyor')

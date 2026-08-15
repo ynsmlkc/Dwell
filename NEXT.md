@@ -121,15 +121,47 @@ Test: `pnpm --filter @dwell/payments test:testnet` (ağ ister, varsayılanda atl
 
 ---
 
-## 4 — Dağıtım ← **sıradaki**
+## 4 — Dağıtım ◐ paket hazır, yayınlanmadı
 
-Şu an yalnızca bu makinede çalışıyor; `settings.json`'daki yollar mutlak.
+Paket adı **`dwell-cli`** — npm'de `dwell` dolu (2015'ten kalma alakasız bir
+modül). Kurulduktan sonra komut yine `dwell`.
 
-- [ ] npm'e yayın → `npx dwell init`
-- [ ] Landing sayfası: ne olduğu, iki buton, canlı örnek satır
-- [ ] `/app`: GitHub girişi → cüzdan bağla → kurulum komutu
+- [x] `package.json` yayına hazır: `files`, `bin`, `engines`, `prepack`
+- [x] `@dwell/protocol` `devDependencies`'e alındı — bundle'a gömülüyor
+- [x] README (npm sayfası)
+- [x] Temiz makinede tarball kurulumu doğrulandı: init → reklam → uninstall
+- [x] Giriş yapılmamışken `init` "demo modu, kazanç yok" diyor
+- [ ] `npm publish` — sende (npm hesabı)
+- [ ] Landing sayfası — **sende**
+
+**Yolda bulunan iki hata.** İkisi de ancak gerçekten kurmayı deneyince çıktı:
+
+1. `@dwell/protocol` `dependencies`'teydi. Yayınlanan pakette `workspace:*`
+   yazıyordu, npm'de öyle bir paket yok, kurulum daha başlarken patlıyordu:
+   `npm error Unsupported URL Type "workspace:"`.
+
+2. Uzun ev dizinlerinde daemon hiç başlamıyordu. Unix soket yolu `sun_path`
+   sınırını (macOS 104, Linux 108 **byte**) aşınca `listen` hata vermiyor —
+   yolu sessizce kesiyor. Sonra `chmod` dosyayı bulamayıp ham bir `ENOENT`
+   stack trace'i basıyor. Artık sınır aşılırsa `tmpdir` altında kısa ve
+   deterministik bir yola düşülüyor (shim ile daemon aynı yolu bağımsız
+   hesaplamak zorunda). Türkçe karakterli kullanıcı adları bu sınıra iki kat
+   hızlı yaklaşıyor — sınır karakter değil byte.
 
 **Bitti kriteri:** Arkadaşın tek komutla kurup kazanmaya başlayabiliyor.
+Kurulum tarafı tamam; kazanç tarafı sunucu bekliyor (madde 5).
+
+---
+
+## 5 — Sunucu (ertelendi)
+
+Sunucu bir yerde koşmadan kimse kazanamaz. Şu an istemci sunucusuz çalışıyor:
+örnek reklamlar dönüyor, gösterimler diske yazılıyor, hiçbir yere gitmiyor.
+`dwell init` bunu açıkça söylüyor.
+
+- [ ] Deploy hedefi seç (Railway / Fly / VPS)
+- [ ] `DWELL_HOT_SECRET` + testnet USDC ile sıcak cüzdan
+- [ ] Kalıcı depolama — şu an her şey bellekte, yeniden başlatmada gidiyor
 
 ---
 

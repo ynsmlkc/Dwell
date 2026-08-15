@@ -16,11 +16,10 @@ importers:
         version: 3.2.7(@types/node@26.2.0)
 
   packages/cli:
-    dependencies:
+    devDependencies:
       '@dwell/protocol':
         specifier: workspace:*
         version: link:../protocol
-    devDependencies:
       '@types/node':
         specifier: ^26.2.0
         version: 26.2.0

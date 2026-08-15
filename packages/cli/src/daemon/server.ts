@@ -12,6 +12,7 @@
 
 import { createServer, type Server, type Socket } from 'node:net'
 import { chmodSync, mkdirSync, unlinkSync, existsSync, statSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname } from 'node:path'
 import { encode, decode, type Request, type Response } from '../ipc.js'
 
@@ -29,7 +30,17 @@ export async function startSocketServer(
 ): Promise<SocketServer> {
   const dir = dirname(socketPath)
   mkdirSync(dir, { recursive: true, mode: 0o700 })
-  chmodSync(dir, 0o700)
+
+  // Dizini yalnizca BIZIM ise kilitleriz.
+  //
+  // Uzun ev dizinlerinde soket `tmpdir()` altina duser (bkz. `socketPathFor`)
+  // ve orasi PAYLASILAN bir dizindir: 0700 vurmak hem EPERM verir hem de
+  // makinedeki diger programlarin isini bozar. O durumda korumayi soket
+  // dosyasinin kendi 0600 modu tasir — asil kontrol zaten odur, dizin izni
+  // ikinci savunma katmaniydi.
+  if (dir !== tmpdir()) {
+    try { chmodSync(dir, 0o700) } catch { /* Windows'ta anlamsiz */ }
+  }
 
   // Bayat soket: daemon carptiysa dosya kalir ve bind engellenir.
   // Once gercekten olu mu diye bakilir, canliysa DOKUNULMAZ.

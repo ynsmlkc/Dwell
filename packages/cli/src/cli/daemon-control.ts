@@ -7,6 +7,7 @@
 
 import { spawn } from 'node:child_process'
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, openSync } from 'node:fs'
+import { socketPathFor } from '../ipc.js'
 import { join } from 'node:path'
 import { connect } from 'node:net'
 import { encode, type Request, type Response } from '../ipc.js'
@@ -23,7 +24,7 @@ const home = (): string =>
 
 export const pidPath = (): string => join(home(), 'daemon.pid')
 export const logPath = (): string => join(home(), 'daemon.log')
-const defaultSocket = (): string => process.env['DWELL_SOCKET'] ?? join(home(), 'dwelld.sock')
+const defaultSocket = (): string => process.env['DWELL_SOCKET'] ?? socketPathFor(home())
 
 /**
  * Daemon ayakta mi?

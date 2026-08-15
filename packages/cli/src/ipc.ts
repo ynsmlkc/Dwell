@@ -6,12 +6,66 @@
  * butcesi 50 milisaniye (ADR-003).
  */
 
-import { homedir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import type { TermShape } from './shim/term-shape.js'
 import { join } from 'node:path'
 
 export const DWELL_HOME = process.env['DWELL_HOME'] ?? join(homedir(), '.dwell')
-export const SOCKET_PATH = join(DWELL_HOME, 'dwelld.sock')
+
+/**
+ * Unix soket yolunun uzunluk siniri (`sun_path`, NUL haric).
+ *
+ * Linux 108, macOS/BSD 104 BYTE. Karakter degil byte: Turkce bir kullanici
+ * adi ("Müşteri") ayni harf sayisinda daha fazla yer kaplar.
+ */
+const SUN_PATH_MAX = process.platform === 'linux' ? 107 : 103
+
+/**
+ * Daemon soketinin yolu.
+ *
+ * Sinir asilirsa `listen` HATA VERMEZ — yolu sessizce keser. Dosya beklenen
+ * yerde olusmaz, ardindan `chmod` anlasilmaz bir `ENOENT` ile patlar ve
+ * kullanici ham bir Node stack trace'i gorur. Gercek makinelerde oluyor:
+ * derin kurumsal ev dizinleri, uzun Windows profil adlari, CI calisma
+ * dizinleri.
+ *
+ * Bu yuzden sinir asilirsa tmpdir altinda KISA ve DETERMINISTIK bir yola
+ * duseriz. Deterministik olmasi sart: shim ile daemon ayri sureclerdir ve
+ * ayni yolu bagimsiz olarak hesaplamak zorundalar.
+ */
+export function socketPathFor(dwellHome: string): string {
+  const normal = join(dwellHome, 'dwelld.sock')
+  if (Buffer.byteLength(normal) <= SUN_PATH_MAX) return normal
+
+  const kisa = join(tmpdir(), `dwell-${shortHash(dwellHome)}.sock`)
+  if (Buffer.byteLength(kisa) > SUN_PATH_MAX) {
+    // tmpdir bile sigmiyorsa yapabilecegimiz bir sey yok. Sessizce yanlis
+    // calismaktansa ne oldugunu soyleyerek durmak dogru.
+    throw new Error(
+      `soket yolu cok uzun (${Buffer.byteLength(kisa)} > ${SUN_PATH_MAX} byte): ${kisa}\n` +
+      'DWELL_SOCKET ile daha kisa bir yol ver',
+    )
+  }
+  return kisa
+}
+
+/**
+ * FNV-1a. Kriptografik DEGIL ve olmasi gerekmiyor: tek isi ev dizini basina
+ * benzersiz bir dosya adi uretmek.
+ *
+ * `node:crypto` yerine bu: shim gunde ~13.700 kez calisiyor ve butcesi dar;
+ * yalnizca isim uretmek icin modul yuklemeye degmez.
+ */
+function shortHash(s: string): string {
+  let h = 0x811c9dc5
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = Math.imul(h, 0x01000193) >>> 0
+  }
+  return h.toString(36).padStart(7, '0')
+}
+
+export const SOCKET_PATH = socketPathFor(DWELL_HOME)
 
 /** Shim'in toplam butcesi. Asarsa bos doner — gec bir reklam, reklamdan kotudur. */
 export const SHIM_BUDGET_MS = 50
