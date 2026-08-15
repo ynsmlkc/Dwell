@@ -14,6 +14,7 @@ import { DWELL_HOME, SOCKET_PATH } from '../ipc.js'
 import * as daemon from './daemon-control.js'
 import { out, ok, warn, info, fail, rows, dim, bold, green, yellow, red, orange, banner, usdc } from './output.js'
 import { cmdLogin, cmdLogout, cmdWhoami } from './login.js'
+import { cmdBalance } from './balance.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -206,6 +207,7 @@ function cmdHelp(): void {
   rows([
     ['dwell init', 'kur ve baslat'],
     ['dwell login', 'cuzdanini bagla — kazanc buraya gider'],
+    ['dwell balance', 'kazancini goster'],
     ['dwell whoami', 'bagli cuzdani goster'],
     ['dwell logout', 'cuzdan baglantisini kaldir'],
     ['dwell doctor', 'kurulumu tesh­is et'],
@@ -237,6 +239,7 @@ export async function main(argv: readonly string[]): Promise<void> {
     case 'login': return cmdLogin(rest)
     case 'logout': return cmdLogout()
     case 'whoami': return cmdWhoami()
+    case 'balance': return cmdBalance(rest)
     case 'help': case '--help': case '-h': return cmdHelp()
     default:
       fail('DWL-9001', `bilinmeyen komut: ${cmd}`, '`dwell help` ile komutlari gor')

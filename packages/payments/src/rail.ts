@@ -85,10 +85,28 @@ export interface PaymentRail {
   /** Batch kurulmadan HEMEN once cagrilir — TOCTOU penceresi dar tutulur. */
   validateDestinations(addresses: readonly string[]): Promise<readonly DestinationStatus[]>
   sourceStatus(): Promise<SourceAccountStatus>
-  /** Imzali envelope'i URETIR ve gonderir. Envelope cagirana geri doner. */
-  submitBatch(batch: PayoutBatch): Promise<SubmissionReceipt>
-  /** Ayni byte'lari tekrar gonderir. Ag seviyesinde idempotenttir. */
-  resubmit(receipt: SubmissionReceipt): Promise<void>
+
+  /**
+   * Zarfi kurar ve IMZALAR — aga hicbir sey YAZMAZ.
+   *
+   * Kurmak ile gondermek bilincli olarak ayri. Tek bir `submitBatch` cagrisi
+   * olsaydi, cagiran defterine ancak gonderimden SONRA yazabilirdi; arada
+   * dusen bir sunucu parayi zincirde gonderilmis ama defterde hala odenebilir
+   * birakirdi — yani ayni para ikinci kez odenirdi.
+   *
+   * Bu ayrimla hash gonderimden ONCE biliniyor: ne olursa olsun neye
+   * bakacagimizi biliyoruz.
+   */
+  prepare(batch: PayoutBatch): Promise<SubmissionReceipt>
+
+  /**
+   * Hazirlanmis zarfi aga gonderir.
+   *
+   * AYNI byte'lar. Tekrar cagrilabilir: ag ayni sequence'i ikinci kez
+   * uygulamaz, dolayisiyla idempotenttir. Yeniden insa etmek bunu bozar.
+   */
+  send(receipt: SubmissionReceipt): Promise<void>
+
   reconcile(receipt: SubmissionReceipt): Promise<SettlementResult>
   now(): number
 }

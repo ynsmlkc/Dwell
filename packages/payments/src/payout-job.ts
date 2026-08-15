@@ -160,20 +160,35 @@ export class PayoutJob {
     const batch: PayoutBatch = { batchId, items }
     const amount = items.reduce((t, i) => add(t, i.amount), ZERO)
 
+    // ── 1. Zarfi kur. Aga hicbir sey yazilmadi. ──
     let receipt: SubmissionReceipt
     try {
-      receipt = await this.deps.rail.submitBatch(batch)
+      receipt = await this.deps.rail.prepare(batch)
     } catch (e) {
-      // Submit CAGRISI patladi — ag hatasi olabilir, transaction gitmis de
-      // olabilir. Hash bilinmedigi icin mutabakat kurulamaz; en guvenlisi
-      // bu turda hicbir sey yazmamak ve bir sonraki kosuda tekrar denemek.
-      alerts.push(`batch ${batchId} submit edilemedi: ${e instanceof Error ? e.message : String(e)}`)
+      // Kurulum patladi ve HICBIR SEY gonderilmedi. Hicbir kayit yazmadan
+      // cikmak guvenli: bir sonraki kosuda bastan denenir.
+      alerts.push(`batch ${batchId} hazirlanamadi: ${e instanceof Error ? e.message : String(e)}`)
       return { ok: false, amount: ZERO }
     }
 
-    // §8 tuzak #9 — kayit submit'ten SONRA degil, receipt alinir alinmaz
-    // yazilir; envelope ve hash saklanir ki retry ayni byte'lari gondersin.
+    // ── 2. Defteri ve kaydi YAZ. Gonderimden ONCE. ──
+    //
+    // Sira bilincli. Once gonderip sonra yazsaydik, arada dusen bir sunucu
+    // parayi zincirde gonderilmis ama defterde hala odenebilir birakirdi —
+    // ayni para ikinci kez odenirdi. Bu sirayla en kotu ihtimalle para
+    // "yolda" asili kalir; hash elimizde oldugu icin sonradan zincire sorup
+    // cozulebilir.
     this.deps.onSubmit(batchId, items, receipt)
+
+    // ── 3. Gonder. ──
+    try {
+      await this.deps.rail.send(receipt)
+    } catch (e) {
+      // Buraya yalnizca ag ACIKCA reddettiginde dusuluyor; odeme kesin
+      // yapilmadi. Yine de `reconcile` ile dogruluyoruz: "kesin" iddiasina
+      // guvenip iade etmek, yanilirsak cifte odeme demek.
+      alerts.push(`batch ${batchId} gonderilemedi: ${e instanceof Error ? e.message : String(e)}`)
+    }
 
     const settlement = await this.#awaitSettlement(receipt, alerts)
 
@@ -227,7 +242,7 @@ export class PayoutJob {
         return { ...last, state: 'expired' }
       }
       // Ayni byte'lari tekrar gonder — ag seviyesinde idempotent.
-      try { await this.deps.rail.resubmit(receipt) } catch { /* zaten gonderilmis olabilir */ }
+      try { await this.deps.rail.send(receipt) } catch { /* zaten gonderilmis olabilir */ }
       last = await this.deps.rail.reconcile(receipt)
     }
 

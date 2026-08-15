@@ -20,8 +20,10 @@ export interface MockRailOptions {
   availableXlm?: bigint
   /** Bu adres batch'te varsa transaction TAMAMEN patlar (§8 tuzak #1). */
   failingAddress?: string
-  /** `submitBatch` cagrisinin kendisi patlasin. */
-  throwOnSubmit?: boolean
+  /** Zarf KURULURKEN patlasin — hicbir sey gonderilmez. */
+  throwOnPrepare?: boolean
+  /** GONDERIM patlasin — zarf kurulmus, defter yazilmis olur. */
+  throwOnSend?: boolean
   /** Mutabakat kac kez `pending` donsun. */
   pendingRounds?: number
   /** Zaman asimi senaryosu: hicbir zaman dahil edilmesin. */
@@ -35,6 +37,8 @@ export class MockRail implements PaymentRail {
   #seq = 1
   readonly submitted: SubmissionReceipt[] = []
   readonly resubmits: string[] = []
+  /** Kurulmus zarflar — gonderilmis olanlar `submitted`'da. */
+  readonly prepared: SubmissionReceipt[] = []
   #pendingLeft: number
 
   constructor(private readonly opts: MockRailOptions = {}) {
@@ -68,8 +72,8 @@ export class MockRail implements PaymentRail {
     }
   }
 
-  async submitBatch(batch: PayoutBatch): Promise<SubmissionReceipt> {
-    if (this.opts.throwOnSubmit) throw new Error('ag hatasi')
+  async prepare(batch: PayoutBatch): Promise<SubmissionReceipt> {
+    if (this.opts.throwOnPrepare) throw new Error('zarf kurulamadi')
 
     const receipt: SubmissionReceipt = {
       batchId: batch.batchId,
@@ -81,11 +85,13 @@ export class MockRail implements PaymentRail {
       feeBid: BigInt(batch.items.length) * 1000n,
       opIndex: batch.items.map((it, index) => ({ publisherId: it.publisherId, index })),
     }
-    this.submitted.push(receipt)
+    this.prepared.push(receipt)
     return receipt
   }
 
-  async resubmit(receipt: SubmissionReceipt): Promise<void> {
+  async send(receipt: SubmissionReceipt): Promise<void> {
+    if (this.opts.throwOnSend) throw new Error('ag reddetti')
+    this.submitted.push(receipt)
     this.resubmits.push(receipt.envelopeXdr)
   }
 

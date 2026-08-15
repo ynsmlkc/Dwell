@@ -87,6 +87,21 @@ export class Ledger {
     return this.store.balance(account, asset)
   }
 
+  /**
+   * Defterde kaydi olan tum publisher'lar.
+   *
+   * Ayri bir publisher tablosu YOK ve olmamali: kimin parasi oldugunu bilen
+   * tek yer defter. Ikinci bir liste tutmak, ikisinin ayrisabilecegi anlamina
+   * gelir ve ayristiklarinda hangisinin dogru oldugu bilinemez.
+   */
+  publishers(): readonly string[] {
+    const set = new Set<string>()
+    for (const e of this.store.all()) {
+      if (e.publisherId) set.add(e.publisherId)
+    }
+    return [...set]
+  }
+
   entriesFor(refType: RefType, refId: string): readonly Entry[] {
     return this.store.byRef(refType, refId)
   }

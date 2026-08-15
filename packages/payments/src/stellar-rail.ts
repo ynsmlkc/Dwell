@@ -150,7 +150,8 @@ export class StellarRail implements PaymentRail {
 
   /* ───────────────────────── gonderim ───────────────────────── */
 
-  async submitBatch(batch: PayoutBatch): Promise<SubmissionReceipt> {
+  /** Kurar ve imzalar. Aga YAZMAZ — yalnizca sequence icin okur. */
+  async prepare(batch: PayoutBatch): Promise<SubmissionReceipt> {
     if (batch.items.length === 0) throw new Error('bos batch gonderilemez')
 
     const acc = await this.#server.loadAccount(this.#keypair.publicKey())
@@ -199,38 +200,28 @@ export class StellarRail implements PaymentRail {
       opIndex,
     }
 
-    try {
-      await this.#server.submitTransaction(tx)
-    } catch (e) {
-      // Gonderim hatasi ODEME YAPILMADI DEMEK DEGIL. Zaman asimi ya da
-      // baglanti kopmasi, transaction ag tarafindan kabul edildikten SONRA
-      // da olabilir. Bu yuzden makbuz YINE DE donuyor: cagiran `reconcile`
-      // ile zincire bakip karar verir.
-      //
-      // Burada throw etmek en tehlikeli hataya yol acardi: "basarisiz oldu"
-      // sanip ayni odemeyi yeniden kurmak.
-      if (isDefinitelyRejected(e)) {
-        throw new SubmitRejected(receipt, describeError(e))
-      }
-    }
-
     return receipt
   }
 
   /**
-   * AYNI byte'lari tekrar gonderir.
+   * Hazirlanmis zarfi gonderir. AYNI byte'lar, her seferinde.
    *
-   * Ag seviyesinde idempotent: ayni sequence + ayni hash, ag ikinci kez
-   * uygulamaz. Yeniden insa etmek bunu bozardi.
+   * Gonderim hatasi "odeme yapilmadi" DEMEK DEGIL: zaman asimi ya da baglanti
+   * kopmasi, ag transaction'i kabul ettikten SONRA da olabilir. Bu yuzden
+   * belirsiz hatalar YUTULUYOR — karar `reconcile`'a, yani zincire birakiliyor.
+   *
+   * Yalnizca ag ACIKCA reddettiginde (HTTP 400) hata firlatiliyor; o durumda
+   * odeme kesin olarak yapilmadi ve guvenle iade edilebilir.
    */
-  async resubmit(receipt: SubmissionReceipt): Promise<void> {
+  async send(receipt: SubmissionReceipt): Promise<void> {
     const tx = TransactionBuilder.fromXDR(receipt.envelopeXdr, this.cfg.networkPassphrase)
     try {
       await this.#server.submitTransaction(tx as any)
     } catch (e) {
-      // `tx_bad_seq` burada IYI haber: sequence tuketilmis, yani ilk gonderim
-      // aslinda gecmis. `reconcile` gercegi soyleyecek.
-      if (!isDefinitelyRejected(e)) return
+      // `tx_bad_seq` burada IYI haber: sequence tuketilmis, yani onceki
+      // gonderim gecmis. `reconcile` gercegi soyleyecek.
+      if (isBadSequence(e)) return
+      if (isDefinitelyRejected(e)) throw new SubmitRejected(receipt, describeError(e))
     }
   }
 
@@ -310,6 +301,10 @@ const isNotFound = (e: unknown): boolean =>
  * belirsiz olan KURULAMAZ. Belirsizi reddedilmis saymak cifte odeme demektir,
  * bu yuzden varsayilan "belirsiz" tarafinda.
  */
+function isBadSequence(e: unknown): boolean {
+  return (e as any)?.response?.data?.extras?.result_codes?.transaction === 'tx_bad_seq'
+}
+
 function isDefinitelyRejected(e: unknown): boolean {
   const status = (e as any)?.response?.status
   // 400 = ag zarfi degerlendirdi ve reddetti. 504/timeout = bilmiyoruz.

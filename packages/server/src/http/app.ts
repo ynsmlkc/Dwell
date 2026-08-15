@@ -22,6 +22,7 @@ import type { Ledger } from '../ledger/ledger.js'
 import { accountId } from '../ledger/accounts.js'
 import { TokenStore, bearerToken, type AuthContext } from './auth.js'
 import type { WalletAuth } from './wallet-auth.js'
+import type { PayoutStore } from '../payouts/store.js'
 import { compareVersions } from '../impressions/ingest.js'
 
 export interface AppDeps {
@@ -35,6 +36,8 @@ export interface AppDeps {
   readonly ipSalt: string
   readonly payoutThreshold: Stroops
   readonly explorerBase?: string
+  /** Odeme gecmisi. Verilmezse `recentPayouts` bos doner. */
+  readonly payouts?: PayoutStore
   /** Cuzdanla giris. Verilmezse `/v1/auth/*` uclari acilmaz. */
   readonly walletAuth?: WalletAuth
 }
@@ -219,7 +222,16 @@ export function createApp(deps: AppDeps) {
       inFlightStroops: inFlight.toString(),
       lifetimeStroops: payable.toString(),
       payoutThresholdStroops: deps.payoutThreshold.toString(),
-      recentPayouts: [],
+      // Odeme gecmisi kayittan. "Param nerede" sorusunun cevabi burada:
+      // her kalem bir islem hash'i tasir, kullanici zincirde dogrulayabilir.
+      recentPayouts: (deps.payouts?.forPublisher(publisherId, 10) ?? []).map((p) => ({
+        txHash: p.txHash,
+        amountStroops: p.amount.toString(),
+        at: p.submittedAt,
+        state: p.state,
+        // Adres SNAPSHOT — o an nereye gonderildigi. Guncel cuzdan DEGIL.
+        destination: p.destinationAddress,
+      })),
       // Odeme neden bloke — kullaniciya sebep gosterilmek zorunda (§6.5).
       blockedReason: payable < deps.payoutThreshold
         ? `esik ${deps.payoutThreshold} stroop, bakiye ${payable}`

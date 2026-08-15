@@ -200,15 +200,17 @@ describe('§8 tuzak #10 — belirsizlik ve zaman asimi', () => {
   it('gecici pending sonrasi AYNI envelope tekrar gonderilir', async () => {
     const r = await setup({ rail: { pendingRounds: 2 } }).run()
     expect(r.paid).toBe(3)
-    expect(rail.resubmits, 'yeniden insa DEGIL, ayni byte\'lar').toEqual(['xdr-b1', 'xdr-b1'])
-    expect(rail.submitted, 'ikinci kez submitBatch cagrilmamali').toHaveLength(1)
+    // Ilk gonderim + iki yeniden gonderim. Ucu de AYNI byte'lar.
+    expect(rail.resubmits, 'yeniden insa DEGIL, ayni byte\'lar').toEqual(['xdr-b1', 'xdr-b1', 'xdr-b1'])
+    // Zarf yalnizca BIR KEZ kuruldu. Yeniden kurmak yeni hash uretirdi.
+    expect(rail.prepared, 'zarf tek kez kurulur').toHaveLength(1)
   })
 
   it('maxTime gecmeden ASLA yeni transaction kurulmaz', async () => {
     // `NOT_FOUND` tek basina anlamsizdir; yeni sequence ile yeniden kurmak
     // cift odeme uretir.
     const r = await setup({ rail: { neverIncluded: true } }).run()
-    expect(rail.submitted).toHaveLength(1)
+    expect(rail.prepared, 'ikinci zarf kurulmadi').toHaveLength(1)
     expect(r.paid).toBe(0)
   })
 
@@ -221,11 +223,25 @@ describe('§8 tuzak #10 — belirsizlik ve zaman asimi', () => {
   })
 })
 
-describe('submit cagrisi patlarsa', () => {
-  it('hicbir kayit yazilmaz — hash bilinmiyor, mutabakat kurulamaz', async () => {
-    const r = await setup({ rail: { throwOnSubmit: true } }).run()
+describe('zarf kurulamazsa', () => {
+  it('hicbir kayit yazilmaz — aga zaten hicbir sey gitmedi', async () => {
+    const r = await setup({ rail: { throwOnPrepare: true } }).run()
     expect(events).toHaveLength(0)
-    expect(r.alerts).toContainEqual(expect.stringMatching(/submit edilemedi/))
+    expect(r.alerts).toContainEqual(expect.stringMatching(/hazirlanamadi/))
+  })
+})
+
+describe('gonderim patlarsa', () => {
+  /**
+   * Zarf kuruldu, defter yazildi, sonra ag reddetti.
+   *
+   * Kayit SILINMEZ: hash elimizde, zincire sorulabilir. Hemen iade etmek,
+   * "ag reddetti" iddiasi yanlissa cifte odeme uretirdi — karar zincirin.
+   */
+  it('kayit yazilmis kalir, karar zincire birakilir', async () => {
+    const r = await setup({ rail: { throwOnSend: true } }).run()
+    expect(events.some((e) => e.startsWith('submit:')), 'defter yazildi').toBe(true)
+    expect(r.alerts).toContainEqual(expect.stringMatching(/gonderilemedi/))
   })
 })
 

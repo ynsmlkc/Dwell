@@ -184,17 +184,18 @@ describe.skipIf(!process.env['DWELL_TESTNET'])('testnet odemesi', () => {
    * Yeniden insa etmek yeni bir hash uretir ve ayni odemeyi IKI KEZ yapar.
    */
   it('ayni envelope tekrar gonderilince IKINCI odeme OLMAZ', async () => {
-    const once = await rail.submitBatch({
+    const once = await rail.prepare({
       batchId: `it-tekrar-${Date.now()}`,
       items: [{ publisherId: 'pub-alice', address: alice.publicKey(), amount: stroops(1_000_000n) }],
     })
+    await rail.send(once)
 
     const sonra = await balanceOf(alice.publicKey(), asset)
     expect((await rail.reconcile(once)).state).toBe('settled')
 
     // Ayni byte'lar tekrar. Ag `tx_bad_seq` ile reddeder — sequence tuketilmis.
-    await rail.resubmit(once)
-    await rail.resubmit(once)
+    await rail.send(once)
+    await rail.send(once)
 
     expect(await balanceOf(alice.publicKey(), asset)).toBe(sonra)
     expect((await rail.reconcile(once)).state).toBe('settled')
@@ -210,10 +211,11 @@ describe.skipIf(!process.env['DWELL_TESTNET'])('testnet odemesi', () => {
   it('basarisiz transaction "odendi" SAYILMAZ', async () => {
     let receipt
     try {
-      receipt = await rail.submitBatch({
+      receipt = await rail.prepare({
         batchId: `it-basarisiz-${Date.now()}`,
         items: [{ publisherId: 'pub-carol', address: carol.publicKey(), amount: stroops(1_000_000n) }],
       })
+      await rail.send(receipt)
     } catch (e: any) {
       // Horizon bunu 400 ile pesinen reddedebilir — o da dogru sonuc:
       // odeme yapilmadi ve makbuz elimizde.

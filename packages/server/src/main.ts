@@ -22,6 +22,10 @@ import { Ledger } from './ledger/ledger.js'
 import { MemoryLedgerStore } from './ledger/memory-store.js'
 import type { Campaign } from './ads/selector.js'
 import { accountId } from './ledger/accounts.js'
+import { MemoryPayoutStore } from './payouts/store.js'
+import { PayoutRunner, schedulePayouts } from './payouts/runner.js'
+import { StellarRail, HORIZON as HORIZON_URLS, TESTNET_USDC } from '@dwell/payments'
+import { WalletStore } from '@dwell/payments'
 
 const PORT = Number(process.env['PORT'] ?? 8787)
 const HOST = process.env['HOST'] ?? '127.0.0.1'
@@ -95,7 +99,7 @@ const tokens = new TokenStore()
 
 /* ─────────────────── cuzdanla giris ─────────────────── */
 
-const HORIZON = process.env['DWELL_HORIZON'] ?? 'https://horizon-testnet.stellar.org'
+const HORIZON = process.env['DWELL_HORIZON'] ?? HORIZON_URLS.testnet
 const HOME_DOMAIN = process.env['DWELL_HOME_DOMAIN'] ?? `${HOST}:${PORT}`
 
 const sep10Keypair = serverKeypair()
@@ -126,6 +130,53 @@ tokens.add({
   clientVersion: null, revokedAt: null, lastSeenAt: null,
 })
 
+/* ─────────────────────── odeme ─────────────────────── */
+
+const PAYOUT_THRESHOLD = stroops(10_000_000n)          // $1
+const payouts = new MemoryPayoutStore()
+const wallets = new WalletStore({
+  clock,
+  holdMs: Number(process.env['DWELL_WALLET_HOLD_MS'] ?? 0),   // uretimde 72 saat
+  notify: (n) => log(`cuzdan ${n.kind}: ${n.publisherId.slice(0, 8)}… → ${n.newAddress.slice(0, 8)}…`),
+})
+
+/**
+ * Sicak cuzdan.
+ *
+ * Anahtar YOKSA odeme turu hic baslatilmaz — sahte bir rayla "odedik" demek,
+ * odememekten kotudur: kullanici odendigini sanir ve beklemeyi birakir.
+ */
+const HOT_SECRET = process.env['DWELL_HOT_SECRET']
+const payoutRunner = HOT_SECRET
+  ? new PayoutRunner({
+      clock, wallets, ledger, store: payouts,
+      rail: new StellarRail({
+        horizonUrl: HORIZON,
+        networkPassphrase: NETWORKS.testnet,
+        sourceSecret: HOT_SECRET,
+        assetCode: process.env['DWELL_ASSET_CODE'] ?? TESTNET_USDC.code,
+        assetIssuer: process.env['DWELL_ASSET_ISSUER'] ?? TESTNET_USDC.issuer,
+      }),
+      threshold: PAYOUT_THRESHOLD,
+      newBatchId: () => `b-${ids.impressionId()}`,
+      log,
+    })
+  : null
+
+if (payoutRunner) {
+  // Uretimde gunde bir. Gelistirmede kisa, yoksa hicbir seyi gozlemleyemezsin.
+  const her = Number(process.env['DWELL_PAYOUT_INTERVAL_MS'] ?? 60_000)
+  schedulePayouts(payoutRunner, her, log)
+  // Yeniden baslatmada asili kalanlari coz — para `payouts_in_flight`'ta
+  // sonsuza kadar beklemesin.
+  void payoutRunner.resumeUnresolved().then((n) => {
+    if (n > 0) log(`${n} asili batch cozuldu`)
+  })
+  log(`odeme turu her ${her / 1000}s · esik ${PAYOUT_THRESHOLD} stroop`)
+} else {
+  log('odeme KAPALI — DWELL_HOT_SECRET tanimli degil')
+}
+
 /* ─────────────────────── dogrulama job'i ─────────────────────── */
 
 // Uretimde cron; burada basit bir aralik. Ledger'a yazan tek yer burasi.
@@ -145,7 +196,8 @@ const app = createApp({
   config: () => config,
   walletAuth,
   ipSalt: process.env['DWELL_IP_SALT'] ?? 'dev-salt-degistir',
-  payoutThreshold: stroops(10_000_000n),        // $1
+  payoutThreshold: PAYOUT_THRESHOLD,
+  payouts,
 })
 
 serve({ fetch: app.fetch, port: PORT, hostname: HOST }, (info) => {

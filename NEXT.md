@@ -56,7 +56,7 @@ Stellar adresinin kendisi.
 - [x] `~/.dwell/credentials.json` 0600 · `dwell whoami` · `dwell logout`
 - [x] Daemon kimliği dosyadan okuyor
 - [ ] Sponsorlu trustline butonu (ADR-020)
-- [ ] `dwell balance` — bekleyen / ödenebilir / ödenmiş + stellar.expert linkleri
+- [x] `dwell balance` — bekleyen / ödenebilir / yolda + stellar.expert linkleri
 - [ ] Token iptal ucu — `logout` şu an yalnızca yerel dosyayı siliyor
 
 Gerçek testnet'e karşı doğrulandı (friendbot'la fonlanmış hesap, Horizon'dan
@@ -99,9 +99,19 @@ op sayısı 2             ücret 200 stroop        memo it-R40HARXW00
 - [x] Harcanabilir XLM ayrı hesaplanıyor (min bakiye + satış yükümlülükleri düşülmüş)
 - [x] Retry aynı byte'ları gönderiyor — ikinci ödeme oluşmuyor (kanıtlandı)
 - [x] `successful === true` dışında hiçbir şey "ödendi" sayılmıyor (kanıtlandı)
-- [ ] Ödeme job'ı zamanlanmış çalışsın (şu an elle tetikleniyor)
-- [ ] `payout_items` şeması: `op_index`, `envelope_xdr`, `destination_address` snapshot
+- [x] Ödeme job'ı zamanlanmış çalışıyor (`schedulePayouts`, turlar üst üste binmiyor)
+- [x] `payout_items`: `op_index`, `envelope_xdr`, `destination_address` snapshot
+- [x] Yeniden başlatmada askıda kalan batch zincire sorulup çözülüyor
 - [ ] Circle testnet USDC — faucet elle dolduruluyor, testte kendi varlığımız
+
+**Yolda bulunan sıra hatası.** `PaymentRail` tek bir `submitBatch` çağrısıydı:
+zarfı kurup gönderiyordu. Bu yüzden defter ancak gönderimden *sonra*
+yazılabiliyordu ve arada düşen bir sunucu, parayı zincirde gönderilmiş ama
+defterde hâlâ ödenebilir bırakırdı — aynı para ikinci kez ödenirdi.
+
+Arayüz `prepare` + `send` olarak ayrıldı. Artık hash gönderimden önce
+biliniyor, defter önce yazılıyor. En kötü ihtimalle para "yolda" askıda kalır;
+bu geri alınabilir ve `resumeUnresolved` onu çözüyor.
 
 Varlık notu: entegrasyon testi `TSTUSD` basıyor çünkü Circle'ın testnet
 USDC'si otomatik alınamıyor. Kanıtlanan mekanizma aynı; hangi varlık olduğu
@@ -111,7 +121,7 @@ Test: `pnpm --filter @dwell/payments test:testnet` (ağ ister, varsayılanda atl
 
 ---
 
-## 4 — Dağıtım
+## 4 — Dağıtım ← **sıradaki**
 
 Şu an yalnızca bu makinede çalışıyor; `settings.json`'daki yollar mutlak.
 
