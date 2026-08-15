@@ -11,6 +11,7 @@ import type { Clock } from '@dwell/protocol'
 import type {
   PaymentRail, PayoutBatch, PayoutItem, SubmissionReceipt, SettlementResult,
 } from './rail.js'
+export type { PayoutItem } from './rail.js'
 import type { WalletStore } from './wallet.js'
 
 export interface PayoutCandidate {

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:testnet": "DWELL_TESTNET=1 vitest run test/integration --testTimeout=180000"
   },
   "dependencies": {
     "@dwell/protocol": "workspace:*",

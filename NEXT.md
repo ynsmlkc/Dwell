@@ -79,19 +79,35 @@ yanlış kimlik bağlamak geri alınamaz.
 
 ---
 
-## 3 — Ödeme (testnet)
+## 3 — Ödeme (testnet) ◐ ray bağlandı (2026-08-15)
 
-`payout-job` yazılı ve 23 testi var ama gerçek raya bağlı değil — şu an yalnızca mock üzerinde çalışıyor.
+`StellarRail` yazıldı ve **gerçek testnet'te para gönderdi**. SOW Teslim 3'ün
+bitti kriteri karşılandı:
 
-- [ ] `StellarRail`: `PaymentRail` arayüzünün gerçek uygulaması
-- [ ] Circle testnet USDC (kendi asset'imiz değil — §8 tuzak #8)
-- [ ] Doğrulama job'ı zamanlanmış çalışsın: `pending` → `verified` → defter
-- [ ] Ödeme job'ı günde bir, eşiği geçenleri öde
+```
+https://stellar.expert/explorer/testnet/tx/927959207ac20892ee189c86ef26c0f1f00b70a15c18156f53451572ec038b62
+
+başarılı  true          ledger 4152729
+op sayısı 2             ücret 200 stroop        memo it-R40HARXW00
+  → GCMZNNFR…MEC3   2.5000000
+  → GAHP3W44…CORM   1.3500000
+  → carol           DÜŞÜRÜLDÜ (trustline yok)
+```
+
+- [x] `StellarRail`: `PaymentRail`'in gerçek uygulaması
+- [x] Trustline / yetki / SEP-29 memo kontrolü zincirden okunuyor
+- [x] Harcanabilir XLM ayrı hesaplanıyor (min bakiye + satış yükümlülükleri düşülmüş)
+- [x] Retry aynı byte'ları gönderiyor — ikinci ödeme oluşmuyor (kanıtlandı)
+- [x] `successful === true` dışında hiçbir şey "ödendi" sayılmıyor (kanıtlandı)
+- [ ] Ödeme job'ı zamanlanmış çalışsın (şu an elle tetikleniyor)
 - [ ] `payout_items` şeması: `op_index`, `envelope_xdr`, `destination_address` snapshot
+- [ ] Circle testnet USDC — faucet elle dolduruluyor, testte kendi varlığımız
 
-**Bitti kriteri:** Testnet'te üç adrese tek işlemde ödeme, stellar.expert'te görünüyor; trustline'sız hedef batch'ten düşürülmüş ve işlem yine başarılı.
+Varlık notu: entegrasyon testi `TSTUSD` basıyor çünkü Circle'ın testnet
+USDC'si otomatik alınamıyor. Kanıtlanan mekanizma aynı; hangi varlık olduğu
+yalnızca config meselesi (`TESTNET_USDC` sabiti hazır).
 
-Bu, SOW'un Deliverable 3 kanıtı.
+Test: `pnpm --filter @dwell/payments test:testnet` (ağ ister, varsayılanda atlanır)
 
 ---
 
