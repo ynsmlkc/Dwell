@@ -540,6 +540,24 @@ Altısından biri eksikse gösterim **sayılmaz.** Şüphede olan gösterim say�
 
 **Fatura dürüstlüğü:** Yalnızca aktif tur içindeki süre faturalanır. Kullanıcı kod okurken veya prompt yazarken ekrana bakmıyor sayılır — ve ADR-023 gereği o anlarda reklam zaten gösterilmez. Teknik olarak sürekli gösterip hepsini saymak mümkündü; yapılmaması bilinçli bir karardır.
 
+### ADR-024 — Reklamveren tarafı açık; kapı içerik değil, bütünlük kontrolü
+
+**Karar:** Herkes reklam verebilir. Kategori yasağı, sektör filtresi veya editoryal onay **yok**. Reklamveren cüzdanını bağlar, parasını yatırır, kampanyası yayına girer.
+
+**Gerekçe:** Talep tarafı şu an boş ve ürünün en büyük riski bu (§15). Kapıya bekçi koymak, henüz kuyruk yokken kuyruğu yönetmeye çalışmaktır. Politika, gerçek bir reklamveren akışı oluştuğunda ve somut bir sorun görüldüğünde yazılır — önce değil.
+
+**Ama üç teknik kontrol politikadan bağımsız olarak gerekli.** Bunlar içerik yargısı değil, sistemin kendi bütünlüğü:
+
+1. **Kreatif metni düşman girdisidir** (ADR-007). Kontrol karakteri içeren kreatif reddedilir — bu zaten uygulanıyor, 20 saldırı vektörü testli.
+
+2. **Bağlantı, metinde yazan alan adıyla eşleşmek zorunda.** Kreatifte `firecrawl.dev` yazıp `evil.example`'a link vermek engellenir. Reklamveren kampanya başına tek bir alan adı beyan eder; tıklama linki o alan adının dışına çıkamaz. Bu bir içerik kararı değil, **kullanıcıyı yanıltmama** kontrolü — reklamı gören kişi nereye gittiğini bilmeli.
+
+3. **Kampanya anında durdurulabilir olmalı.** `campaigns.status = 'suspended'` şemada var ve `AdSelector` bunu zaten filtreliyor. Bir sorun çıktığında müdahale yolu, sorun çıkmadan önce hazır olmalı.
+
+**Sonradan gerekirse ne eklenir:** Kategori kuralı, manuel onay kuyruğu veya reklamveren doğrulaması. Üçü de `campaigns` tablosuna bir alan ve `AdSelector`'a bir filtre; mimariyi değiştirmez. Bu yüzden bugün yazılmasına gerek yok.
+
+**Açık kayıt (§15):** Terminale reklam basan bir ürün, reklamverenini seçmediğinde ne bastığından da sorumlu olmaya devam eder. Bu, bilinerek alınmış bir risktir; ürün büyüdüğünde yeniden değerlendirilecektir.
+
 ### ADR-021 — Reklamveren parayı cüzdanından yatırır; her kuruş defterde görünür
 
 **Karar:** Reklamveren kampanya oluştururken cüzdanını bağlar ve platform adresine USDC gönderir. Yatan para **ledger'a bir kayıt olarak girer**; kampanya bütçesi bu bakiyeden türetilir. Bakiyesi biten kampanya otomatik olarak servis dışı kalır.

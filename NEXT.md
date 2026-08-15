@@ -88,21 +88,15 @@ Bu, SOW'un Deliverable 3 kanıtı.
 | 3 | Zincirleme (chain-capture): mevcut statusLine'ı ezme, altına istifle | PROJECT.md §6.1, spinner.md §4 |
 | 4 | Zincir bütçesi kararı: 200 ms içinde mi, opt-in mi | ADR-003 |
 | 5 | `dwell pause` gerçekten duraklatsın — şu an yalnızca mesaj basıyor | main.ts'te not düşülü |
-| 6 | Reklamveren içerik politikası — yasaklı kategoriler, kreatifte URL/komut yok | §E14, **açık** |
+| 6 | Link–alan adı eşleşmesi: metinde yazan domain ile tıklama hedefi aynı olmalı | ADR-024 |
 
-**6. madde ilk reklamverenden önce yazılmalı.** Rakip ürünün terminalde kumar sitesi reklamı gösterdiğini gördük; o satır senin ürününün itibarı.
+**İçerik politikası yazılmayacak** — reklamveren tarafı açık (ADR-024). Yalnızca 6. maddedeki bütünlük kontrolü gerekli: kullanıcı reklamda gördüğü alan adına gitmeli, başka yere değil.
 
 ---
 
-## Mühendislik olmayan, en değerli iş
+## Talep tarafı
 
-**5 devtool şirketiyle konuş.** Firecrawl, Resend, Neon, Sentry tipi — geliştiriciye satan, reklam bütçesi olan yerler.
-
-Tek soru: *"Geliştiricinin terminaline $30 CPM'den ulaşmak ilgini çeker mi?"*
-
-İkisi evet derse projenin risk profili tamamen değişir. Sıfırı evet derse bunu şimdi öğrenirsin, üç ay sonra değil. Mühendislik maliyeti sıfır.
-
-Şu an arz tarafı çalışıyor ama **talep tarafı boş.** Ay sonunda çalışan bir sistemin olacak, içinde reklam olmayacak.
+Sende. Bu listede yok.
 
 ---
 
