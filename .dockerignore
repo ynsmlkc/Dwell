@@ -1,0 +1,15 @@
+# Imaja girmemesi gerekenler. Her satir hem boyut hem guvenlik meselesi:
+# `.env` buraya yazilmazsa gizli anahtarlar imajin icine gomulur ve imaji
+# eline gecirenm herkes onlari okur.
+.env
+.env.*
+node_modules
+**/node_modules
+**/dist
+.git
+.github
+**/test
+**/*.test.ts
+*.tgz
+*.md
+!packages/cli/README.md

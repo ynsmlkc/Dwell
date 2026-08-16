@@ -108,6 +108,15 @@ export function createApp(deps: AppDeps) {
    */
   app.get('/v1/config', (c) => c.json(remoteConfigSchema.parse(deps.config())))
 
+  /**
+   * Saglik kontrolu — Railway ve benzeri platformlar bunu cagirir.
+   *
+   * Yetki ISTEMEZ ve istememeli: platformun elinde token yok. Icerde ne
+   * oldugunu da SIZDIRMAZ — kampanya sayisi, bakiye, kullanici sayisi gibi
+   * seyler kimlik dogrulamasi olmayan bir uctan disari cikmaz.
+   */
+  app.get('/health', (c) => c.json({ ok: true, version: PROTOCOL_VERSION }))
+
   /* ─────────────────── cuzdanla giris ─────────────────── */
 
   /**

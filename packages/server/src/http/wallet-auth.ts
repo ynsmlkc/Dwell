@@ -155,11 +155,30 @@ export function horizonSigners(horizonUrl: string): WalletAuthDeps['loadSigners'
   }
 }
 
-/** Sunucunun SEP-10 imzalama anahtari. Uretimde secret manager'dan gelir. */
+/**
+ * Sunucunun SEP-10 imzalama anahtari.
+ *
+ * `DWELL_SEP10_SECRET` verilmezse gelistirme icin uretilir — ama uretimde bu
+ * SESSIZ BIR ARIZADIR: anahtar her yeniden baslatmada degisir, o sirada
+ * imzalanmakta olan her challenge gecersiz olur ve kullanici "imza
+ * dogrulanamadi" gorur. Sebebini de asla bulamaz, cunku hicbir sey bozuk
+ * gorunmez.
+ *
+ * Bu yuzden gercek bir dagitimda (`DWELL_ENV=production`) anahtar YOKSA
+ * sunucu hic acilmaz. Yanlis calisan bir giris, calismayan bir girise gore
+ * cok daha pahali.
+ */
 export function serverKeypair(): Keypair {
   const secret = process.env['DWELL_SEP10_SECRET']
   if (secret) return Keypair.fromSecret(secret)
-  // Gelistirmede uretilir. Uretimde ASLA — her yeniden baslatmada degisir ve
-  // `stellar.toml`'daki SIGNING_KEY ile uyusmaz.
+
+  if (process.env['DWELL_ENV'] === 'production') {
+    throw new Error(
+      'DWELL_SEP10_SECRET tanimli degil.\n' +
+      'Uretimde sabit bir imzalama anahtari sart — yoksa her yeniden ' +
+      'baslatmada degisir ve girisler sessizce bozulur.\n' +
+      'Uret: node -e "console.log(require(\'@stellar/stellar-sdk\').Keypair.random().secret())"',
+    )
+  }
   return Keypair.random()
 }

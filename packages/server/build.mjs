@@ -13,5 +13,25 @@ await build({
   bundle: true, platform: 'node', target: 'node20', format: 'esm',
   // @dwell/protocol bir workspace paketi ve KAYNAK TypeScript. Disarida
   // birakilirsa calisma aninda .ts cozumleyemez; bundle'a katilmali.
+
+  // ESM ciktisinda `require` YOKTUR. Bagimliliklarimizin bir kismi (Stellar
+  // SDK zinciri) hala CommonJS ve calisma aninda `require('util')` cagiriyor.
+  // Bu banner olmadan sunucu ILK SATIRDA oluyor:
+  //
+  //   Error: Dynamic require of "util" is not supported
+  //
+  // Gelistirirken gorunmuyordu cunku `tsx` ile kaynaktan calisiyorduk;
+  // yalnizca paketlenmis halde ortaya cikiyor.
+  banner: {
+    js: [
+      "import { createRequire as __dwellCreateRequire } from 'node:module'",
+      "import { fileURLToPath as __dwellFileURLToPath } from 'node:url'",
+      "import { dirname as __dwellDirname } from 'node:path'",
+      'const require = __dwellCreateRequire(import.meta.url)',
+      // Bazi CJS paketleri bunlari da bekliyor.
+      'const __filename = __dwellFileURLToPath(import.meta.url)',
+      'const __dirname = __dwellDirname(__filename)',
+    ].join('\n'),
+  },
 })
 console.log(`  dist/server.mjs  ${(statSync('dist/server.mjs').size / 1024).toFixed(1)} KB`)

@@ -28,10 +28,23 @@ import { StellarRail, HORIZON as HORIZON_URLS, TESTNET_USDC } from '@dwell/payme
 import { WalletStore } from '@dwell/payments'
 
 const PORT = Number(process.env['PORT'] ?? 8787)
+// Yerelde YALNIZCA loopback. Konteynerde 0.0.0.0 gerekiyor ve orada
+// `HOST` acikca veriliyor (Dockerfile). Varsayilani 0.0.0.0 yapmak,
+// gelistirirken sunucuyu farkinda olmadan tum yerel aga acardi.
 const HOST = process.env['HOST'] ?? '127.0.0.1'
 
-/** Gelistirme token'i. Uretimde GitHub device flow uretecek. */
-const DEV_TOKEN = process.env['DWELL_DEV_TOKEN'] ?? 'dwl_dev_token_0123456789abcdef0123'
+/**
+ * Gelistirme token'i.
+ *
+ * Uretimde OLUSTURULMAZ. Sabit degeri bu dosyada yaziyor ve repo herkese
+ * acik: uretimde de eklenseydi, repoyu okuyan herkesin elinde gecerli bir
+ * token olurdu ve istedigi kadar gosterim bildirebilirdi.
+ *
+ * Uretimde token'lar yalnizca `dwell login` ile, cuzdan imzasi karsiliginda
+ * uretilir.
+ */
+const IS_PROD = process.env['DWELL_ENV'] === 'production'
+const DEV_TOKEN = IS_PROD ? null : (process.env['DWELL_DEV_TOKEN'] ?? 'dwl_dev_token_0123456789abcdef0123')
 const DEV_PUBLISHER = 'dev-publisher'
 const DEV_ADVERTISER = 'dev-advertiser'
 
@@ -124,11 +137,13 @@ const walletAuth = new WalletAuth({
   },
 })
 
-tokens.add({
-  id: 'dev-token', publisherId: DEV_PUBLISHER, tokenHash: hashToken(DEV_TOKEN),
-  scopes: ['report:impressions', 'read:balance'],
-  clientVersion: null, revokedAt: null, lastSeenAt: null,
-})
+if (DEV_TOKEN) {
+  tokens.add({
+    id: 'dev-token', publisherId: DEV_PUBLISHER, tokenHash: hashToken(DEV_TOKEN),
+    scopes: ['report:impressions', 'read:balance'],
+    clientVersion: null, revokedAt: null, lastSeenAt: null,
+  })
+}
 
 /* ─────────────────────── odeme ─────────────────────── */
 
@@ -146,6 +161,8 @@ const wallets = new WalletStore({
  * Anahtar YOKSA odeme turu hic baslatilmaz — sahte bir rayla "odedik" demek,
  * odememekten kotudur: kullanici odendigini sanir ve beklemeyi birakir.
  */
+let zamanlama: { stop: () => void } | null = null
+
 const HOT_SECRET = process.env['DWELL_HOT_SECRET']
 const payoutRunner = HOT_SECRET
   ? new PayoutRunner({
@@ -166,7 +183,7 @@ const payoutRunner = HOT_SECRET
 if (payoutRunner) {
   // Uretimde gunde bir. Gelistirmede kisa, yoksa hicbir seyi gozlemleyemezsin.
   const her = Number(process.env['DWELL_PAYOUT_INTERVAL_MS'] ?? 60_000)
-  schedulePayouts(payoutRunner, her, log)
+  zamanlama = schedulePayouts(payoutRunner, her, log)
   // Yeniden baslatmada asili kalanlari coz — para `payouts_in_flight`'ta
   // sonsuza kadar beklemesin.
   void payoutRunner.resumeUnresolved().then((n) => {
@@ -200,10 +217,35 @@ const app = createApp({
   payouts,
 })
 
-serve({ fetch: app.fetch, port: PORT, hostname: HOST }, (info) => {
+const server = serve({ fetch: app.fetch, port: PORT, hostname: HOST }, (info) => {
   const bakiye = ledger.balance(accountId('advertiser', DEV_ADVERTISER))
   log(`dwell sunucusu http://${HOST}:${info.port}`)
   log(`${campaigns.length} kampanya · reklamveren bakiyesi ${bakiye} stroop`)
-  log(`gelistirme token'i: ${DEV_TOKEN}`)
+  if (DEV_TOKEN) log(`gelistirme token'i: ${DEV_TOKEN}`)
+  else log("gelistirme token'i YOK (uretim) — giris yalnizca `dwell login` ile")
   log(`SEP-10 imzalama anahtari: ${sep10Keypair.publicKey()}`)
 })
+
+/* ─────────────────── temiz kapanis ─────────────────── */
+
+/**
+ * Railway her deploy'da SIGTERM gonderir ve kisa bir sure sonra sureci
+ * oldurur.
+ *
+ * Onemli olan: kapanirken YENI odeme turu BASLATMAMAK. Zincire gonderilmis
+ * ama mutabakati yapilmamis bir batch, sunucu dustugunde `payouts_in_flight`
+ * ta asili kalir. Kaybolmaz — `resumeUnresolved` acilista zincire sorup
+ * cozuyor — ama hic olusturmamak daha iyi.
+ */
+let kapaniyor = false
+for (const sig of ['SIGTERM', 'SIGINT'] as const) {
+  process.on(sig, () => {
+    if (kapaniyor) return
+    kapaniyor = true
+    log(`${sig} — kapaniyor`)
+    zamanlama?.stop()
+    server.close(() => process.exit(0))
+    // Acik baglantilar kapanmazsa da bekleme: platform zaten olduruyor.
+    setTimeout(() => process.exit(0), 5_000).unref()
+  })
+}
