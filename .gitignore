@@ -4,3 +4,7 @@ node_modules/
 .DS_Store
 spikes/**/out/
 packages/*/dist/
+
+# Gizli anahtarlar — asla commitlenmez
+.env.*
+!.env.example
