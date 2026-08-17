@@ -1,30 +1,51 @@
 # Site — tasarım brief'i
 
-> 2026-08-17. Tasarım araçlarına (v0, Lovable, Bolt, Figma Make) verilecek
-> prompt aşağıda, `PROMPT` başlığı altında. Öncesindeki kısım senin için:
-> neyin gerçek olduğu, neyin olmadığı.
+> 2026-08-17 · **v2** — reklamveren paneli artık gerçek, eklendi.
+>
+> Tasarım araçlarına (v0, Lovable, Bolt, Figma Make) verilecek prompt aşağıda,
+> `PROMPT` başlığı altında. Öncesi senin için: neyin gerçek olduğu, neyin
+> olmadığı.
 
-## Üç alan
+## Değişen ne
 
-| Alan | Arka uç | Şimdi |
-|---|---|---|
-| Landing `/` | gerekmiyor | **yap** |
-| Yayıncı paneli `/app` | hazır | **yap** |
-| Reklamveren `/advertisers` | **yok** | sadece teklif sayfası + form |
+v1'de "reklamveren panelini tasarlatma, arka ucu yok" yazıyordu. Artık var:
+cüzdanla giriş, zincirden para yatırma, kampanya oluşturma, yayına alma.
+Hepsi canlı sunucuda çalışıyor ve test edildi.
+
+## Dört alan
+
+| Alan | Rota | Arka uç | Durum |
+|---|---|---|---|
+| Landing | `/` | gerekmiyor | yap |
+| Yayıncı paneli | `/app` | hazır | yap |
+| Reklamveren tanıtım | `/advertisers` | gerekmiyor | yap |
+| Reklamveren paneli | `/advertisers/app` | **hazır** | yap |
+| Gizlilik | `/privacy` | gerekmiyor | yap |
 
 ## Gerçekten var olan uçlar
 
 ```
 GET  /health
 GET  /v1/config
-POST /v1/auth/challenge     { address }        → { transaction, network_passphrase }
-POST /v1/auth/verify        { address, transaction } → { token, publisherId }
-POST /v1/ads/next           (yalnızca CLI kullanır)
-POST /v1/impressions        (yalnızca CLI kullanır)
-GET  /v1/me/balance         → aşağıdaki JSON
+
+POST /v1/auth/challenge   { address }
+                          → { transaction, network_passphrase, expiresAt }
+POST /v1/auth/verify      { address, transaction, role? }
+                          → { token, tokenId, publisherId, role }
+                            role: "publisher" (varsayılan) | "advertiser"
+
+── yayıncı ──
+GET  /v1/me/balance
+
+── reklamveren ──
+GET  /v1/advertiser/me
+POST /v1/advertiser/campaigns              { brand, text, cta, bidCpmStroops }
+POST /v1/advertiser/campaigns/:id/status   { status: "active" | "paused" }
 ```
 
-`/v1/me/balance` — panelin tek veri kaynağı:
+Canlı: `https://dwellserver-production.up.railway.app`
+
+### `/v1/me/balance` — yayıncı paneli
 
 ```json
 {
@@ -38,25 +59,90 @@ GET  /v1/me/balance         → aşağıdaki JSON
 }
 ```
 
-Stroop = USDC'nin 10 milyonda biri. `575000` stroop = **$0,0575**.
+### `/v1/advertiser/me` — reklamveren paneli
 
-## Var OLMAYAN şeyler — bunları tasarlatma
+```json
+{
+  "advertiserId": "GBOYXJ4JZLZY72GZIFXZSX7HVKDDITADWUDGDYE3EML24GXDV3K7KX7C",
+  "balanceStroops": "20000000",
+  "spendableStroops": "18400000",
+  "deposit": {
+    "address": "GB56NGRB2G66BYYMSRWND4WLGB7H6TTXTL3GGFXRY3ENB65QMCIGDEHN",
+    "assetCode": "USDC",
+    "assetIssuer": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+    "note": "Yalnizca <kendi adresin> adresinden gonderilen odemeler hesabina yazilir"
+  },
+  "campaigns": [
+    {
+      "id": "c-01M07QTJMKWEK07FCT7EFJMYD2",
+      "brand": "Resend",
+      "text": "email API for developers",
+      "cta": "resend.com",
+      "bidCpmStroops": "400000000",
+      "status": "active",
+      "preview": "✶ Resend — email API for developers · resend.com"
+    }
+  ]
+}
+```
 
-Tasarım araçları bunları kendiliğinden ekler. Eklerse çalışmayan buton olur:
+Stroop = USDC'nin 10 milyonda biri. `400000000` = **$40 CPM** = gösterim
+başına $0,04.
 
-- Cüzdan değiştirme ucu yok (panelde gösterilir ama düzenlenemez)
-- Cihaz/oturum iptal ucu yok
-- Kampanya oluşturma, para yatırma, reklamveren istatistiği — hiçbiri yok
-- E-posta/şifre girişi yok ve olmayacak: **kimlik cüzdandır**
-- Bildirim ayarları, profil, avatar, takım yönetimi — hiçbiri yok
+`balanceStroops` ile `spendableStroops` farkı **rezerve**: teslim edilmiş ama
+henüz raporlanmamış reklamlar ve doğrulanmayı bekleyen gösterimler.
+Reklamveren "param var ama harcanmıyor" dediğinde cevabı bu.
 
-## Dil kararı
+## Doğrulama kuralları — formda göstermek zorunda
 
-Prompt İngilizce yazıldı (tasarım araçları İngilizce'de belirgin şekilde
-daha iyi). Site metni Türkçe olacaksa prompt'un sonundaki satırı değiştir.
+| Kural | Değer |
+|---|---|
+| Satır uzunluğu | `✶ {brand} — {text} · {cta}` **≤ 80 karakter** |
+| `cta` | yalnızca alan adı — `firecrawl.dev` ✓, `https://x.com/a` ✗ |
+| Kaçış/kontrol karakteri | reddedilir (temizlenmez) |
+| Minimum teklif | 1.000.000 stroop CPM = **$0,10 / 1000** |
+| Yayıncı payı | **%50, sabit** — reklamveren değiştiremez |
+| Yeni kampanya | **`paused` başlar** |
+| Bakiyesiz yayına alma | **402** döner |
 
-Not: CLI çıktısı şu an Türkçe, reklam metinleri İngilizce. İkisinin bir
-gün tutarlı olması lazım — ama o ayrı bir karar, siteyi bloklamasın.
+Hata cevabı hangi alanın bozuk olduğunu söylüyor:
+
+```json
+{ "code": "DWL_9001", "message": "...", "hint": "satir 94 karakter, en fazla 80 olabilir", "field": "text" }
+```
+
+## Var OLMAYAN şeyler — tasarlatma
+
+- Cüzdan değiştirme ucu (panelde görünür, düzenlenemez)
+- Cihaz/oturum iptal ucu
+- Kampanya **silme** veya metnini **düzenleme** (sadece oluştur + duraklat/başlat)
+- Günlük bütçe, hedefleme, zamanlama, A/B
+- Grafik/istatistik — gösterim sayısı, tıklama, CTR **hiçbiri yok**
+- E-posta/şifre girişi — kimlik cüzdandır, hep öyle kalacak
+
+## Yayıncı tarafında kritik bir sorun: trustline
+
+Stellar'da bir cüzdan, kabul edeceği her varlık için önce **trustline**
+açmak zorunda. Bu olmadan USDC gönderilemez.
+
+Gerçek testte yaşandı: yayıncı eşiği aştı, ödeme çıkmadı, parası defterde
+bekledi. Sebep trustline eksikliğiydi ve kullanıcının bunu bilmesinin
+hiçbir yolu yoktu.
+
+**Panel bunu tespit edip çözmeli.** Tarayıcı Horizon'dan cüzdanın
+bakiyelerini okuyabilir; USDC trustline'ı yoksa açık bir uyarı ve
+Freighter'a `changeTrust` imzalatan bir buton göstermeli.
+
+Maliyeti: cüzdanda 0,5 XLM kilitleniyor (silinince geri geliyor). Kullanıcıda
+XLM yoksa bunu da söylemek gerekiyor.
+
+> İleride bu ücreti biz üstleneceğiz (ADR-020, sponsorlu trustline) ama o
+> sunucu tarafı iş; şimdilik kullanıcı kendi açıyor.
+
+## Dil
+
+Prompt İngilizce (tasarım araçları İngilizce'de belirgin şekilde daha iyi).
+Site metni Türkçe olacaksa prompt'un son satırını değiştir.
 
 ---
 
@@ -80,26 +166,50 @@ proof, and the thing to design around. Here is a real one:
 ✶ Firecrawl — docs to LLM-ready markdown · firecrawl.dev
 ```
 
-Currently on Stellar **testnet**. Real money does not move yet. Do not hide
-this; say it plainly where relevant.
+Currently on Stellar **testnet**. Money moves — advertisers deposit, publishers
+get paid on-chain — but it is test money. Say this plainly where relevant;
+do not hide it and do not apologise for it.
 
 ## Audience
 
-Developers who use Claude Code and similar tools. They are skeptical of
-anything that installs into their machine, allergic to marketing language,
-and will read the privacy section before the pricing section. Write for
-someone who will `cat` the install script before running it.
+Two, and they want opposite things:
+
+**Developers** who use Claude Code. Skeptical of anything that installs into
+their machine, allergic to marketing language, will read the privacy section
+before anything else. Write for someone who will `cat` a script before running it.
+
+**Advertisers** — small dev-tool companies. They want to know what the
+placement looks like, who sees it, and what it costs. They do not want a
+funnel.
 
 ## Routes
 
 Build exactly these. No others.
 
 ```
-/               landing
-/app            publisher dashboard (wallet-gated)
-/advertisers    advertiser offer + contact form
-/privacy        what we send and what we never send
+/                  landing (for developers)
+/app               publisher dashboard        — wallet-gated
+/advertisers       what the placement is + how to start
+/advertisers/app   advertiser dashboard       — wallet-gated
+/privacy           what we send and never send
 ```
+
+## Identity — read this before designing any auth
+
+There is **no email, no password, no signup form, anywhere**. Identity is a
+Stellar wallet, verified by signature (SEP-10). The same person can be both a
+publisher and an advertiser, but those are two separate logins with separate
+tokens.
+
+Login flow, both roles, three visible states — all three required:
+
+1. `Requesting access…` — waiting for the Freighter extension popup
+2. `Waiting for signature…` — the challenge is being signed
+3. Error — show the server's message in full, with a **Try again** button
+
+If the Freighter extension is not detected, replace the button with an inline
+message and a link to `https://freighter.app`. Never show a dead disabled
+button with no explanation.
 
 ---
 
@@ -109,33 +219,27 @@ Build exactly these. No others.
 
 **a. Hero**
 - Headline, one sentence, concrete. Not "monetize your workflow".
-- The ad line itself, rendered as it appears in a terminal — monospace,
-  the `✶` in the accent color. This is the single most important element
-  on the page. Consider showing it inside a realistic terminal frame with
-  a prompt line above it.
-- Primary CTA: install command in a copy-to-clipboard field:
-  `npx dwell-cli init`
-  Clicking copies; the button label changes to "Copied" for 2 seconds,
-  then reverts.
-- Secondary link: "How it works" → scrolls to section (c).
+- The ad line itself, rendered as it appears in a terminal — monospace, the
+  `✶` in the accent color, inside a realistic terminal frame with a prompt
+  line above it. This is the single most important element on the page.
+- Primary CTA: copy-to-clipboard field with `npx dwell-cli init`. Clicking
+  copies; the label becomes "Copied" for 2 seconds, then reverts.
+- Secondary: "How it works" → scrolls to (c).
 
 **b. The honest line**
-One short paragraph, immediately below the hero, stating: it only appears
-while you are waiting, it disappears when the answer arrives, it never
-interrupts, and it is off when you are idle. This preempts the reader's
-first objection.
+One paragraph directly under the hero: it only appears while you are waiting,
+it disappears when the answer arrives, it never interrupts, and nothing shows
+when you are idle. This preempts the reader's first objection.
 
 **c. How it works — three steps**
 1. Install — one command, edits only your Claude Code settings
 2. Wait — the line shows while the model is working
-3. Get paid — USDC to your Stellar wallet, you connect it, we never see
-   your keys
+3. Get paid — USDC to your Stellar wallet; you connect it, we never see your keys
 
-Do not use three identical rounded cards with circular icons. Find another
-structure — a numbered horizontal sequence, a diagram, a timeline, a table.
+Do not use three identical rounded cards with circular icons. Use another
+structure: a numbered horizontal sequence, a diagram, a timeline, a table.
 
 **d. What we send**
-A two-column comparison, plainly worded:
 
 | We send | We never send |
 |---|---|
@@ -143,142 +247,212 @@ A two-column comparison, plainly worded:
 | session id, client version | your file names |
 | OS and architecture | your prompts, your code |
 
-Below it: a link to `/privacy`.
+Link to `/privacy` below it.
 
-**e. Earnings, honestly**
-State the current status: testnet, payouts proven on-chain but not enabled
-for real users yet. Include a link to a real transaction:
-`https://stellar.expert/explorer/testnet/tx/f2bf54a8d14e0f27eb9977bfd762b8614fb5ceacb0226b1417af7e70b7b645ef`
-Do not invent earnings figures. Do not show "$X/month" projections.
+**e. Proof, not projections**
+State the status: testnet, payouts working on-chain. Link a real transaction:
+`https://stellar.expert/explorer/testnet/tx/9cbb1a573c4a3eeacefde360280c93d08df1cc0b7522d82e3b411898aae6ad86`
+Do not invent earnings figures. No "$X/month" projections. No stats bar with
+made-up numbers.
 
 **f. Uninstall**
-Short section. `dwell uninstall` removes only our own entries and never
-touches the user's own settings. Developers decide to install based on how
-easy it is to leave.
+Short. `dwell uninstall` removes only our own entries and never touches the
+user's own settings. Developers decide to install based on how easy it is to leave.
 
-**g. Advertiser strip**
-One line + button → `/advertisers`.
+**g. Advertiser strip** — one line + button → `/advertisers`.
 
-**h. Footer**
-GitHub link, `/privacy`, status: "testnet". Nothing else. No newsletter,
+**h. Footer** — GitHub, `/privacy`, "testnet". Nothing else. No newsletter,
 no social icons unless real accounts exist.
 
-### Explicitly do NOT include on the landing page
-- A "Trusted by" logo wall (there are no customers yet)
-- Testimonials (there are none)
-- Pricing tiers (there is no pricing)
-- A stats bar with invented numbers ("10,000 developers")
-- A blog teaser, a roadmap section, an FAQ accordion with filler questions
+### Do NOT include
+A "Trusted by" logo wall, testimonials, pricing tiers, invented stats, a blog
+teaser, a roadmap, or an FAQ accordion with filler questions. There are no
+customers yet and pretending otherwise is the fastest way to lose this audience.
 
 ---
 
 ## 2. Publisher dashboard `/app`
 
-Wallet-gated. There is no email, no password, no signup. Identity **is** the
-Stellar wallet address.
-
 ### State A — not connected
-- One card, centered, minimal.
-- Explain in one sentence: connect the wallet where you want to be paid.
-- Button: **Connect Freighter**
-- Secondary, smaller: "Don't have Freighter?" → `https://freighter.app`
-- If the Freighter browser extension is not detected, the button is replaced
-  by an inline message with the install link. Do not show a disabled button
-  with no explanation.
-
-Connect flow (three visible states, all needed):
-1. `Requesting access…` — waiting for the extension popup
-2. `Waiting for signature…` — the challenge is being signed
-3. Error state — the message from the server, rendered in full, with a
-   **Try again** button
+One centered card. One sentence: connect the wallet where you want to be paid.
+Button: **Connect Freighter**. Login flow as described above.
 
 ### State B — connected, no earnings yet
-The wallet is connected but the CLI is not installed or hasn't reported yet.
-- Show the wallet address in full (not truncated — the user must be able to
+- Wallet address **in full** (never truncated — the user must be able to
   verify where their money goes)
-- Big, calm empty state: "No impressions yet."
-- The install command with a copy button, same component as the landing hero
+- Calm empty state: "No impressions yet."
+- The install command with a copy button
 - One line: it can take a few minutes after your first session
 
 ### State C — connected, with data
-The main screen. Four numbers, **not** four identical stat cards — give the
-payable amount visual primacy, the others are context.
 
-| Field | Source | Meaning to show |
+Four numbers, **not** four identical stat cards. Give payable visual primacy.
+
+| Field | Source | What it means |
 |---|---|---|
 | Payable | `payableStroops` | verified, yours |
-| Pending | `pendingStroops` | counted, not verified yet, **may not survive** |
-| In flight | `inFlightStroops` | sent to the chain, awaiting confirmation — **hide this row entirely when zero** |
+| Pending | `pendingStroops` | counted, not verified yet — **may not survive** |
+| In flight | `inFlightStroops` | sent to the chain, awaiting confirmation — **hide the row entirely when zero** |
 | Lifetime | `lifetimeStroops` | total ever earned, secondary |
 
-Below the numbers:
+Below:
 
-- **Progress to payout.** A bar from 0 to `payoutThresholdStroops`, with the
-  remaining amount in words: "$0.94 to go". When the threshold is reached,
-  the bar is replaced by: "Threshold reached — included in the next payout
-  round."
-- **`blockedReason`**, when present and when it is *not* just the threshold.
-  Render it as an informational row, not an error. It explains why a payout
-  hasn't happened (e.g. a 72-hour hold after changing wallets).
-- **Wallet** — full address, a copy button, and a link to
-  `https://stellar.expert/explorer/testnet/account/<address>`.
-  Note in small text: to change your payout wallet, run `dwell login --force`.
-  There is no wallet-change button — do not add one.
-- **Recent payouts** — a table from `recentPayouts`. Columns: date, amount,
-  status, transaction. The transaction is a link to
-  `https://stellar.expert/explorer/testnet/tx/<txHash>`.
-  When the array is empty, show a one-line empty state, not a skeleton.
+- **Progress to payout.** Bar from 0 to `payoutThresholdStroops`, with the
+  remainder in words: "$0.94 to go". At threshold, replace with "Threshold
+  reached — included in the next payout round."
+- **`blockedReason`** when present and not merely the threshold. An
+  informational row, not an error — it explains why a payout hasn't happened.
+- **Wallet** — full address, copy button, link to
+  `https://stellar.expert/explorer/testnet/account/<address>`. Small text: to
+  change your payout wallet, run `dwell login --force`. **No wallet-change
+  button** — do not add one.
+- **Recent payouts** — table from `recentPayouts`: date, amount, status,
+  transaction linking to `https://stellar.expert/explorer/testnet/tx/<txHash>`.
+  Empty array → one-line empty state, not a skeleton.
 
-### States that must all be designed
-Design tools skip these. Every one is required:
+### State D — USDC trustline missing ⚠ REQUIRED
 
-- Loading (first fetch)
-- Network error — the API is unreachable. Message plus **Retry**.
-- 401 — the session expired. Message: reconnect your wallet, with the
-  connect button.
-- Zero balance, zero payouts (State B)
-- Threshold not reached vs. reached
-- `blockedReason` present vs. absent
-- In-flight amount zero (row hidden) vs. non-zero
+A Stellar wallet must explicitly opt in to each asset it can receive. Without
+a USDC trustline, **the payout silently does not happen** — the money waits in
+the ledger and the user has no way to know why. This happened in a real test.
+
+Read the connected wallet's balances from Horizon
+(`https://horizon-testnet.stellar.org/accounts/<address>`) and check for a
+balance entry with `asset_code: "USDC"` and
+`asset_issuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"`.
+
+If absent, show a prominent banner above everything else:
+
+- Plain explanation: your wallet cannot receive USDC yet, so payouts will not
+  go out. Do not use the word "trustline" alone without explaining it.
+- Button: **Enable USDC** → build a `changeTrust` operation and have Freighter
+  sign and submit it.
+- Note the cost: 0.5 XLM stays locked in your wallet while it is enabled, and
+  is returned if you remove it.
+- If the wallet has less than ~1 XLM, say that instead and explain they need
+  a little XLM first.
+- After success, re-check and dismiss the banner.
+
+This banner outranks the balance numbers. Earning money you cannot receive is
+worse than not earning.
+
+### Every state must be designed
+Loading · network error (with **Retry**) · 401 session expired (reconnect) ·
+zero balance · below vs. at threshold · `blockedReason` present vs. absent ·
+in-flight zero (hidden) vs. non-zero · trustline missing vs. present.
 
 ### Amount formatting
 The API returns stroops as decimal strings. 1 USDC = 10,000,000 stroops.
-Display as USD with enough decimals to be honest: `575000` → `$0.0575`.
-Never round to `$0.06`. Never display raw stroops to the user, but show them
-on hover or in a tooltip for the curious.
-
-Parse with BigInt, never `parseFloat` — these are money values.
+`575000` → `$0.0575`. Never round to `$0.06`. Parse with **BigInt**, never
+`parseFloat` — these are money values. Show raw stroops on hover for the curious.
 
 ---
 
 ## 3. Advertisers `/advertisers`
 
-There is no advertiser backend yet. **Do not design a dashboard, a campaign
-builder, a budget slider, or an analytics chart.** A page that promises a
-self-serve panel that doesn't exist is worse than no page.
+A page, not a funnel. Sections:
 
-What this page is:
 - What the placement is, with the same real ad line as the landing hero
-- Who sees it: developers, at the moment they are idle and waiting
-- The format constraints, stated plainly: one line, plain text, no images,
-  no animation, no tracking pixels, max ~80 characters
-- What we measure: display duration, and only impressions longer than 10
-  seconds count
-- A short form: name, email, company, website, what you'd advertise, budget
-  range. On submit: a confirmation state that says a human will reply.
-- No pricing table. Pricing is a conversation right now.
+- Who sees it: developers, at the moment they are idle and waiting for a model
+- Format constraints, plainly: one line, plain text, max 80 characters
+  including the brand and domain. No images, no animation, no tracking pixels.
+- What counts: only impressions displayed longer than 10 seconds
+- What it costs: you set a CPM, minimum $0.10 per 1000 impressions. Publishers
+  receive 50%. No pricing table — the number is yours to choose.
+- CTA: **Connect wallet to start** → `/advertisers/app`
+
+No contact form. Self-serve works; a form would be a downgrade.
 
 ---
 
-## 4. Privacy `/privacy`
+## 4. Advertiser dashboard `/advertisers/app`
 
-Plain prose, no legal boilerplate generator output. Cover:
-- The exact list of fields sent (same as the landing table, expanded)
-- That the project identifier is a hash generated with a salt that never
-  leaves the machine — raw paths never reach the network
-- That IP addresses are hashed, never stored raw
-- That the wallet private key never enters the CLI or the site
-- How to remove everything: `dwell uninstall`
+Wallet-gated, `role: "advertiser"` on login.
+
+### State A — not connected
+Same login card as the publisher side, different copy: connect the wallet you
+will fund campaigns from. **The wallet matters** — see deposits below.
+
+### State B — connected, zero balance
+The deposit instructions are the entire screen. Nothing else competes.
+
+From `deposit` in the response:
+- The address, in full, with a copy button, and a QR code
+- The asset: USDC, with the issuer address shown in small monospace (an
+  advertiser who knows Stellar will check it; one who doesn't will ignore it)
+- **The critical warning, and it must be impossible to miss:** payments are
+  matched by *sender address*. Only USDC sent **from their own connected
+  wallet** is credited. Money sent from an exchange arrives but cannot be
+  matched to them.
+- After sending: credited within about 20 seconds. A "checking…" indicator
+  that polls `/v1/advertiser/me` and updates when the balance changes.
+
+### State C — connected, funded
+
+**Balance block**
+- `balanceStroops` — the headline number
+- `spendableStroops` — shown **only when it differs** from the balance. When
+  it does, explain the difference in one line: the rest is reserved for ads
+  already delivered but not yet reported.
+- An **Add funds** action that reopens the deposit instructions.
+
+**Campaign list**
+Each campaign shows:
+- `preview` — rendered exactly as it appears in a terminal, monospace, `✶` in
+  the accent color. This is the point of the product; make it the visual anchor
+  of the row.
+- status: `paused` / `active` / `exhausted`
+- CPM, formatted as USD (`bidCpmStroops` → `$40.00 CPM`), with cost per
+  impression underneath (`$0.04`)
+- Toggle: **Activate** / **Pause** → `POST /v1/advertiser/campaigns/:id/status`
+  - 402 response → inline message: no budget, add funds. Do not use a modal.
+- No delete, no edit — the API does not support them. Do not add the buttons.
+
+**New campaign form**
+
+Fields: `brand`, `text`, `cta`, `bidCpmStroops`.
+
+This form is where the design earns its keep. It must contain a **live preview**
+that renders exactly what a developer will see:
+
+```
+✶ {brand} — {text} · {cta}
+```
+
+with a live character count against the 80-character limit, counting the whole
+line, not the individual field. Turn red past the limit before submitting.
+
+Client-side validation mirroring the server:
+- Total line ≤ 80 characters
+- `cta` must be a bare domain — reject `https://`, paths, query strings.
+  Explain why: the developer must land where the line says they will.
+- CPM at least $0.10 per 1000. Take the CPM in dollars and convert to stroops
+  (`$40` → `"400000000"`); do not make the user think in stroops.
+- Show the publisher's 50% share as a note, not an input. It is fixed.
+
+On the server's 400, the response includes a `field` — highlight that input
+and show the `hint` beneath it.
+
+After creating: the campaign appears **paused**. Say why in one line — you
+review it, then start it. A typo shown to thousands of people cannot be undone
+and has already been paid for.
+
+### Every state must be designed
+Loading · network error · 401 · zero balance (deposit screen) · funded with no
+campaigns · campaigns paused · campaigns active · activation refused for lack
+of budget · form validation errors per field · line-too-long while typing.
+
+---
+
+## 5. Privacy `/privacy`
+
+Plain prose, not legal-boilerplate output:
+- The exact list of fields sent
+- The project identifier is hashed with a salt that never leaves the machine —
+  raw paths never reach the network
+- IP addresses are hashed, never stored raw
+- The wallet private key never enters the CLI or the site
+- Removal: `dwell uninstall`
 
 ---
 
@@ -288,60 +462,56 @@ The product is a single line of text that appears in the dark, does its job,
 and disappears. Restraint is the brand. Anything loud contradicts the thing
 being sold.
 
-**Typography.** Monospace should carry more of the page than usual — this is
-a CLI product and the ad unit itself is monospace. Use it for data, labels,
-commands, addresses, and amounts. Pair it with one well-set text face for
-prose and headlines. Do not use Inter or Space Grotesk; they are the current
-default and read as generic.
+**Typography.** Monospace should carry more of the page than usual — this is a
+CLI product and the ad unit itself is monospace. Use it for data, labels,
+commands, addresses, amounts, and every ad preview. Pair it with one well-set
+text face for prose and headlines. Do not use Inter or Space Grotesk; they are
+the current default and read as generic.
 
-**Color.** Dwell's accent is an orange used for the `✶` glyph. Build the
-palette around it. Neutrals should be biased slightly toward that hue rather
-than pure grey. Support light and dark; the viewer's system preference wins
-by default.
+**Color.** Dwell's accent is the orange of the `✶` glyph. Build the palette
+around it; bias the neutrals slightly toward that hue rather than pure grey.
+Support light and dark, system preference by default.
 
-**Numbers.** Use tabular figures wherever amounts align in columns.
+**Numbers.** Tabular figures wherever amounts align in columns.
 
 ### Do not produce any of these
-These are the current generic-AI-design defaults. If the output contains one,
-it is wrong:
-
 - Purple-to-blue gradient hero on white
 - Dark hero with a single acid-green or vermilion accent
-- Warm cream background (#F4F1EA) with a serif display face and terracotta accent
-- Floating dashboard screenshots tilted at an angle, with drop shadows
+- Warm cream (#F4F1EA) + serif display + terracotta accent
+- Floating dashboard screenshots tilted at an angle with drop shadows
 - Three feature cards with circular pastel icons
 - Emoji as section markers
 - Everything centered
 - Bento grids
 - A large blurred gradient blob behind the hero
-- Glassmorphism, `backdrop-filter` cards
+- Glassmorphism / `backdrop-filter` cards
 - Fake logo walls, fake avatars, fake testimonial photos
 - Animated counters counting up on scroll
 
 ### Take one real risk
 Pick one place — most likely the hero — and do something specific to this
-product that another site could not reuse. The obvious candidate: show the
-ad line behaving exactly as it does in reality, appearing while "waiting"
-and vanishing when the "answer" arrives. Make the visitor understand the
-product by watching it, before they read a word about it.
+product that no other site could reuse. The obvious candidate: show the ad line
+behaving exactly as it does in reality, appearing while "waiting" and vanishing
+when the "answer" arrives. Let the visitor understand the product by watching
+it, before reading a word.
 
 ## Technical requirements
 
-- Responsive from 360px up. Tables and code blocks scroll inside their own
+- Responsive from 360px. Tables and code blocks scroll inside their own
   container; the page body never scrolls sideways.
-- Keyboard accessible: visible focus states on every interactive element.
-- Respect `prefers-reduced-motion` — the hero animation must have a static
-  fallback.
-- Every button and link must have a real destination or a defined action.
-  If a feature does not exist, do not add a button for it.
-- Copy-to-clipboard fields must show a confirmation state.
-- No external font CDNs; self-host or use system stacks.
+- Visible focus states on every interactive element.
+- Respect `prefers-reduced-motion` — the hero animation needs a static fallback.
+- Every button and link has a real destination or a defined action. If a
+  feature does not exist, there is no button for it.
+- Copy-to-clipboard fields show a confirmation state.
+- No external font CDNs.
+- All money math with BigInt.
 
 ## Deliverable
 
 React + Tailwind, or plain HTML/CSS. Every route, every state listed above.
-Use realistic content throughout — the actual ad lines (Firecrawl, Resend,
-Neon), the actual command `npx dwell-cli init`, the actual transaction hash.
-No lorem ipsum, no placeholder names.
+Realistic content throughout — the actual ad lines (Firecrawl, Resend, Neon),
+the actual command `npx dwell-cli init`, the actual API shapes, the actual
+transaction hash. No lorem ipsum, no placeholder names.
 
 All copy in English.
