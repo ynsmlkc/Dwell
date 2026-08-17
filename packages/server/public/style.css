@@ -143,7 +143,18 @@ section:first-of-type { border-top: 0; }
   /* Genislik sabit: "copy" → "✓" degisiminde dugme ziplamasin. */
   min-width: 3.4em; text-align: center; display: inline-block;
 }
-.btn .tag.done { font-size: 15px; line-height: 1; letter-spacing: 0; }
+.btn .tag.done { display: inline-flex; align-items: center; justify-content: center; }
+
+/* Cizilen tik. `stroke-dasharray` ile kendini ciziyor — onay bir olay,
+   aniden belirmek yerine olmasi daha dogru hissettiriyor. */
+.tick {
+  width: 18px; height: 18px; display: block;
+  fill: none; stroke: currentColor;
+  stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
+}
+.tick path { stroke-dasharray: 18; stroke-dashoffset: 18; animation: tick-draw 260ms ease-out forwards; }
+@keyframes tick-draw { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .tick path { stroke-dashoffset: 0; animation: none; } }
 .btn-primary .tag { color: var(--bg); }
 .link-under { font-family: var(--mono); font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--line-3); padding-bottom: 2px; }
 .link-under:hover { color: var(--ink); }

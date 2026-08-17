@@ -185,6 +185,15 @@ export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
 export function show(el, on) { el?.classList.toggle('hidden', !on); }
 
+/**
+ * Onay isareti — yazi tipi glifi degil, cizilmis SVG.
+ *
+ * `✓` karakteri her isletim sisteminde farkli boyutta ve kalinlikta
+ * geliyor; macOS'ta ince, Windows'ta kalin, Linux'ta bazen hic yok.
+ * Cizersek her yerde ayni.
+ */
+const TICK = `<svg class="tick" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8.5l3.6 3.6L13.5 4.7"/></svg>`;
+
 export function copyButton(btn, text) {
   btn.addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(text()); } catch { /* izin yok */ }
@@ -192,9 +201,8 @@ export function copyButton(btn, text) {
     if (tag.dataset.busy) return;              // ust uste tiklamada etiketi kaybetme
     tag.dataset.busy = '1';
     tag.dataset.before = tag.textContent;
-    // Kelime yerine tik: onay bir SONUC, okunacak bir metin degil. Goz onu
-    // okumadan taniyor ve dugmenin genisligi de ziplamiyor.
-    tag.textContent = '✓';
+
+    tag.innerHTML = TICK;
     tag.classList.add('done');
     setTimeout(() => {
       tag.textContent = tag.dataset.before;
