@@ -7,7 +7,7 @@ satır görünür. Gösterim sayılır, kazancın Stellar üzerinden USDC olarak
 ödenir.
 
 ```
-npx dwell-cli init
+npx @dwell/cli init
 ```
 
 Kurulduktan sonra komut `dwell`.
@@ -29,8 +29,8 @@ terminal reklam göstermez, dolayısıyla gösterim de saymaz.
 ## Kurulum
 
 ```bash
-npx dwell-cli init          # kur ve başlat
-npx dwell-cli init --spinner   # üstteki "Thinking…" kelimelerini de kullan
+npx @dwell/cli init          # kur ve başlat
+npx @dwell/cli init --spinner   # üstteki "Thinking…" kelimelerini de kullan
 ```
 
 Sonra yeni bir Claude Code oturumu aç.

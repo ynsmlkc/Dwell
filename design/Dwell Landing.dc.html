@@ -74,7 +74,7 @@
 
       <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 32px">
         <button onClick="{{ copyInstall }}" style="display: flex; align-items: center; gap: 14px; padding: 13px 18px; border: 1px solid rgba(236,231,225,0.2); border-radius: 4px; background: rgba(236,231,225,0.04); color: #ece7e1; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; cursor: pointer" style-hover="border-color: oklch(0.74 0.16 52); background: rgba(249,115,53,0.07)">
-          <span style="color: #6f6a63">$</span>npx dwell-cli init
+          <span style="color: #6f6a63">$</span>npx @dwell/cli init
           <span style="color: oklch(0.74 0.16 52); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase">{{ copyLabel }}</span>
         </button>
         <a href="#how" style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; color: #9d968d; border-bottom: 1px solid rgba(236,231,225,0.2); padding-bottom: 2px" style-hover="color: #ece7e1">How it works ↓</a>
@@ -220,10 +220,10 @@ class Component extends DCLogic {
       stateLabel: reduced ? "waiting" : (waiting ? "waiting — the line is shown" : "answer arrived — the line is gone"),
       copyLabel: this.state.copied ? "copied" : "copy",
       copyLabel2: this.state.copied2 ? "copied" : "copy",
-      copyInstall: () => this.copy("npx dwell-cli init", "copied"),
+      copyInstall: () => this.copy("npx @dwell/cli init", "copied"),
       copyUninstall: () => this.copy("dwell uninstall", "copied2"),
       steps: [
-        { no: "01", title: "Install", body: "One command. It edits your Claude Code settings and nothing else on the machine.", code: "npx dwell-cli init" },
+        { no: "01", title: "Install", body: "One command. It edits your Claude Code settings and nothing else on the machine.", code: "npx @dwell/cli init" },
         { no: "02", title: "Wait", body: "While the model is working, one line sits in your status line next to what the assistant is doing. Idle means empty.", code: "impressions count after 10s displayed" },
         { no: "03", title: "Get paid", body: "USDC lands in the Stellar wallet you connect. You sign with Freighter; we never see a private key.", code: "dwell login" }
       ],

@@ -1,5 +1,5 @@
 {
-  "name": "dwell-cli",
+  "name": "@dwell/cli",
   "version": "0.1.0",
   "description": "AI kodlama araclarinin bekleme anlarini kazanca cevirir. Terminal reklamlari, Stellar uzerinden USDC odemesi.",
   "keywords": [
@@ -43,5 +43,8 @@
     "@dwell/protocol": "workspace:*",
     "@types/node": "^26.2.0",
     "esbuild": "^0.28.2"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

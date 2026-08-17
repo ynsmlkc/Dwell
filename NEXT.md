@@ -123,7 +123,7 @@ Test: `pnpm --filter @dwell/payments test:testnet` (ağ ister, varsayılanda atl
 
 ## 4 — Dağıtım ◐ paket hazır, yayınlanmadı
 
-Paket adı **`dwell-cli`** — npm'de `dwell` dolu (2015'ten kalma alakasız bir
+Paket adı **`@dwell/cli`** — npm'de `dwell` dolu (2015'ten kalma alakasız bir
 modül). Kurulduktan sonra komut yine `dwell`.
 
 - [x] `package.json` yayına hazır: `files`, `bin`, `engines`, `prepack`
