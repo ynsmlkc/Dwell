@@ -27,6 +27,7 @@ import { Pipeline } from './pipeline.js'
 import { Ledger } from './ledger/ledger.js'
 import { CampaignStore } from './ads/campaign-store.js'
 import { DepositWatcher, sqliteCursor } from './advertisers/deposits.js'
+import { WithdrawService } from './advertisers/withdraw.js'
 import { accountId } from './ledger/accounts.js'
 import { openDb, MEMORY, vacuumExpired } from './store/db.js'
 import {
@@ -227,6 +228,26 @@ const payoutRunner = HOT_SECRET
     })
   : null
 
+/**
+ * Reklamveren cekimi. Odemeyle AYNI rayi kullaniyor; sicak cuzdan yoksa
+ * ikisi de kapali — para gonderecek bir yer yok.
+ */
+const withdraw = HOT_SECRET
+  ? new WithdrawService({
+      clock, ledger, store: payouts,
+      rail: new StellarRail({
+        horizonUrl: HORIZON,
+        networkPassphrase: NETWORKS.testnet,
+        sourceSecret: HOT_SECRET,
+        assetCode: process.env['DWELL_ASSET_CODE'] ?? TESTNET_USDC.code,
+        assetIssuer: process.env['DWELL_ASSET_ISSUER'] ?? TESTNET_USDC.issuer,
+      }),
+      spendable: (a) => pipeline.spendable(a),
+      newBatchId: () => `w-${ids.impressionId()}`,
+      log,
+    })
+  : null
+
 if (payoutRunner) {
   // Uretimde gunde bir. Gelistirmede kisa, yoksa hicbir seyi gozlemleyemezsin.
   const her = Number(process.env['DWELL_PAYOUT_INTERVAL_MS'] ?? 60_000)
@@ -329,6 +350,7 @@ const app = createApp({
   payouts,
   campaigns: campaignStore,
   trustlineXdr,
+  ...(withdraw ? { withdraw } : {}),
   ...(hotAddress ? { depositAddress: hotAddress } : {}),
   assetCode: process.env['DWELL_ASSET_CODE'] ?? TESTNET_USDC.code,
   assetIssuer: process.env['DWELL_ASSET_ISSUER'] ?? TESTNET_USDC.issuer,

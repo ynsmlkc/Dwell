@@ -100,7 +100,28 @@
         <p class="figure" id="balance">$0</p>
         <p class="small hidden" id="reserved-note" style="margin: 12px 0 0; max-width: 54ch"></p>
       </div>
-      <button class="btn btn-quiet" id="add-funds">Add funds</button>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap">
+        <button class="btn btn-quiet" id="add-funds">Add funds</button>
+        <button class="btn btn-quiet hidden" id="withdraw">Withdraw</button>
+      </div>
+    </div>
+
+    <!-- Cekme kutusu — yalnizca acikca istendiginde -->
+    <div class="card hidden" id="withdraw-box" style="margin-bottom: clamp(24px, 4vw, 36px)">
+      <h3 style="margin-bottom: 6px">Withdraw unspent budget</h3>
+      <p class="small" style="margin: 0 0 20px; max-width: 62ch">Goes back to <span id="w-addr" style="color: var(--muted)"></span> — the wallet you funded from. There is no other destination; your address is your identity here.</p>
+
+      <div style="display: flex; flex-wrap: wrap; align-items: end; gap: 16px">
+        <label class="field" style="max-width: 220px">Amount in USD<input type="text" id="w-amount" placeholder="0.00"></label>
+        <button class="btn btn-sm btn-quiet" id="w-max">Max</button>
+        <button class="btn btn-primary" id="w-send">
+          <span class="spinner hidden" id="w-spin"></span><span>Withdraw</span>
+        </button>
+        <button class="btn btn-sm btn-quiet" id="w-cancel">Cancel</button>
+      </div>
+      <p class="small" style="margin: 14px 0 0" id="w-avail"></p>
+      <p class="err hidden" id="w-error"></p>
+      <div class="note hidden" id="w-done" style="margin-top: 16px; border-left-color: var(--accent)"></div>
     </div>
 
     <section style="padding-bottom: 0">
@@ -203,6 +224,56 @@ $('#reconnect').onclick = () => { session.clear(); view('v-connect'); };
 $('#signout').onclick = () => { session.clear(); location.reload(); };
 $('#retry-load').onclick = () => load();
 $('#add-funds').onclick = () => { forceDeposit = true; render(); };
+
+/* ─────────── para cekme ─────────── */
+
+const wBox = $('#withdraw-box');
+$('#withdraw').onclick = () => {
+  show(wBox, true);
+  $('#w-addr').textContent = short(me.advertiserId);
+  $('#w-avail').textContent = `${usd(me.withdrawableStroops)} available to withdraw.`;
+  show($('#w-error'), false); show($('#w-done'), false);
+  wBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
+$('#w-cancel').onclick = () => show(wBox, false);
+$('#w-max').onclick = () => {
+  // Ham stroop'tan dolara: BigInt, float degil.
+  $('#w-amount').value = usd(me.withdrawableStroops).replace('$', '');
+};
+
+$('#w-send').onclick = async () => {
+  show($('#w-error'), false);
+  const amount = toStroops($('#w-amount').value);
+  if (amount === null || amount <= 0n) {
+    $('#w-error').textContent = 'Enter an amount, e.g. 12.50';
+    show($('#w-error'), true); return;
+  }
+  if (amount > BigInt(me.withdrawableStroops)) {
+    $('#w-error').textContent = `Only ${usd(me.withdrawableStroops)} can be withdrawn right now.`;
+    show($('#w-error'), true); return;
+  }
+
+  show($('#w-spin'), true);
+  $('#w-send').disabled = true;
+  try {
+    const r = await api('/v1/advertiser/withdraw', {
+      method: 'POST', body: { amountStroops: amount.toString() },
+    });
+    $('#w-done').innerHTML =
+      `Sent ${usd(r.amountStroops)}. `
+      + `<a href="https://stellar.expert/explorer/testnet/tx/${r.txHash}" target="_blank" rel="noopener" style="color: var(--accent)">View on the chain ↗</a>`;
+    show($('#w-done'), true);
+    $('#w-amount').value = '';
+    await load();
+    show(wBox, true);
+  } catch (e) {
+    $('#w-error').textContent = e.message;
+    show($('#w-error'), true);
+  } finally {
+    show($('#w-spin'), false);
+    $('#w-send').disabled = false;
+  }
+};
 $('#back-to-campaigns').onclick = () => { forceDeposit = false; render(); };
 
 /* ─────────── veri ─────────── */
@@ -245,6 +316,10 @@ function render() {
     $('#reserved-note').textContent =
       `${usd(spendable.toString())} spendable — ${usd(reserved.toString())} is held for ads already shown but not yet reported.`;
   }
+
+  // Cekilecek bir sey yoksa dugme de yok — basilinca hata veren dugme,
+  // olmayan dugmeden kotu.
+  show($('#withdraw'), BigInt(me.withdrawableStroops || '0') > 0n);
 
   const cs = me.campaigns || [];
   show($('#no-campaigns'), cs.length === 0);

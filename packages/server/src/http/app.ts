@@ -47,6 +47,8 @@ export interface AppDeps {
   readonly assetIssuer?: string
   /** Cuzdanla giris. Verilmezse `/v1/auth/*` uclari acilmaz. */
   readonly walletAuth?: WalletAuth
+  /** Reklamverenin harcamadigi butceyi geri cekmesi. */
+  readonly withdraw?: import('../advertisers/withdraw.js').WithdrawService
   /** USDC kabulu icin imzasiz islem kurar. */
   readonly trustlineXdr?: (address: string) => Promise<
     | { ok: true; xdr: string; networkPassphrase: string }
@@ -329,6 +331,10 @@ export function createApp(deps: AppDeps) {
               note: `Yalnizca ${advertiserId} adresinden gonderilen odemeler hesabina yazilir`,
             }
           : null,
+        // Su an cekilebilecek tutar. `spendable` ile ayni ama esigin
+        // altindaysa sifir: kullaniciya cekilemeyecek bir rakam gostermek,
+        // dugmeye basip hata almasina yol acardi.
+        withdrawableStroops: (deps.withdraw?.available(advertiserId) ?? 0n).toString(),
         campaigns: store.forAdvertiser(advertiserId).map(toCampaignJson),
       })
     })
@@ -354,6 +360,31 @@ export function createApp(deps: AppDeps) {
       if (!r.ok) return c.json({ ...err('DWL_9001', r.reason), field: r.field }, 400)
 
       return c.json(toCampaignJson(r.campaign), 201)
+    })
+
+    /**
+     * Harcanmamis butceyi geri cek.
+     *
+     * Hedef parametresi YOK: para reklamverenin kendi adresine gider.
+     * Kimlik zaten cuzdan (ADR-010), baska bir hedef kabul etmek kimlik
+     * dogrulamasini anlamsiz kilardi.
+     */
+    app.post('/v1/advertiser/withdraw', requireScope('manage:campaigns'), async (c) => {
+      if (!deps.withdraw) return c.json(err('DWL_9001', 'cekim kapali'), 404)
+      const { publisherId: advertiserId } = c.get('auth')
+
+      const body = await c.req.json().catch(() => null)
+      const raw = typeof body?.amountStroops === 'string' ? body.amountStroops : null
+      if (raw === null || !/^\d+$/.test(raw)) {
+        return c.json(err('DWL_9001', '`amountStroops` tam sayi metni olmali'), 400)
+      }
+
+      const r = await deps.withdraw.withdraw(advertiserId, stroops(BigInt(raw)))
+      if (!r.ok) {
+        // 409 = "su an olmaz, sonra olabilir". 400 = "boyle olmaz".
+        return c.json(err('DWL_9001', r.reason), r.retryable ? 409 : 400)
+      }
+      return c.json({ txHash: r.txHash, amountStroops: r.amount.toString() })
     })
 
     app.post('/v1/advertiser/campaigns/:id/status', requireScope('manage:campaigns'), async (c) => {

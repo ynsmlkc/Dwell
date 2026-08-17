@@ -202,14 +202,26 @@ export class Ledger {
     publisherId: string
     amount: Stroops
     asset?: Asset
+    /**
+     * Paranin cikacagi hesap turu.
+     *
+     * Varsayilan `publisher` — yayinci kazancinin odenmesi. `advertiser`
+     * ise reklamverenin harcamadigi butceyi geri cekmesi. Ikisi AYNI
+     * makineyi kullaniyor: ayni `payouts_in_flight` kutusu, ayni ters
+     * kayit yolu, ayni mutabakat. Ayri bir akis yazmak, test edilmis
+     * mantigin ikinci ve daha az bakimli bir kopyasini uretmek olurdu.
+     */
+    kind?: 'publisher' | 'advertiser'
   }): readonly Entry[] {
     if (input.amount <= 0n) throw new LedgerError('odeme tutari pozitif olmali', 'DWL_5006')
     const asset = input.asset ?? 'USDC'
     const key = `${input.batchId}:${input.publisherId}`
 
+    const kind = input.kind ?? 'publisher'
+
     return this.#post([
       this.#entry({
-        accountId: accountId('publisher', input.publisherId), amount: neg(input.amount),
+        accountId: accountId(kind, input.publisherId), amount: neg(input.amount),
         asset, type: 'payout_submit', refType: 'payout_batch', refId: key,
         idempotencyKey: `payout_submit:${key}:publisher`,
         publisherId: input.publisherId,
