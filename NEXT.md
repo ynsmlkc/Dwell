@@ -153,6 +153,40 @@ Kurulum tarafı tamam; kazanç tarafı sunucu bekliyor (madde 5).
 
 ---
 
+## 6 — Uçtan uca para akışı ✅ (2026-08-17)
+
+Reklamverenin cebinden yayıncının cüzdanına, tek elle müdahale olmadan:
+
+```
+reklamveren cüzdanla giriş yaptı
+15 USDC kasaya gönderdi          → izleyici gördü, deftere yazdı
+iki kampanya oluşturdu, yayına aldı
+yayıncı cüzdanla giriş yaptı     → cüzdanı otomatik bağlandı
+22 gösterim                       → doğrulandı → $1.32 ödenebilir
+eşik ($1) aşıldı                  → ödeme turu çalıştı
+
+💸 https://stellar.expert/explorer/testnet/tx/b54a5980b1e66d742099dc3946bc9542909bcc22b1cf19d05353eb561f61e6a0
+   1.3200000 USDC · başarılı · ledger 4188711
+   yayıncının cüzdanındaki bakiye: 1.3200000 USDC
+```
+
+Yolda iki şey kanıtlandı:
+
+**Bütçe bitince reklam duruyor.** İlk denemede CPM'i gerçekçi olmayan bir
+seviyeye ($200/1000) koymuştum; $5 bütçe 25 gösterimde bitti ve sistem
+sunmayı bıraktı. Doğru davranış.
+
+**Parayı alamayacak hesaba ödeme yapılmıyor.** USDC trustline'ı olmayan bir
+yayıncı eşiği aştı ama ödeme çıkmadı — parası defterde duruyor, kaybolmadı.
+Trustline eklenince ödeniyor. (ADR-020'deki sponsorlu trustline butonu tam
+bu yüzden gerekli.)
+
+**Yolda bulunan hata:** girişte cüzdan `WalletStore`'a bağlanmıyordu, yani
+ödeme işi HERKESİ "cüzdan bağlı değil" diye atlıyordu. Hiçbir hata
+görünmüyor, sadece para hiç gitmiyordu.
+
+---
+
 ## 5 — Sunucu ✅ canlı (2026-08-17)
 
 ```
@@ -164,7 +198,7 @@ Railway, Dockerfile ile derleniyor, SQLite bir Volume üzerinde.
 - [x] Deploy — Railway, iki aşamalı Docker imajı (~50 MB)
 - [x] `/health`, temiz kapanış (SIGTERM'de ödeme turu durur)
 - [x] Kalıcı depolama — SQLite, `/data/dwell.db`
-- [ ] `DWELL_HOT_SECRET` + testnet USDC ile sıcak cüzdan (ödeme hâlâ kapalı)
+- [x] `DWELL_HOT_SECRET` + sıcak cüzdan — **ödeme açık**
 
 Gerçek dağıtımda uçtan uca doğrulandı:
 
