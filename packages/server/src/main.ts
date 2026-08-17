@@ -345,6 +345,26 @@ const app = createApp({
  * onune gecmiyor — Hono sirayla bakiyor.
  */
 const PUBLIC = join(dirname(fileURLToPath(import.meta.url)), 'public')
+
+/**
+ * Statik dosyalar HER ZAMAN dogrulanir.
+ *
+ * Bunu koymadan once bir deploy sonrasi kullanici hala eski `app.js`'i
+ * goruyordu: tarayici dosyayi onbellekten veriyor, sunucudaki yeni surumu
+ * hic sormuyordu. "Sayfayi zorla yenile" demek cozum degil — kullanicilarin
+ * cogu bunu bilmez ve bilmesi de gerekmez.
+ *
+ * `no-cache` "onbelleğe alma" DEMEK DEGIL; "kullanmadan once bana sor"
+ * demek. Dosya degismediyse 304 doner, indirme olmaz. Toplam site 18 KB;
+ * bir tur dogrulamanin bedeli, yanlis surumu gostermenin bedelinin yaninda
+ * hicbir sey.
+ */
+app.use('/*', async (c, next) => {
+  await next()
+  if (!c.req.path.startsWith('/v1/') && c.req.path !== '/health') {
+    c.header('cache-control', 'no-cache')
+  }
+})
 app.use('/*', serveStatic({
   root: PUBLIC,
   // Klasor istendiginde `index.html` don: `/app` → `public/app/index.html`
