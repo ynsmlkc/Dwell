@@ -153,15 +153,36 @@ Kurulum tarafı tamam; kazanç tarafı sunucu bekliyor (madde 5).
 
 ---
 
-## 5 — Sunucu (ertelendi)
+## 5 — Sunucu ✅ canlı (2026-08-17)
 
-Sunucu bir yerde koşmadan kimse kazanamaz. Şu an istemci sunucusuz çalışıyor:
-örnek reklamlar dönüyor, gösterimler diske yazılıyor, hiçbir yere gitmiyor.
-`dwell init` bunu açıkça söylüyor.
+```
+https://dwellserver-production.up.railway.app
+```
 
-- [ ] Deploy hedefi seç (Railway / Fly / VPS)
-- [ ] `DWELL_HOT_SECRET` + testnet USDC ile sıcak cüzdan
-- [ ] Kalıcı depolama — şu an her şey bellekte, yeniden başlatmada gidiyor
+Railway, Dockerfile ile derleniyor, SQLite bir Volume üzerinde.
+
+- [x] Deploy — Railway, iki aşamalı Docker imajı (~50 MB)
+- [x] `/health`, temiz kapanış (SIGTERM'de ödeme turu durur)
+- [x] Kalıcı depolama — SQLite, `/data/dwell.db`
+- [ ] `DWELL_HOT_SECRET` + testnet USDC ile sıcak cüzdan (ödeme hâlâ kapalı)
+
+Gerçek dağıtımda uçtan uca doğrulandı:
+
+```
+giriş (SEP-10)  → token, publisherId = cüzdan adresi
+3 gösterim      → kabul
+45 sn sonra     → bekleyen 0 · ödenebilir 425.000
+REDEPLOY
+eski token      → hâlâ geçerli, yeniden giriş gerekmedi
+ödenebilir      → 425.000 (birebir aynı)
+yeni gösterim   → 575.000 (üstüne biniyor, sıfırlanmıyor)
+aynı gösterim   → yinelenen olarak reddedildi
+```
+
+Deploy sırasında çıkan ve düzeltilen hatalar `git log`'da: bundle'ın ESM'de
+hiç açılmaması, üretimde oluşan geliştirme token'ı, her yeniden başlatmada
+değişen SEP-10 anahtarı, Railway'in enjekte ettiği `PORT`, root'a ait
+bağlanan Volume.
 
 ---
 
