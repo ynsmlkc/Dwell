@@ -144,6 +144,27 @@ function migrate(db: Db): void {
     );
     CREATE INDEX IF NOT EXISTS ix_impressions_state ON impressions (state);
 
+    CREATE TABLE IF NOT EXISTS campaigns (
+      id             TEXT PRIMARY KEY,
+      advertiser_id  TEXT NOT NULL,
+      bid_cpm        TEXT NOT NULL,
+      rev_share_bps  INTEGER NOT NULL,
+      brand          TEXT NOT NULL,
+      text           TEXT NOT NULL,
+      cta            TEXT NOT NULL,
+      status         TEXT NOT NULL,
+      frequency_cap  INTEGER NOT NULL,
+      created_at     INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_campaigns_advertiser ON campaigns (advertiser_id);
+    CREATE INDEX IF NOT EXISTS ix_campaigns_status     ON campaigns (status);
+
+    -- Kucuk anahtar/deger. Su an yalnizca zincir tarama cursor'u.
+    CREATE TABLE IF NOT EXISTS kv (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
     -- Sunulan reklamlar. Bir gosterim ancak burada karsiligi olan bir nonce
     -- ile kabul edilir.
     --

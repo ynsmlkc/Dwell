@@ -165,10 +165,15 @@ export const tokenScopeSchema = z.enum([
   'read:balance',
   'wallet:write',
   'devices:manage',
+  // Reklamveren tarafi. Yayinci token'i bunlari ASLA tasimaz: calinmis bir
+  // daemon token'i kampanya olusturup baskasinin parasini harcayamamali.
+  'manage:campaigns',
+  'read:spend',
 ])
 export type TokenScope = z.infer<typeof tokenScopeSchema>
 
 export const DAEMON_SCOPES: readonly TokenScope[] = ['report:impressions', 'read:balance']
+export const ADVERTISER_SCOPES: readonly TokenScope[] = ['manage:campaigns', 'read:spend']
 
 export const deviceTokenSchema = z.object({
   token: z.string().min(32),

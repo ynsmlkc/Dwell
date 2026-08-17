@@ -17,9 +17,11 @@ import { createApp } from './http/app.js'
 import { hashToken } from './http/auth.js'
 import { WalletAuth, serverKeypair, horizonSigners } from './http/wallet-auth.js'
 import { Sep10, NETWORKS } from '@dwell/payments'
+import { Keypair } from '@stellar/stellar-sdk'
 import { Pipeline } from './pipeline.js'
 import { Ledger } from './ledger/ledger.js'
-import type { Campaign } from './ads/selector.js'
+import { CampaignStore } from './ads/campaign-store.js'
+import { DepositWatcher, sqliteCursor } from './advertisers/deposits.js'
 import { accountId } from './ledger/accounts.js'
 import { openDb, MEMORY, vacuumExpired } from './store/db.js'
 import {
@@ -89,17 +91,14 @@ ledger.deposit({
 
 /* ─────────────────────────── kampanyalar ─────────────────────────── */
 
-const campaigns: Campaign[] = [
-  { id: 'c-firecrawl', advertiserId: DEV_ADVERTISER, bidCpm: stroops(300_000_000n), revShareBps: 5000,
-    creative: { brand: 'Firecrawl', text: 'docs to LLM-ready markdown', cta: 'firecrawl.dev' },
-    status: 'active', frequencyCap: 1 },
-  { id: 'c-resend', advertiserId: DEV_ADVERTISER, bidCpm: stroops(250_000_000n), revShareBps: 5000,
-    creative: { brand: 'Resend', text: 'email API for developers', cta: 'resend.com' },
-    status: 'active', frequencyCap: 1 },
-  { id: 'c-neon', advertiserId: DEV_ADVERTISER, bidCpm: stroops(200_000_000n), revShareBps: 5000,
-    creative: { brand: 'Neon', text: 'serverless Postgres', cta: 'neon.tech' },
-    status: 'active', frequencyCap: 1 },
-]
+/**
+ * Kampanyalar artik REKLAMVERENDEN geliyor, kodda sabit degil.
+ *
+ * Onceden burada uc tane gomulu kayit vardi ve kampanya eklemek deploy
+ * gerektiriyordu. Artik reklamveren cuzdaniyla giriyor, parasini yatiriyor,
+ * kampanyasini kendisi olusturuyor.
+ */
+const campaignStore = new CampaignStore(db, clock, () => ids.impressionId())
 
 /* ─────────────────────────── boru hatti ─────────────────────────── */
 
@@ -126,7 +125,7 @@ const pipeline = new Pipeline({
     loadDeliveries: () => mirror.loadDeliveries(),
     saveDelivery: (d) => mirror.saveDelivery(d),
   },
-  campaigns: () => campaigns,
+  campaigns: () => campaignStore.all(),
   minImpressionMs: config.minImpressionMs,
   minClientVersion: config.minClientVersion,
   // Gelistirmede 24 saat beklemek isi imkansiz kilar; uretimde 24 saat
@@ -192,6 +191,8 @@ const wallets = new WalletStore({
 let zamanlama: { stop: () => void } | null = null
 
 const HOT_SECRET = process.env['DWELL_HOT_SECRET']
+/** Reklamverenin para gonderecegi adres. */
+const hotAddress = HOT_SECRET ? Keypair.fromSecret(HOT_SECRET).publicKey() : null
 const payoutRunner = HOT_SECRET
   ? new PayoutRunner({
       clock, wallets, ledger, store: payouts,
@@ -222,6 +223,39 @@ if (payoutRunner) {
   log('odeme KAPALI — DWELL_HOT_SECRET tanimli degil')
 }
 
+/* ─────────────────── reklamveren para yatirma ─────────────────── */
+
+/**
+ * Zinciri tarayip gelen USDC'yi deftere yazar.
+ *
+ * Eslesme GONDEREN ADRESE gore: reklamveren cuzdaniyla giris yaptigi icin
+ * `G_ADV`'den gelen para `G_ADV`'nin hesabina gider. Memo yok, reklamveren
+ * basina ayri adres yok (ADR-021).
+ *
+ * Sicak cuzdan yoksa calismaz — para gonderilecek adres de yok zaten.
+ */
+const depositWatcher = HOT_SECRET && hotAddress
+  ? new DepositWatcher({
+      clock, ledger,
+      horizonUrl: HORIZON,
+      destination: hotAddress,
+      assetCode: process.env['DWELL_ASSET_CODE'] ?? TESTNET_USDC.code,
+      assetIssuer: process.env['DWELL_ASSET_ISSUER'] ?? TESTNET_USDC.issuer,
+      // Bir adres ancak GIRIS YAPMISSA reklamveren sayilir. Rastgele birinin
+      // gonderdigi para deftere yazilmaz — kimin oldugunu bilmiyoruz.
+      isKnownAdvertiser: (a) => tokens.forPublisher(a).length > 0,
+      cursor: sqliteCursor(db),
+      log,
+    })
+  : null
+
+if (depositWatcher) {
+  const her = Number(process.env['DWELL_DEPOSIT_INTERVAL_MS'] ?? 20_000)
+  setInterval(() => { void depositWatcher.poll() }, her).unref()
+  void depositWatcher.poll()
+  log(`yatirma izleyicisi: her ${her / 1000}s · adres ${hotAddress}`)
+}
+
 /* ─────────────────────── dogrulama job'i ─────────────────────── */
 
 // Uretimde cron; burada basit bir aralik. Ledger'a yazan tek yer burasi.
@@ -243,12 +277,16 @@ const app = createApp({
   ipSalt: process.env['DWELL_IP_SALT'] ?? 'dev-salt-degistir',
   payoutThreshold: PAYOUT_THRESHOLD,
   payouts,
+  campaigns: campaignStore,
+  ...(hotAddress ? { depositAddress: hotAddress } : {}),
+  assetCode: process.env['DWELL_ASSET_CODE'] ?? TESTNET_USDC.code,
+  assetIssuer: process.env['DWELL_ASSET_ISSUER'] ?? TESTNET_USDC.issuer,
 })
 
 const server = serve({ fetch: app.fetch, port: PORT, hostname: HOST }, (info) => {
   const bakiye = ledger.balance(accountId('advertiser', DEV_ADVERTISER))
   log(`dwell sunucusu http://${HOST}:${info.port}`)
-  log(`${campaigns.length} kampanya · reklamveren bakiyesi ${bakiye} stroop`)
+  log(`${campaignStore.all().length} kampanya · dev reklamveren bakiyesi ${bakiye} stroop`)
   if (DEV_TOKEN) log(`gelistirme token'i: ${DEV_TOKEN}`)
   else log("gelistirme token'i YOK (uretim) — giris yalnizca `dwell login` ile")
   log(`SEP-10 imzalama anahtari: ${sep10Keypair.publicKey()}`)

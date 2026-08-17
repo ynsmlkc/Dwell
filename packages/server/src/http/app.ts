@@ -23,6 +23,7 @@ import { accountId } from '../ledger/accounts.js'
 import { bearerToken, type AuthContext, type TokenLookup } from './auth.js'
 import type { WalletAuth } from './wallet-auth.js'
 import type { PayoutStore } from '../payouts/store.js'
+import type { CampaignStore } from '../ads/campaign-store.js'
 import { compareVersions } from '../impressions/ingest.js'
 
 export interface AppDeps {
@@ -38,6 +39,12 @@ export interface AppDeps {
   readonly explorerBase?: string
   /** Odeme gecmisi. Verilmezse `recentPayouts` bos doner. */
   readonly payouts?: PayoutStore
+  /** Reklamveren tarafi. Verilmezse `/v1/advertiser/*` uclari acilmaz. */
+  readonly campaigns?: CampaignStore
+  /** Sicak cuzdan adresi — reklamveren parayi buraya gonderir. */
+  readonly depositAddress?: string
+  readonly assetCode?: string
+  readonly assetIssuer?: string
   /** Cuzdanla giris. Verilmezse `/v1/auth/*` uclari acilmaz. */
   readonly walletAuth?: WalletAuth
 }
@@ -51,6 +58,18 @@ const err = (code: ErrorCode, hint?: string) => ({
 /** §10 — IP yalnizca hash'lenerek saklanir, ham hali hicbir yere yazilmaz. */
 const hashIp = (ip: string | undefined, salt: string): string | null =>
   ip ? createHash('sha256').update(salt).update(ip).digest('hex').slice(0, 32) : null
+
+/** Kampanyanin disariya gorunen sekli. Ic alanlar sizmaz. */
+const toCampaignJson = (c: import('../ads/selector.js').Campaign) => ({
+  id: c.id,
+  brand: c.creative.brand,
+  text: c.creative.text,
+  cta: c.creative.cta,
+  bidCpmStroops: c.bidCpm.toString(),
+  status: c.status,
+  // Onizleme: reklamverenin gorecegi satir, kullanicinin gordugunun aynisi.
+  preview: `✶ ${c.creative.brand} — ${c.creative.text} · ${c.creative.cta ?? ''}`,
+})
 
 export function createApp(deps: AppDeps) {
   const app = new Hono<{ Variables: Vars }>()
@@ -151,13 +170,16 @@ export function createApp(deps: AppDeps) {
         return c.json(err('DWL_9001', '`address` ve `transaction` gerekli'), 400)
       }
 
-      const r = await wa.verify(address, signed)
+      // Rol token'in kapsamini belirliyor. Bilinmeyen deger yayinci sayilir
+      // — sessizce reklamveren yetkisi vermek yanlis tarafta hata olurdu.
+      const role = body?.role === 'advertiser' ? 'advertiser' : 'publisher'
+      const r = await wa.verify(address, signed, role)
       // 401: imza gecerli degil. Bu bir sunucu hatasi degil, kimlik reddi.
       if (!r.ok) return c.json(err('DWL_2002', r.detail ? `${r.reason}: ${r.detail}` : r.reason), 401)
 
       // Ham token YALNIZCA burada gorunur. Tekrar okunamaz — kaybedilirse
       // yeniden giris yapilir. Sunucuda yalnizca hash'i var.
-      return c.json({ token: r.token, tokenId: r.tokenId, publisherId: r.publisherId })
+      return c.json({ token: r.token, tokenId: r.tokenId, publisherId: r.publisherId, role })
     })
   }
 
@@ -247,6 +269,91 @@ export function createApp(deps: AppDeps) {
         : null,
     })
   })
+
+  /* ─────────────────── reklamveren ─────────────────── */
+
+  /**
+   * Reklamveren de CUZDANLA giris yapiyor — yayincilarla ayni SEP-10 akisi,
+   * farkli kapsamlar. `advertiserId` adresin kendisi (ADR-010).
+   *
+   * Kapsam ayrimi onemli: calinmis bir daemon token'i kampanya olusturup
+   * baskasinin butcesini harcayamaz.
+   */
+  if (deps.campaigns) {
+    const store = deps.campaigns
+
+    /** Reklamverenin ozeti: bakiye, para yatirma bilgisi, kampanyalar. */
+    app.get('/v1/advertiser/me', requireScope('read:spend'), (c) => {
+      const { publisherId: advertiserId } = c.get('auth')
+      const bakiye = deps.ledger.balance(accountId('advertiser', advertiserId))
+
+      return c.json({
+        advertiserId,
+        balanceStroops: bakiye.toString(),
+        // Rezerve: teslim edilmis ama henuz raporlanmamis reklamlar + bekleyen
+        // gosterimler. Reklamveren "param var ama harcayamiyorum" dedigi anda
+        // cevabi bu.
+        spendableStroops: deps.pipeline.spendable(advertiserId).toString(),
+        deposit: deps.depositAddress
+          ? {
+              address: deps.depositAddress,
+              assetCode: deps.assetCode ?? 'USDC',
+              assetIssuer: deps.assetIssuer ?? null,
+              // KRITIK: para KENDI cuzdanindan gelmeli. Eslesme gonderen
+              // adrese gore yapiliyor; borsadan gonderilen para sahipsiz kalir.
+              note: `Yalnizca ${advertiserId} adresinden gonderilen odemeler hesabina yazilir`,
+            }
+          : null,
+        campaigns: store.forAdvertiser(advertiserId).map(toCampaignJson),
+      })
+    })
+
+    app.post('/v1/advertiser/campaigns', requireScope('manage:campaigns'), async (c) => {
+      const { publisherId: advertiserId } = c.get('auth')
+      const body = await c.req.json().catch(() => null)
+
+      const bid = typeof body?.bidCpmStroops === 'string' ? body.bidCpmStroops : null
+      if (bid === null || !/^\d+$/.test(bid)) {
+        return c.json(err('DWL_9001', '`bidCpmStroops` tam sayi metni olmali'), 400)
+      }
+
+      const r = store.create({
+        advertiserId,
+        brand: String(body?.brand ?? ''),
+        text: String(body?.text ?? ''),
+        cta: String(body?.cta ?? ''),
+        bidCpm: stroops(BigInt(bid)),
+      })
+      // Red sebebi ALANIYLA birlikte donuyor: form hangi kutuyu
+      // kirmizi yapacagini bilsin.
+      if (!r.ok) return c.json({ ...err('DWL_9001', r.reason), field: r.field }, 400)
+
+      return c.json(toCampaignJson(r.campaign), 201)
+    })
+
+    app.post('/v1/advertiser/campaigns/:id/status', requireScope('manage:campaigns'), async (c) => {
+      const { publisherId: advertiserId } = c.get('auth')
+      const body = await c.req.json().catch(() => null)
+      const durum = body?.status
+
+      if (durum !== 'active' && durum !== 'paused') {
+        return c.json(err('DWL_9001', '`status` yalnizca active veya paused olabilir'), 400)
+      }
+
+      // Yayina almadan once para kontrolu. Bos butceyle "aktif" gorunen bir
+      // kampanya, reklamvereni hicbir sey olmadigini anlamadan bekletir.
+      if (durum === 'active') {
+        const spendable = deps.pipeline.spendable(advertiserId)
+        if (spendable <= 0n) {
+          return c.json(err('DWL_3004', 'bakiye yok — once para yatir'), 402)
+        }
+      }
+
+      const r = store.setStatus(c.req.param('id'), advertiserId, durum)
+      if (!r.ok) return c.json(err('DWL_9001', r.reason), 404)
+      return c.json(toCampaignJson(r.campaign))
+    })
+  }
 
   app.notFound((c) => c.json(err('DWL_9001', 'bilinmeyen uc'), 404))
 

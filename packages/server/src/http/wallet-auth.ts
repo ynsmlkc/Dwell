@@ -44,8 +44,25 @@ export interface WalletAuthDeps {
   readonly hashToken: (raw: string) => string
 }
 
-/** Yeni girisin alacagi kapsamlar. Daemon cuzdan degistiremez (ADR-014). */
-export const LOGIN_SCOPES: readonly TokenScope[] = ['report:impressions', 'read:balance']
+/**
+ * Rol basina kapsamlar.
+ *
+ * Ayni cuzdan hem yayinci hem reklamveren olabilir — ama AYNI ANDA DEGIL,
+ * ayni token'la degil. Iki ayri giris, iki ayri token.
+ *
+ * Sebep: kapsam karistirmak, calinmis bir daemon token'inin kampanya
+ * olusturup butce harcamasi demek. Daemon her makinede duruyor; panel
+ * token'i yalnizca tarayicida.
+ */
+export type Role = 'publisher' | 'advertiser'
+
+export const SCOPES_BY_ROLE: Record<Role, readonly TokenScope[]> = {
+  publisher: ['report:impressions', 'read:balance'],
+  advertiser: ['manage:campaigns', 'read:spend'],
+}
+
+/** Geriye donuk ad. */
+export const LOGIN_SCOPES = SCOPES_BY_ROLE.publisher
 
 export type ChallengeResult =
   | { readonly ok: true; readonly xdr: string; readonly networkPassphrase: string; readonly expiresAt: number }
@@ -75,7 +92,7 @@ export class WalletAuth {
   }
 
   /** Imzalanmis challenge'i dogrular ve token uretir. */
-  async verify(address: string, signedXdr: string): Promise<LoginResult> {
+  async verify(address: string, signedXdr: string, role: Role = 'publisher'): Promise<LoginResult> {
     const pending = this.#pending.get(address)
     if (!pending) return { ok: false, reason: 'challenge bulunamadi — once /v1/auth/challenge' }
 
@@ -118,7 +135,7 @@ export class WalletAuth {
     const { tokenId } = this.deps.issueToken({
       publisherId: address,
       tokenHash: this.deps.hashToken(raw),
-      scopes: LOGIN_SCOPES,
+      scopes: SCOPES_BY_ROLE[role],
     })
 
     return { ok: true, token: raw, tokenId, publisherId: address }
