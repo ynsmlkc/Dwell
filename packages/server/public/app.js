@@ -189,9 +189,18 @@ export function copyButton(btn, text) {
   btn.addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(text()); } catch { /* izin yok */ }
     const tag = btn.querySelector('.tag') || btn;
-    const before = tag.textContent;
-    tag.textContent = 'copied';
-    setTimeout(() => { tag.textContent = before; }, 2000);
+    if (tag.dataset.busy) return;              // ust uste tiklamada etiketi kaybetme
+    tag.dataset.busy = '1';
+    tag.dataset.before = tag.textContent;
+    // Kelime yerine tik: onay bir SONUC, okunacak bir metin degil. Goz onu
+    // okumadan taniyor ve dugmenin genisligi de ziplamiyor.
+    tag.textContent = '✓';
+    tag.classList.add('done');
+    setTimeout(() => {
+      tag.textContent = tag.dataset.before;
+      tag.classList.remove('done');
+      delete tag.dataset.busy;
+    }, 1600);
   });
 }
 
