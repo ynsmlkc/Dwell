@@ -123,7 +123,7 @@ Test: `pnpm --filter @dwell/payments test:testnet` (ağ ister, varsayılanda atl
 
 ## 4 — Dağıtım ◐ paket hazır, yayınlanmadı
 
-Paket adı **`@dwell/cli`** — npm'de `dwell` dolu (2015'ten kalma alakasız bir
+Paket adı **`dwellsh`** — npm'de `dwell` dolu (2015'ten kalma alakasız bir
 modül). Kurulduktan sonra komut yine `dwell`.
 
 - [x] `package.json` yayına hazır: `files`, `bin`, `engines`, `prepack`
@@ -131,7 +131,7 @@ modül). Kurulduktan sonra komut yine `dwell`.
 - [x] README (npm sayfası)
 - [x] Temiz makinede tarball kurulumu doğrulandı: init → reklam → uninstall
 - [x] Giriş yapılmamışken `init` "demo modu, kazanç yok" diyor
-- [ ] `npm publish` — sende (npm hesabı)
+- [x] `npm publish` — yayında
 - [ ] Landing sayfası — **sende**
 
 **Yolda bulunan iki hata.** İkisi de ancak gerçekten kurmayı deneyince çıktı:

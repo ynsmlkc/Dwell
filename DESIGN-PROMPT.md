@@ -68,7 +68,7 @@ button with no explanation.
 - The ad line itself, rendered as it appears in a terminal — monospace, the
   `✶` in the accent color, inside a realistic terminal frame with a prompt
   line above it. This is the single most important element on the page.
-- Primary CTA: copy-to-clipboard field with `npx @dwell/cli init`. Clicking
+- Primary CTA: copy-to-clipboard field with `npx dwellsh init`. Clicking
   copies; the label becomes "Copied" for 2 seconds, then reverts.
 - Secondary: "How it works" → scrolls to (c).
 
@@ -444,7 +444,7 @@ it, before reading a word.
 
 React + Tailwind, or plain HTML/CSS. Every route, every state listed above.
 Realistic content throughout — the actual ad lines (Firecrawl, Resend, Neon),
-the actual command `npx @dwell/cli init`, the actual API shapes, the actual
+the actual command `npx dwellsh init`, the actual API shapes, the actual
 transaction hash. No lorem ipsum, no placeholder names.
 
 All copy in English.
