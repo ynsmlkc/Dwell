@@ -152,13 +152,26 @@ const walletAuth = new WalletAuth({
   }, clock),
   loadSigners: horizonSigners(HORIZON),
   hashToken,
-  issueToken: ({ publisherId, tokenHash, scopes }) => {
+  issueToken: ({ publisherId, tokenHash, scopes, role }) => {
     const tokenId = ids.impressionId()
     tokens.add({
       id: tokenId, publisherId, tokenHash, scopes,
       clientVersion: null, revokedAt: null, lastSeenAt: null,
     })
-    log(`giris: ${publisherId.slice(0, 8)}…${publisherId.slice(-4)}`)
+
+    // Yayinci girisi cuzdani DA baglar.
+    //
+    // Kimlik zaten cuzdan (ADR-010): `publisherId` adresin kendisi. Ama
+    // odeme isi `WalletStore`'a bakiyor ve orasi bos kalirsa HERKES
+    // "cuzdan bagli degil" diye atlanir — kullanici cuzdaniyla giris
+    // yaptigi halde. Hicbir odeme hicbir zaman yapilmazdi.
+    //
+    // Yalnizca ilk girişte: `bind` her cagrildiginda bildirim gonderiyor.
+    if (role === 'publisher' && wallets.get(publisherId) === null) {
+      wallets.bind(publisherId, publisherId, 'testnet')
+    }
+
+    log(`giris (${role}): ${publisherId.slice(0, 8)}…${publisherId.slice(-4)}`)
     return { tokenId }
   },
 })

@@ -273,3 +273,40 @@ describe('para yatirma', () => {
     expect(t.ledger.balance(accountId('advertiser', ADV))).toBe(1_234_567n)
   })
 })
+
+/**
+ * Girişte cüzdan bağlanmasi.
+ *
+ * Gercek dagitimda bulundu: kimse odeme alamiyordu. `WalletStore` bos
+ * kaldigi icin odeme isi HERKESI "cuzdan bagli degil" diye atliyordu —
+ * kullanici cuzdaniyla giris yaptigi halde. Hicbir hata gorunmuyordu,
+ * yalnizca para hic gitmiyordu.
+ */
+describe('giriste cuzdan baglanmasi', () => {
+  it('yayinci girisi cuzdani baglar ve odeme engeli KALKAR', async () => {
+    const { WalletStore } = await import('@dwell/payments')
+    const w = new WalletStore({ clock, holdMs: 0, notify: () => {} })
+
+    // Giris oncesi: odeme engelli.
+    expect(w.payoutBlock(ADV).blocked).toBe(true)
+    expect(w.payoutBlock(ADV).reason).toContain('bagli degil')
+
+    // `main.ts`'teki davranis: publisherId adresin kendisi.
+    w.bind(ADV, ADV, 'testnet')
+
+    expect(w.payoutBlock(ADV).blocked).toBe(false)
+    expect(w.get(ADV)!.address).toBe(ADV)
+  })
+
+  it('ikinci giris bekleme suresi BASLATMAZ', async () => {
+    const { WalletStore } = await import('@dwell/payments')
+    const bildirimler: unknown[] = []
+    const w = new WalletStore({ clock, holdMs: 72 * 3600_000, notify: (n) => bildirimler.push(n) })
+
+    w.bind(ADV, ADV, 'testnet')
+    w.bind(ADV, ADV, 'testnet')          // ayni adres — degisiklik degil
+
+    expect(w.get(ADV)!.holdUntil).toBeNull()
+    expect(w.payoutBlock(ADV).blocked).toBe(false)
+  })
+})

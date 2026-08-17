@@ -40,6 +40,7 @@ export interface WalletAuthDeps {
     publisherId: string
     tokenHash: string
     scopes: readonly TokenScope[]
+    role: Role
   }) => { tokenId: string }
   readonly hashToken: (raw: string) => string
 }
@@ -136,6 +137,7 @@ export class WalletAuth {
       publisherId: address,
       tokenHash: this.deps.hashToken(raw),
       scopes: SCOPES_BY_ROLE[role],
+      role,
     })
 
     return { ok: true, token: raw, tokenId, publisherId: address }
