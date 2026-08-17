@@ -41,6 +41,18 @@ export interface WalletStoreDeps {
   readonly holdMs?: number
   /** Bildirim kanallari: e-posta VE daemon uzerinden terminal (§E1). */
   readonly notify: (n: WalletChangeNotice) => void
+
+  /**
+   * Kalicilik. Verilmezse baglamalar yalnizca bellekte kalir.
+   *
+   * Kalici olmasi sart: cuzdan baglantisi kaybolursa kullanicinin parasi
+   * odenemez hale gelir ve `dwell balance` sebep olarak "cuzdan bagli degil"
+   * der — kullanici bagladigini bildigi halde.
+   */
+  readonly persist?: {
+    readonly load: () => readonly WalletBinding[]
+    readonly save: (b: WalletBinding) => void
+  }
 }
 
 export interface WalletChangeNotice {
@@ -58,7 +70,12 @@ export class WalletStore {
   readonly #byPublisher = new Map<string, WalletBinding>()
   readonly #byAddress = new Map<string, string>()
 
-  constructor(private readonly deps: WalletStoreDeps) {}
+  constructor(private readonly deps: WalletStoreDeps) {
+    for (const b of deps.persist?.load() ?? []) {
+      this.#byPublisher.set(b.publisherId, b)
+      this.#byAddress.set(b.address, b.publisherId)
+    }
+  }
 
   get(publisherId: string): WalletBinding | null {
     return this.#byPublisher.get(publisherId) ?? null
@@ -94,6 +111,7 @@ export class WalletStore {
     if (previous && previous.address !== address) this.#byAddress.delete(previous.address)
     this.#byPublisher.set(publisherId, binding)
     this.#byAddress.set(address, publisherId)
+    this.deps.persist?.save(binding)
 
     // Bildirim HER baglamada gider — ilk baglamada da. Kullanici kendisi
     // yapmadiysa bunu ancak bildirimle ogrenir.

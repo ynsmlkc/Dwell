@@ -44,7 +44,19 @@ export function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(ba, bb)
 }
 
-export class TokenStore {
+/**
+ * HTTP katmaninin token'lardan ihtiyaci olan tek sey.
+ *
+ * Somut sinif yerine arayuz: bellekteki ve SQLite'li surumler ayni yere
+ * takilabiliyor. `AppDeps` somut `TokenStore`'a bagliyken kalici surumu
+ * gecirmek imkansizdi.
+ */
+export interface TokenLookup {
+  find(rawToken: string): DeviceTokenRecord | null
+  touch(tokenId: string, at: number, clientVersion: string | null): void
+}
+
+export class TokenStore implements TokenLookup {
   readonly #byHash = new Map<string, DeviceTokenRecord>()
 
   add(rec: DeviceTokenRecord): void { this.#byHash.set(rec.tokenHash, rec) }

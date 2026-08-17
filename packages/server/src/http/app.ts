@@ -20,7 +20,7 @@ import type { Clock, IdGenerator } from '@dwell/protocol'
 import type { Pipeline } from '../pipeline.js'
 import type { Ledger } from '../ledger/ledger.js'
 import { accountId } from '../ledger/accounts.js'
-import { TokenStore, bearerToken, type AuthContext } from './auth.js'
+import { bearerToken, type AuthContext, type TokenLookup } from './auth.js'
 import type { WalletAuth } from './wallet-auth.js'
 import type { PayoutStore } from '../payouts/store.js'
 import { compareVersions } from '../impressions/ingest.js'
@@ -30,7 +30,7 @@ export interface AppDeps {
   readonly ids: IdGenerator
   readonly pipeline: Pipeline
   readonly ledger: Ledger
-  readonly tokens: TokenStore
+  readonly tokens: TokenLookup
   readonly config: () => RemoteConfig
   /** IP'yi hash'lemek icin yerel tuz. Ham IP ASLA saklanmaz (§10). */
   readonly ipSalt: string

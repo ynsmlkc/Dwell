@@ -28,6 +28,22 @@ export interface PipelineOptions {
   readonly pendingMs: number
   readonly dailyCap: number
   readonly isDatacenterIp?: (ipHash: string | null) => boolean
+
+  /**
+   * Kalicilik kancalari.
+   *
+   * Verilmezse her sey yalnizca bellekte kalir — testlerin ve gelistirmenin
+   * varsayilani bu. Uretimde SQLite aynasi baglaniyor.
+   *
+   * Okuma yollarina DOKUNULMUYOR: `Map`'ler oldugu gibi duruyor, yalnizca
+   * yazarken bir kopya da diske gidiyor ve acilista geri yukleniyor.
+   */
+  readonly persist?: {
+    readonly loadImpressions: () => readonly StoredImpression[]
+    readonly saveImpression: (i: StoredImpression) => void
+    readonly loadDeliveries: () => readonly DeliveredAd[]
+    readonly saveDelivery: (d: DeliveredAd) => void
+  }
 }
 
 export class Pipeline {
@@ -49,7 +65,7 @@ export class Pipeline {
       clock: opts.clock,
       findDelivery: (n) => this.#deliveries.get(n) ?? null,
       seen: (p, id) => this.#impressions.get(this.#key(p, id)) ?? null,
-      save: (i) => { this.#impressions.set(this.#key(i.publisherId, i.id), i) },
+      save: (i) => { this.#update(i) },
       minImpressionMs: opts.minImpressionMs,
       minClientVersion: opts.minClientVersion,
     })
@@ -61,6 +77,19 @@ export class Pipeline {
       countToday: (p, at) => this.#countToday(p, at),
       isDatacenterIp: opts.isDatacenterIp ?? (() => false),
     })
+
+    // Diskteki durumu geri yukle. Yeniden baslatmadan sonra:
+    //   • bekleyen gosterimler dogrulanmaya devam eder
+    //   • ekranda duran reklamlarin nonce'lari hala taninir
+    // Ikincisi olmasaydi, deploy anindaki her gosterim "bilinmeyen nonce"
+    // diye reddedilir ve istemci onu kuyrugundan silerdi — kazanc sessizce
+    // kaybolurdu.
+    if (opts.persist) {
+      for (const i of opts.persist.loadImpressions()) {
+        this.#impressions.set(this.#key(i.publisherId, i.id), i)
+      }
+      for (const d of opts.persist.loadDeliveries()) this.#deliveries.set(d.nonce, d)
+    }
   }
 
   /**
@@ -105,7 +134,7 @@ export class Pipeline {
     const sel = this.selector.select(publisherId)
     if (!sel) return null
 
-    this.#deliveries.set(sel.nonce, {
+    const delivery: DeliveredAd = {
       nonce: sel.nonce,
       publisherId,
       campaignId: sel.campaign.id,
@@ -114,7 +143,9 @@ export class Pipeline {
       revShareBps: sel.campaign.revShareBps,
       expiresAt: sel.nonceExpiresAt,
       consumed: false,
-    })
+    }
+    this.#deliveries.set(sel.nonce, delivery)
+    this.opts.persist?.saveDelivery(delivery)
     this.#gcDeliveries()
     return sel
   }
@@ -167,6 +198,7 @@ export class Pipeline {
 
   #update(imp: StoredImpression): void {
     this.#impressions.set(this.#key(imp.publisherId, imp.id), imp)
+    this.opts.persist?.saveImpression(imp)
   }
 
   #countToday(publisherId: string, at: number): number {

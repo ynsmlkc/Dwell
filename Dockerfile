@@ -35,12 +35,17 @@ FROM node:24-alpine
 WORKDIR /app
 
 # root DEGIL. Konteynerden kacan bir aciğin makineyi de ele gecirmemesi icin.
-RUN addgroup -S dwell && adduser -S dwell -G dwell
-USER dwell
+#
+# Ama `USER dwell` BURADA verilmiyor: Railway diski root'a ait baglaniyor ve
+# sahipligini duzeltmek icin bir an root olmak gerekiyor. Entrypoint bunu
+# yapip hemen `dwell` kullanicisina duserek node'u calistiriyor.
+RUN addgroup -S dwell && adduser -S dwell -G dwell \
+ && apk add --no-cache su-exec
 
 # Tek dosya. Butun bagimliliklar esbuild ile iceri gomulu, bu yuzden
 # `node_modules` TASINMIYOR — imaj ~150 MB yerine ~50 MB.
 COPY --from=build --chown=dwell:dwell /app/packages/server/dist/server.mjs ./server.mjs
+COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Konteynerde 0.0.0.0 SART: 127.0.0.1'e baglanan bir sunucuya disaridan
 # ulasilamaz ve platform "saglik kontrolu basarisiz" der.
@@ -52,9 +57,7 @@ ENV DWELL_ENV=production
 ENV PORT=8787
 EXPOSE 8787
 
-# `node server.mjs` — arada shell YOK.
-#
-# Shell olsaydi SIGTERM shell'e giderdi, Node'a degil: platform deploy
-# sirasinda sinyali gonderir, sunucu duymaz, 30 saniye sonra zorla
-# oldurulur ve temiz kapanis hic calismaz.
+# Entrypoint diskin sahipligini duzeltip `exec` ile node'a devreder.
+# `exec` sayesinde node 1 numarali surec olur ve SIGTERM'i dogrudan alir.
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["node", "server.mjs"]

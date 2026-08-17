@@ -14,15 +14,18 @@ import { serve } from '@hono/node-server'
 import { systemClock, cryptoIdGenerator, stroops, FALLBACK_CONFIG } from '@dwell/protocol'
 import type { RemoteConfig } from '@dwell/protocol'
 import { createApp } from './http/app.js'
-import { TokenStore, hashToken } from './http/auth.js'
+import { hashToken } from './http/auth.js'
 import { WalletAuth, serverKeypair, horizonSigners } from './http/wallet-auth.js'
 import { Sep10, NETWORKS } from '@dwell/payments'
 import { Pipeline } from './pipeline.js'
 import { Ledger } from './ledger/ledger.js'
-import { MemoryLedgerStore } from './ledger/memory-store.js'
 import type { Campaign } from './ads/selector.js'
 import { accountId } from './ledger/accounts.js'
-import { MemoryPayoutStore } from './payouts/store.js'
+import { openDb, MEMORY, vacuumExpired } from './store/db.js'
+import {
+  SqliteLedgerStore, SqliteTokenStore, SqlitePayoutStore,
+  SqliteImpressionMirror, walletPersistence,
+} from './store/persistent.js'
 import { PayoutRunner, schedulePayouts } from './payouts/runner.js'
 import { StellarRail, HORIZON as HORIZON_URLS, TESTNET_USDC } from '@dwell/payments'
 import { WalletStore } from '@dwell/payments'
@@ -54,14 +57,30 @@ const log = (m: string): void => { process.stdout.write(`${new Date().toISOStrin
 
 /* ─────────────────────────── defter ─────────────────────────── */
 
+/**
+ * Kalici depolama.
+ *
+ * `DWELL_DB` bir Railway diskini gostermeli (`/data/dwell.db`). Verilmezse
+ * BELLEKTE calisir ve her yeniden baslatmada her sey silinir — gelistirmede
+ * istenen budur, uretimde felakettir. Bu yuzden uretimde gurultulu uyariyor.
+ */
+const DB_PATH = process.env['DWELL_DB'] ?? MEMORY
+if (DB_PATH === MEMORY && process.env['DWELL_ENV'] === 'production') {
+  log('⚠⚠ DWELL_DB TANIMSIZ — veriler BELLEKTE, her deploy\'da bakiyeler SILINIR')
+}
+const db = openDb(DB_PATH)
+
 const ledger = new Ledger(
-  new MemoryLedgerStore(clock, () => ids.impressionId()),
+  new SqliteLedgerStore(db, clock, () => ids.impressionId()),
   clock,
   () => ids.impressionId(),
 )
 
 // ADR-021: reklamverenin parasi defterde gorunmeli. Uretimde cuzdandan
 // yatirma akisi bunu yazacak; simdilik elle.
+//
+// `topupId` sabit oldugu icin idempotent: defter zaten yazilmissa ikinci
+// kez eklemez. Yoksa her yeniden baslatmada 100.000 USDC daha basardik.
 ledger.deposit({
   advertiserId: DEV_ADVERTISER,
   amount: stroops(1_000_000_000_000n),          // 100.000 USDC
@@ -97,8 +116,16 @@ const config: RemoteConfig = {
   reportIntervalSec: 30,
 }
 
+const mirror = new SqliteImpressionMirror(db)
+
 const pipeline = new Pipeline({
   clock, ids, ledger,
+  persist: {
+    loadImpressions: () => mirror.loadImpressions(),
+    saveImpression: (i) => mirror.saveImpression(i),
+    loadDeliveries: () => mirror.loadDeliveries(),
+    saveDelivery: (d) => mirror.saveDelivery(d),
+  },
   campaigns: () => campaigns,
   minImpressionMs: config.minImpressionMs,
   minClientVersion: config.minClientVersion,
@@ -108,7 +135,7 @@ const pipeline = new Pipeline({
   dailyCap: 400,
 })
 
-const tokens = new TokenStore()
+const tokens = new SqliteTokenStore(db)
 
 /* ─────────────────── cuzdanla giris ─────────────────── */
 
@@ -148,11 +175,12 @@ if (DEV_TOKEN) {
 /* ─────────────────────── odeme ─────────────────────── */
 
 const PAYOUT_THRESHOLD = stroops(10_000_000n)          // $1
-const payouts = new MemoryPayoutStore()
+const payouts = new SqlitePayoutStore(db)
 const wallets = new WalletStore({
   clock,
   holdMs: Number(process.env['DWELL_WALLET_HOLD_MS'] ?? 0),   // uretimde 72 saat
   notify: (n) => log(`cuzdan ${n.kind}: ${n.publisherId.slice(0, 8)}… → ${n.newAddress.slice(0, 8)}…`),
+  persist: walletPersistence(db),
 })
 
 /**
@@ -224,7 +252,16 @@ const server = serve({ fetch: app.fetch, port: PORT, hostname: HOST }, (info) =>
   if (DEV_TOKEN) log(`gelistirme token'i: ${DEV_TOKEN}`)
   else log("gelistirme token'i YOK (uretim) — giris yalnizca `dwell login` ile")
   log(`SEP-10 imzalama anahtari: ${sep10Keypair.publicKey()}`)
+  log(`veritabani: ${DB_PATH === MEMORY ? 'BELLEK (kalici degil)' : DB_PATH}`)
+  log(`${ledger.publishers().length} publisher · ${pipeline.impressions().length} gosterim yuklendi`)
 })
+
+// Olu kayitlari topla. Defter ASLA silinmez; yalnizca suresi gecmis reklam
+// sunumlari ve 90 gunden eski karara baglanmis gosterimler.
+setInterval(() => {
+  const n = vacuumExpired(db, clock.now(), 90 * 86_400_000)
+  if (n > 0) log(`temizlik: ${n} olu kayit silindi`)
+}, 3600_000).unref()
 
 /* ─────────────────── temiz kapanis ─────────────────── */
 
@@ -244,7 +281,7 @@ for (const sig of ['SIGTERM', 'SIGINT'] as const) {
     kapaniyor = true
     log(`${sig} — kapaniyor`)
     zamanlama?.stop()
-    server.close(() => process.exit(0))
+    server.close(() => { db.close(); process.exit(0) })
     // Acik baglantilar kapanmazsa da bekleme: platform zaten olduruyor.
     setTimeout(() => process.exit(0), 5_000).unref()
   })
