@@ -13,6 +13,8 @@ import { startSocketServer, type SocketServer } from './server.js'
 import { ImpressionQueue } from './queue.js'
 import { SpinnerSync } from './spinner-sync.js'
 import { ServerSync } from './sync.js'
+import { writeFileSync, existsSync, unlinkSync } from 'node:fs'
+import { join, dirname } from 'node:path'
 import { SOCKET_PATH, DWELL_HOME, type Request, type Response, type HookEvent } from '../ipc.js'
 
 export interface DaemonOptions {
@@ -71,7 +73,9 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
   /** Spinner on yuklemesi: sunucu modunda siradaki reklami TUKETIR (spinner
    *  sayilmadigi icin bir reklamin harcanmasi sorun degil), yerelde peek. */
   const spinnerAd = (): AdPayload | null => (sync ? sync.nextAd() : peekAd())
-  let paused = false
+  // Acilista diskteki duraklatma durumunu geri yukle.
+  const pausePath = (): string => join(dirname(opts.socketPath ?? SOCKET_PATH), 'paused')
+  let paused = existsSync(pausePath())
   let lastError: string | null = null
   const queue = new ImpressionQueue({
     dir: opts.dataDir ?? DWELL_HOME,
@@ -164,6 +168,24 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
         //   tur N suruyor  → DOKUNULMAZ                    → dosya = ekran ✓
         //   tur N bitti    → siradaki yazilir (Z)
         if (req.event === 'Stop') spinner?.sync(spinnerAd()?.creative.brand ?? null)
+        return { t: 'ok' }
+      }
+
+      case 'pause': {
+        // Duraklatma DISKE yazilir.
+        //
+        // Yalnizca bellekte tutsaydik `dwell restart` ya da makine yeniden
+        // baslatma sessizce devam ettirirdi — kullanici durdurdugunu bilir,
+        // reklamlar doner. Sessizce yanlis calisan bir anahtar, hic olmayan
+        // anahtardan kotudur.
+        paused = req.on
+        try {
+          if (req.on) writeFileSync(pausePath(), String(clock.now()), { mode: 0o600 })
+          else if (existsSync(pausePath())) unlinkSync(pausePath())
+        } catch (e) {
+          opts.onError?.(e)
+        }
+        opts.onLog?.(req.on ? 'duraklatildi' : 'devam ediliyor')
         return { t: 'ok' }
       }
 

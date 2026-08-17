@@ -70,7 +70,6 @@
       <div style="display: flex; flex-wrap: wrap; gap: 8px 28px">
         <span style="color: var(--faint)">CPM <span style="color: var(--ink)" id="cpm-label"></span></span>
         <span style="color: var(--faint)">per impression <span style="color: var(--ink)" id="per-imp"></span></span>
-        <span style="color: var(--faint)">publisher gets <span style="color: var(--ink)" id="share"></span></span>
       </div>
       <span style="color: var(--dim)">stroops: <span id="stroops"></span></span>
     </div>
@@ -113,7 +112,6 @@ function paint() {
   const s = toStroops(parseFloat(slider.value).toFixed(7));
   $('#cpm-label').textContent = usd(s.toString()) + ' CPM';
   $('#per-imp').textContent = usd((s / 1000n).toString());
-  $('#share').textContent = usd((s / 2n).toString()) + ' per 1000';
   $('#stroops').textContent = s.toString();
 }
 slider.addEventListener('input', paint);

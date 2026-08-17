@@ -209,9 +209,19 @@ async function cmdStatus(): Promise<void> {
 async function cmdPause(paused: boolean): Promise<void> {
   const alive = await daemon.isAlive()
   if (!alive) fail('DWL-1001', 'Daemon calismiyor', '`dwell init` ile baslat')
-  // Not: daemon tarafinda `pause` istegi henuz yok; su an yalnizca durum
-  // gosteriliyor. Omurga tamamlaninca IPC'ye eklenecek.
-  out(paused ? `${yellow('⏸')} duraklatildi` : `${green('▶')} devam ediyor`)
+
+  // Once GERCEKTEN durdur, sonra soyle.
+  //
+  // Onceden bu komut yalnizca mesaj basiyordu: kullanici duraklattigini
+  // sanip reklamlar donmeye devam ediyordu. Bir arayuzun yapabilecegi en
+  // kotu sey, olmayan bir seyi olmus gibi gostermek.
+  const res = await daemon.ask({ t: 'pause', on: paused })
+  if (!res || res.t !== 'ok') {
+    fail('DWL-1001', paused ? 'Duraklatilamadi' : 'Devam ettirilemedi', 'daemon cevap vermedi')
+  }
+
+  out(paused ? `${yellow('⏸')} duraklatildi — reklam gosterilmeyecek` : `${green('▶')} devam ediyor`)
+  if (paused) info(dim('kalici: yeniden baslatsan da duraklatilmis kalir · `dwell resume`'))
 }
 
 /**

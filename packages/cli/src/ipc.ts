@@ -85,6 +85,8 @@ export type Request =
   | { readonly t: 'hook'; readonly event: HookEvent; readonly session: string; readonly promptId?: string }
   /** Saglik ve teshis — `dwell doctor` / `dwell status`. */
   | { readonly t: 'health' }
+  /** Reklami gecici durdur/devam ettir — `dwell pause` / `dwell resume`. */
+  | { readonly t: 'pause'; readonly on: boolean }
 
 export type HookEvent =
   | 'UserPromptSubmit'   // tur acar
