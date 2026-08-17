@@ -47,6 +47,11 @@ export interface AppDeps {
   readonly assetIssuer?: string
   /** Cuzdanla giris. Verilmezse `/v1/auth/*` uclari acilmaz. */
   readonly walletAuth?: WalletAuth
+  /** USDC kabulu icin imzasiz islem kurar. */
+  readonly trustlineXdr?: (address: string) => Promise<
+    | { ok: true; xdr: string; networkPassphrase: string }
+    | { ok: false; reason: string }
+  >
 }
 
 type Vars = { auth: AuthContext }
@@ -182,6 +187,26 @@ export function createApp(deps: AppDeps) {
       return c.json({ token: r.token, tokenId: r.tokenId, publisherId: r.publisherId, role })
     })
   }
+
+  /**
+   * Kullanicinin cuzdanina USDC kabulu ekleyecek IMZASIZ islemi kurar.
+   *
+   * Neden sunucuda: bunu tarayicida kurmak Stellar SDK'sini indirmek demek
+   * (~1 MB) ve tek ihtiyacimiz bir `changeTrust` operasyonu. Sunucu kuruyor,
+   * kullanici Freighter'da imzaliyor, tarayici dogrudan Horizon'a gonderiyor.
+   *
+   * Yetki ISTEMEZ ve gerekmiyor: islem kullanicinin KENDI hesabinda, kendi
+   * imzasiyla gecerli oluyor. Biz yalnizca zarfi hazirliyoruz.
+   */
+  app.post('/v1/wallet/trustline-xdr', async (c) => {
+    if (!deps.trustlineXdr) return c.json(err('DWL_9001', 'kapali'), 404)
+    const body = await c.req.json().catch(() => null)
+    const address = typeof body?.address === 'string' ? body.address.trim() : ''
+
+    const r = await deps.trustlineXdr(address)
+    if (!r.ok) return c.json(err('DWL_4001', r.reason), 400)
+    return c.json({ xdr: r.xdr, network_passphrase: r.networkPassphrase })
+  })
 
   app.post('/v1/ads/next', requireVersion, requireScope('report:impressions'), (c) => {
     const { publisherId } = c.get('auth')

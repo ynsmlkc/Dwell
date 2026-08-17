@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy — Dwell</title>
+<meta name="description" content="Every field the Dwell CLI sends, and everything it never sends.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28' fill='%23f97335'>✶</text></svg>">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header class="top">
+  <a class="brand" href="/"><span class="star">✶</span>dwell</a>
+  <nav class="nav">
+    <a href="/">for developers</a>
+    <a href="/advertisers">advertisers</a>
+    <a href="/app">your earnings</a>
+  </nav>
+</header>
+
+<main class="wrap-narrow" style="padding-top: clamp(48px, 7vw, 88px); padding-bottom: 88px">
+  <h1 style="margin-bottom: 28px">Privacy</h1>
+  <p class="body" style="margin: 0 0 40px; font-size: 15px; line-height: 1.75">The CLI runs on your machine and talks to one server. This page lists everything that crosses the wire. If something is not on this list, it does not leave your computer.</p>
+
+  <section>
+    <h2 style="font-size: clamp(21px, 2.4vw, 27px); margin-bottom: 14px">Your project stays yours</h2>
+    <p class="body" style="line-height: 1.75; margin: 0">The project identifier is a hash, salted with a value generated on your machine that never leaves it. Raw directory paths and file names never reach the network — not truncated, not hashed-and-sent-alongside. They are simply not part of any request.</p>
+  </section>
+
+  <section>
+    <h2 style="font-size: clamp(21px, 2.4vw, 27px); margin-bottom: 14px">Prompts and code are never read</h2>
+    <p class="body" style="line-height: 1.75; margin: 0">The CLI does not read your prompts, your files, or the model's answers. It knows one thing: whether the assistant is currently working. That signal is what decides whether a line is shown.</p>
+  </section>
+
+  <section>
+    <h2 style="font-size: clamp(21px, 2.4vw, 27px); margin-bottom: 14px">IP addresses</h2>
+    <p class="body" style="line-height: 1.75; margin: 0">Hashed with a server-side salt and used only for fraud checks. The raw address is never written to storage.</p>
+  </section>
+
+  <section>
+    <h2 style="font-size: clamp(21px, 2.4vw, 27px); margin-bottom: 14px">Your keys</h2>
+    <p class="body" style="line-height: 1.75; margin: 0">The wallet private key never enters the CLI or this site. Login is a signature request handled by the Freighter extension; we receive the signed challenge and nothing else. The message you sign cannot be submitted to the network — its sequence number is zero — so it can never move anything.</p>
+  </section>
+
+  <section>
+    <h2 style="font-size: clamp(21px, 2.4vw, 27px); margin-bottom: 16px">The exact fields</h2>
+    <ul class="mono" style="margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; font-size: 14px; color: var(--ink-soft)">
+      <li class="row"><span>impression_id</span><span>random per shown line</span></li>
+      <li class="row"><span>campaign_id</span><span>which ad was shown</span></li>
+      <li class="row"><span>duration_ms</span><span>how long it was visible</span></li>
+      <li class="row"><span>session_id</span><span>rotates per CLI session</span></li>
+      <li class="row"><span>client_version</span><span>e.g. dwellsh 0.1.1</span></li>
+      <li class="row"><span>os / arch</span><span>e.g. darwin / arm64</span></li>
+      <li class="row"><span>project_hash</span><span>salted locally, one-way</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2 style="font-size: clamp(21px, 2.4vw, 27px); margin-bottom: 14px">Removal</h2>
+    <p class="body" style="margin: 0 0 18px; line-height: 1.75">One command. It removes only the entries we added; your own settings are untouched.</p>
+    <code style="display: inline-block; width: auto; border-color: var(--line-3); font-size: 14px"><span style="color: var(--faint)">$ </span>dwell uninstall</code>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap-narrow">
+    <span>✶ dwell — testnet</span>
+    <a href="https://github.com/ynsmlkc/Dwell" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</footer>
+
+<style>
+  .row { display: grid; grid-template-columns: minmax(0, 200px) minmax(0, 1fr); gap: 16px; }
+  .row > span:last-child { color: var(--faint); }
+  @media (max-width: 560px) { .row { grid-template-columns: 1fr; gap: 2px; } }
+</style>
+</body>
+</html>

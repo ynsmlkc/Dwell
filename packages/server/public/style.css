@@ -1,0 +1,213 @@
+/* Dwell — tasarim sistemi.
+ *
+ * Tasarim dosyalarindaki satir ici stiller buraya cikarildi. Sebep tekrar
+ * degil: bes sayfa ayni degerleri tasiyor ve biri degistiginde hepsinin
+ * degismesi gerekiyor. Satir ici birakmak, dorduncude unutmak demekti. */
+
+:root {
+  --bg:        #0c0b0a;
+  --bg-deep:   #080706;
+  --bg-deeper: #060505;
+  --ink:       #ece7e1;
+  --ink-soft:  #d6d0c8;
+  --muted:     #9d968d;
+  --faint:     #6f6a63;
+  --dim:       #57534c;
+  --line:      rgba(236, 231, 225, 0.09);
+  --line-2:    rgba(236, 231, 225, 0.14);
+  --line-3:    rgba(236, 231, 225, 0.2);
+  --accent:    oklch(0.74 0.16 52);
+  --accent-hi: oklch(0.8 0.14 52);
+  --accent-bg: oklch(0.74 0.16 52 / 0.06);
+  --warn:      #b8574a;
+  --good:      #8fae7f;
+
+  --serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --mono:  ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  /* Izgara: sayfanin terminal degil ama teknik oldugunu soyleyen tek dokunus. */
+  background-image:
+    linear-gradient(rgba(236, 231, 225, 0.032) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(236, 231, 225, 0.032) 1px, transparent 1px);
+  background-size: 64px 64px;
+  color: var(--ink);
+  font-family: var(--serif);
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+  overflow-x: hidden;
+}
+
+a { color: var(--ink); text-decoration: none; }
+a:hover { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+::selection { background: oklch(0.74 0.16 52 / 0.3); }
+
+.mono { font-family: var(--mono); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 56px); }
+.wrap-narrow { max-width: 720px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 40px); }
+.hidden { display: none !important; }
+
+/* ── ust cubuk ── */
+.top {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 14px clamp(16px, 4vw, 56px);
+  background: rgba(12, 11, 10, 0.82);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: baseline; gap: 9px; font-family: var(--mono); font-size: 14px; letter-spacing: 0.02em; }
+.brand .star { color: var(--accent); font-size: 15px; }
+.nav { display: flex; align-items: center; gap: clamp(12px, 2vw, 28px); font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.nav a { color: var(--muted); }
+.nav a:hover { color: var(--ink); }
+.nav a.cta { color: var(--ink); border-bottom: 1px solid rgba(236, 231, 225, 0.25); padding-bottom: 2px; }
+.nav a.cta:hover { color: var(--accent); }
+.chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 11px; border: 1px solid rgba(236, 231, 225, 0.16);
+  border-radius: 3px; font-size: 12px; color: var(--muted); white-space: nowrap;
+}
+.chip .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+
+/* ── tipografi ── */
+h1, h2, h3 { font-weight: 400; letter-spacing: -0.02em; margin: 0; }
+h1 { font-size: clamp(30px, 4.6vw, 52px); line-height: 1.05; }
+.h-hero { font-size: clamp(38px, 6.4vw, 76px); line-height: 1.03; max-width: 20ch; text-wrap: pretty; }
+h2 { font-size: clamp(24px, 3vw, 36px); }
+h3 { font-size: clamp(19px, 2.2vw, 25px); letter-spacing: -0.01em; }
+em.hl { font-style: italic; color: var(--accent); }
+.eyebrow {
+  font-family: var(--mono); font-size: 12px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent); margin: 0 0 24px;
+}
+.lead { font-family: var(--mono); font-size: 15px; line-height: 1.68; color: var(--muted); text-wrap: pretty; max-width: 58ch; }
+.body { font-family: var(--mono); font-size: 14px; line-height: 1.7; color: var(--muted); text-wrap: pretty; }
+.small { font-family: var(--mono); font-size: 12.5px; line-height: 1.65; color: var(--faint); }
+.statement { font-size: clamp(19px, 2.3vw, 26px); line-height: 1.5; letter-spacing: -0.01em; color: var(--ink-soft); text-wrap: pretty; max-width: 62ch; }
+
+section { border-top: 1px solid var(--line); padding: clamp(40px, 6vw, 72px) 0; }
+section:first-of-type { border-top: 0; }
+
+/* ── terminal ── */
+.term { border: 1px solid var(--line-2); border-radius: 6px; background: var(--bg-deep); overflow: hidden; margin: 0; }
+.term-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 14px; border-bottom: 1px solid rgba(236, 231, 225, 0.1);
+  font-family: var(--mono); font-size: 12px; color: var(--faint);
+}
+.term-body { padding: 20px 16px 0; font-family: var(--mono); font-size: clamp(12px, 1.35vw, 14.5px); line-height: 1.85; }
+.term-status {
+  border-top: 1px solid rgba(236, 231, 225, 0.1); background: var(--bg-deeper);
+  padding: 12px 16px; min-height: 46px;
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  font-family: var(--mono); font-size: clamp(11.5px, 1.3vw, 14px);
+}
+/* Reklam satirinin KENDISI. Yuvarlak kose, gradyan, golge YOK — ekrana
+   basilan seyin aynisi olmak zorunda. */
+.ad { display: flex; align-items: baseline; gap: 8px; min-width: 0; transition: opacity 260ms linear; }
+.ad-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ad .brand-name { font-weight: 600; color: var(--ink); }
+.ad .sep { color: var(--muted); }
+.ad .cta { color: var(--faint); }
+.ad-right { color: var(--dim); white-space: nowrap; }
+
+/* ── dugmeler ── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 13px 18px; border: 1px solid var(--line-3); border-radius: 4px;
+  background: rgba(236, 231, 225, 0.04); color: var(--ink);
+  font-family: var(--mono); font-size: 14px; cursor: pointer;
+}
+.btn:hover { border-color: var(--accent); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.btn-primary:hover { background: var(--accent-hi); border-color: var(--accent-hi); color: var(--bg); }
+.btn-quiet { background: transparent; }
+.btn-sm { padding: 8px 14px; font-size: 12.5px; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; border-color: var(--line-3); }
+.btn-primary:disabled { background: rgba(236, 231, 225, 0.09); color: var(--faint); }
+.btn .tag { color: var(--accent); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
+.btn-primary .tag { color: var(--bg); }
+.link-under { font-family: var(--mono); font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--line-3); padding-bottom: 2px; }
+.link-under:hover { color: var(--ink); }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 1.5px solid rgba(12, 11, 10, 0.35); border-top-color: var(--bg);
+  display: inline-block; animation: spin 700ms linear infinite; flex: none;
+}
+@keyframes pulse { 0%, 100% { opacity: 0.35 } 50% { opacity: 1 } }
+.pulse { animation: pulse 1.6s ease-in-out infinite; }
+
+/* ── kutular ── */
+.card { border: 1px solid var(--line-2); border-radius: 6px; background: rgba(236, 231, 225, 0.02); padding: clamp(20px, 3.5vw, 32px); }
+.note { border: 1px solid var(--line-2); border-left: 2px solid var(--muted); border-radius: 4px; padding: 14px 16px; font-family: var(--mono); font-size: 13px; line-height: 1.65; color: var(--ink-soft); }
+.note-accent { border-left-color: var(--accent); }
+.note-warn { border-left-color: var(--warn); }
+.banner {
+  border: 1px solid oklch(0.74 0.16 52 / 0.5); border-left: 3px solid var(--accent);
+  border-radius: 5px; background: var(--accent-bg); padding: clamp(18px, 3vw, 26px);
+}
+.grid-1px { display: grid; gap: 1px; background: rgba(236, 231, 225, 0.11); border: 1px solid rgba(236, 231, 225, 0.11); }
+.grid-1px > * { background: var(--bg); }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: clamp(18px, 3vw, 40px); align-items: start; }
+
+code, .code {
+  font-family: var(--mono); font-size: 13px; color: var(--ink);
+  border: 1px solid rgba(236, 231, 225, 0.11); border-radius: 4px;
+  padding: 11px 14px; background: rgba(236, 231, 225, 0.02);
+  word-break: break-all; line-height: 1.7; display: block;
+}
+
+/* ── tablo ── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; min-width: 520px; border-collapse: collapse; font-family: var(--mono); font-size: 13px; }
+th {
+  text-align: left; font-weight: 400; font-size: 11.5px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--dim);
+  padding: 0 16px 10px 0; border-bottom: 1px solid rgba(236, 231, 225, 0.11);
+}
+td { padding: 13px 16px 13px 0; border-bottom: 1px solid rgba(236, 231, 225, 0.06); color: var(--muted); }
+td.num { text-align: right; color: var(--ink); white-space: nowrap; }
+
+/* ── formlar ── */
+label.field { display: grid; gap: 8px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
+input[type="text"], input[type="number"] {
+  padding: 11px 13px; border: 1px solid rgba(236, 231, 225, 0.16); border-radius: 4px;
+  background: rgba(236, 231, 225, 0.03); color: var(--ink);
+  font-family: var(--mono); font-size: 14px; text-transform: none; letter-spacing: 0; width: 100%;
+}
+input.bad { border-color: oklch(0.74 0.16 52 / 0.6); }
+.err { margin: 8px 0 0; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--accent); }
+
+/* ── ilerleme ── */
+.bar { height: 3px; background: rgba(236, 231, 225, 0.1); border-radius: 2px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent); transition: width 400ms ease; }
+
+/* ── altlik ── */
+footer { border-top: 1px solid var(--line); }
+footer .wrap, footer .wrap-narrow {
+  padding-top: 26px; padding-bottom: 26px;
+  display: flex; flex-wrap: wrap; gap: 12px 28px;
+  align-items: center; justify-content: space-between;
+  font-family: var(--mono); font-size: 12.5px; color: var(--faint);
+}
+footer a { color: var(--faint); }
+footer a:hover { color: var(--ink); }
+
+/* ── buyuk rakam ── */
+.figure { font-family: var(--mono); font-size: clamp(36px, 6.5vw, 68px); line-height: 1; letter-spacing: -0.035em; color: var(--ink); }
+.figure-label { font-family: var(--mono); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin: 0 0 4px; }

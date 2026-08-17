@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dwell — one sponsored line while your agent thinks</title>
+<meta name="description" content="Developers get paid in USDC for one line of text that shows in the terminal only while an AI coding assistant is working.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28' fill='%23f97335'>✶</text></svg>">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header class="top">
+  <a class="brand" href="/"><span class="star">✶</span>dwell</a>
+  <nav class="nav">
+    <a href="#how">how it works</a>
+    <a href="#data">what we send</a>
+    <a href="/advertisers">advertisers</a>
+    <a class="cta" href="/app">your earnings</a>
+    <span class="chip"><span class="dot"></span>testnet</span>
+  </nav>
+</header>
+
+<main class="wrap">
+
+  <section style="padding-top: clamp(56px, 9vw, 104px)">
+    <p class="eyebrow">Terminal-native ad marketplace</p>
+    <h1 class="h-hero">One sponsored line while your <em class="hl">agent</em> thinks. You get paid in USDC.</h1>
+    <p class="lead" style="margin: 26px 0 40px">Install a small CLI. While Claude Code is working, a single line of text sits in your status line. When the answer lands, it is gone.</p>
+
+    <!-- Urunun kendisi. Anlatmak yerine GOSTERIYORUZ: satir bekleme
+         basladiginda beliriyor, cevap gelince kayboluyor. -->
+    <figure class="term" style="box-shadow: 0 24px 70px -30px rgba(0,0,0,0.9)">
+      <figcaption class="term-bar">
+        <span>~/projects/api — claude</span>
+        <span id="phase">waiting — the line is shown</span>
+      </figcaption>
+      <div class="term-body">
+        <div style="color: var(--faint)">❯ claude</div>
+        <div style="margin-top: 6px">&gt; add rate limiting to the auth middleware</div>
+        <div style="display: flex; gap: 10px; margin-top: 10px; color: var(--muted)">
+          <span style="color: var(--accent)">●</span><span id="activity">Editing src/auth/middleware.ts</span>
+        </div>
+        <div id="output" style="color: var(--faint); white-space: pre; margin-top: 4px"></div>
+      </div>
+      <div class="term-status" style="margin-top: 22px">
+        <span class="ad" id="ad">
+          <span style="color: var(--accent)">✶</span>
+          <span class="ad-text">
+            <span class="brand-name" id="ad-brand">Firecrawl</span><span class="sep"> — <span id="ad-text">docs to LLM-ready markdown</span> · </span><span class="cta" id="ad-cta">firecrawl.dev</span>
+          </span>
+        </span>
+        <span class="ad-right" id="ad-right">Edit · 2.8s</span>
+      </div>
+    </figure>
+
+    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 32px">
+      <button class="btn" id="copy-install"><span style="color: var(--faint)">$</span>npx dwellsh init<span class="tag">copy</span></button>
+      <a class="link-under" href="#how" style="font-size: 14px">How it works ↓</a>
+    </div>
+  </section>
+
+  <section>
+    <p class="statement">It only appears while you are waiting. It disappears when the answer arrives. It never interrupts a command, never opens a window, and when you are idle there is nothing there at all.</p>
+  </section>
+
+  <section id="how">
+    <h2 style="margin-bottom: 40px">How it works</h2>
+    <ol style="margin: 0; padding: 0; list-style: none">
+      <li class="step">
+        <span class="no">01</span>
+        <h3>Install</h3>
+        <div>
+          <p class="body" style="margin: 0 0 10px">One command. It edits your Claude Code settings and nothing else on the machine.</p>
+          <span class="mono" style="font-size: 13px; color: var(--faint)">npx dwellsh init</span>
+        </div>
+      </li>
+      <li class="step">
+        <span class="no">02</span>
+        <h3>Wait</h3>
+        <div>
+          <p class="body" style="margin: 0 0 10px">While the model is working, one line sits in your status line next to what the assistant is doing. Idle means empty.</p>
+          <span class="mono" style="font-size: 13px; color: var(--faint)">impressions count after 10s displayed</span>
+        </div>
+      </li>
+      <li class="step">
+        <span class="no">03</span>
+        <h3>Get paid</h3>
+        <div>
+          <p class="body" style="margin: 0 0 10px">USDC lands in the Stellar wallet you connect. You sign with Freighter; we never see a private key.</p>
+          <span class="mono" style="font-size: 13px; color: var(--faint)">dwell login</span>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section id="data">
+    <h2 style="margin-bottom: 8px">What we send</h2>
+    <p class="body" style="margin: 0 0 36px">Every field, in both directions. Nothing else leaves the machine.</p>
+    <div class="grid-1px" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr))">
+      <div style="padding: 22px 24px">
+        <p class="eyebrow" style="margin-bottom: 18px; letter-spacing: 0.12em">We send</p>
+        <ul class="mono" style="margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; font-size: 14px; color: var(--ink-soft)">
+          <li>impression id, campaign id, duration</li>
+          <li>session id, client version</li>
+          <li>OS and architecture</li>
+        </ul>
+      </div>
+      <div style="padding: 22px 24px">
+        <p class="eyebrow" style="margin-bottom: 18px; letter-spacing: 0.12em; color: var(--faint)">We never send</p>
+        <ul class="mono" style="margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; font-size: 14px; color: var(--muted)">
+          <li style="text-decoration: line-through; text-decoration-color: rgba(157,150,141,0.45)">your directory path</li>
+          <li style="text-decoration: line-through; text-decoration-color: rgba(157,150,141,0.45)">your file names</li>
+          <li style="text-decoration: line-through; text-decoration-color: rgba(157,150,141,0.45)">your prompts, your code</li>
+        </ul>
+      </div>
+    </div>
+    <a class="link-under" href="/privacy" style="display: inline-block; margin-top: 18px">The full privacy detail →</a>
+  </section>
+
+  <section>
+    <h2 style="margin-bottom: 8px">Where this actually stands</h2>
+    <p class="body" style="margin: 0 0 30px; max-width: 60ch">Stellar testnet. Advertisers deposit, publishers get paid on-chain, the pipeline runs end to end — with test money. No projections here, only the ledger.</p>
+    <div style="border: 1px solid rgba(236,231,225,0.11); background: rgba(236,231,225,0.02); padding: 20px 22px; display: grid; gap: 14px" class="mono">
+      <div style="display: flex; flex-wrap: wrap; gap: 8px 24px; color: var(--faint); font-size: 13px">
+        <span>network <span style="color: var(--ink)">testnet</span></span>
+        <span>asset <span style="color: var(--ink)">USDC</span></span>
+        <span>publisher share <span style="color: var(--ink)">50%</span></span>
+      </div>
+      <a href="https://stellar.expert/explorer/testnet/tx/9cbb1a573c4a3eeacefde360280c93d08df1cc0b7522d82e3b411898aae6ad86" style="color: var(--accent); word-break: break-all; line-height: 1.6; font-size: 13px" target="_blank" rel="noopener">9cbb1a573c4a3eeacefde360280c93d08df1cc0b7522d82e3b411898aae6ad86 ↗</a>
+      <span style="color: var(--faint); font-size: 13px">A real payout transaction. Open it and check.</span>
+    </div>
+  </section>
+
+  <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: clamp(20px, 4vw, 56px); align-items: start">
+    <div>
+      <h2 style="font-size: clamp(24px, 2.8vw, 32px); margin-bottom: 14px">Leaving takes one command</h2>
+      <p class="body" style="margin: 0">Uninstall removes only the entries we added to your Claude Code settings. Anything you configured yourself is left exactly as it was.</p>
+    </div>
+    <button class="btn btn-quiet" id="copy-uninstall" style="justify-self: start"><span style="color: var(--faint)">$</span>dwell uninstall<span class="tag">copy</span></button>
+  </section>
+
+  <section style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px">
+    <p style="margin: 0; max-width: 52ch; font-size: clamp(18px, 2.1vw, 24px); line-height: 1.45; letter-spacing: -0.01em">Selling a dev tool? Buy the line — 80 characters, plain text, in front of developers who are waiting.</p>
+    <a class="btn btn-primary" href="/advertisers">For advertisers →</a>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>✶ dwell — testnet</span>
+    <div style="display: flex; gap: 24px">
+      <a href="https://github.com/ynsmlkc/Dwell" target="_blank" rel="noopener">GitHub</a>
+      <a href="/privacy">Privacy</a>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .step {
+    display: grid; grid-template-columns: minmax(44px, 56px) minmax(0, 1fr) minmax(0, 1.15fr);
+    gap: clamp(14px, 3vw, 40px); align-items: start;
+    padding: 26px 0; border-top: 1px solid var(--line);
+  }
+  .step .no { font-family: var(--mono); font-size: 12px; color: var(--accent); padding-top: 6px; }
+  @media (max-width: 720px) { .step { grid-template-columns: 40px 1fr; } .step > div { grid-column: 2; } }
+</style>
+
+<script type="module">
+  import { copyButton, $ } from '/app.js';
+
+  copyButton($('#copy-install'), () => 'npx dwellsh init');
+  copyButton($('#copy-uninstall'), () => 'dwell uninstall');
+
+  /* Hero animasyonu — urunun gercek davranisi.
+     Bekleme basliyor → satir beliriyor → cevap geliyor → satir gidiyor. */
+  const ADS = [
+    { brand: 'Firecrawl', text: 'docs to LLM-ready markdown', cta: 'firecrawl.dev' },
+    { brand: 'Resend', text: 'email API for developers', cta: 'resend.com' },
+    { brand: 'Neon', text: 'serverless Postgres with branching', cta: 'neon.tech' },
+  ];
+  const ACTS = [
+    { label: 'Edit', verb: 'Editing src/auth/middleware.ts' },
+    { label: 'Search', verb: 'Searching for rate limit helpers' },
+    { label: 'Thinking', verb: 'Thinking about token bucket vs. sliding window' },
+  ];
+  const DONE = '✓ src/auth/middleware.ts  +34 −6\n✓ tests pass — 18 files, 0 failing';
+
+  const el = {
+    ad: $('#ad'), brand: $('#ad-brand'), text: $('#ad-text'), cta: $('#ad-cta'),
+    right: $('#ad-right'), activity: $('#activity'), output: $('#output'), phase: $('#phase'),
+  };
+
+  let i = 0, waiting = true, secs = 2.8;
+
+  function paint() {
+    const ad = ADS[i], act = ACTS[i % ACTS.length];
+    el.brand.textContent = ad.brand;
+    el.text.textContent = ad.text;
+    el.cta.textContent = ad.cta;
+    el.ad.style.opacity = waiting ? '1' : '0';
+    el.activity.textContent = waiting ? act.verb : 'Done — 3 files changed';
+    el.output.textContent = waiting ? '' : DONE;
+    el.right.textContent = waiting ? `${act.label} · ${secs.toFixed(1)}s` : 'idle';
+    el.phase.textContent = waiting ? 'waiting — the line is shown' : 'answer arrived — the line is gone';
+  }
+
+  // Hareket istemeyene tek kare: yine de urunu gosterir.
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    setInterval(() => { if (waiting) { secs += 0.4; paint(); } }, 400);
+    setInterval(() => {
+      waiting = false; paint();
+      setTimeout(() => { waiting = true; i = (i + 1) % ADS.length; secs = 0.4; paint(); }, 2600);
+    }, 9000);
+  }
+  paint();
+</script>
+</body>
+</html>

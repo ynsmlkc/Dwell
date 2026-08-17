@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your campaigns — Dwell</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28' fill='%23f97335'>✶</text></svg>">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header class="top">
+  <a class="brand" href="/"><span class="star">✶</span>dwell</a>
+  <nav class="nav">
+    <a href="/advertisers">the placement</a>
+    <span class="chip hidden" id="who"><span class="dot"></span><span id="who-addr"></span></span>
+    <button class="btn btn-sm btn-quiet hidden" id="signout">sign out</button>
+  </nav>
+</header>
+
+<main class="wrap" style="padding-top: clamp(32px, 5vw, 60px); padding-bottom: 96px">
+
+  <!-- ═══ bagli degil ═══ -->
+  <div id="v-connect" class="card hidden" style="max-width: 480px; margin: clamp(20px, 8vw, 90px) auto 0">
+    <h1 style="font-size: clamp(24px, 3vw, 32px); margin-bottom: 12px">Connect the wallet you will pay from</h1>
+    <p class="body" style="margin: 0 0 20px">This one matters. Deposits are matched by <strong style="color: var(--ink-soft)">who sent them</strong>, so the wallet you connect now is the only wallet whose money we can credit to you.</p>
+
+    <div class="note note-accent hidden" id="no-freighter" style="margin-bottom: 18px">
+      Freighter is not installed. <a href="https://freighter.app" target="_blank" rel="noopener" style="color: var(--accent)">Install it</a>, then reload.
+    </div>
+
+    <button class="btn btn-primary" id="connect" style="width: 100%">
+      <span class="spinner hidden" id="connect-spin"></span><span id="connect-label">Connect Freighter</span>
+    </button>
+
+    <div class="note note-warn hidden" id="connect-error" style="margin-top: 18px">
+      <p style="margin: 0 0 10px" id="connect-error-text"></p>
+      <button class="btn btn-sm btn-quiet" id="retry-connect">Try again</button>
+    </div>
+  </div>
+
+  <div id="v-loading" class="hidden" style="display: grid; gap: 18px; max-width: 640px">
+    <div style="height: 64px; border-radius: 4px; background: rgba(236,231,225,0.045)"></div>
+    <div style="height: 40px; border-radius: 4px; background: rgba(236,231,225,0.045)"></div>
+  </div>
+
+  <div id="v-neterr" class="note note-warn hidden" style="max-width: 520px; padding: 22px 24px">
+    <h2 style="font-size: 22px; margin-bottom: 10px; font-family: var(--serif)">Cannot reach the server</h2>
+    <p style="margin: 0 0 18px; color: var(--muted)">Your balance and your campaigns are untouched. Running campaigns keep running.</p>
+    <button class="btn btn-sm btn-quiet" id="retry-load">Retry</button>
+  </div>
+
+  <div id="v-expired" class="note hidden" style="max-width: 520px; padding: 22px 24px">
+    <h2 style="font-size: 22px; margin-bottom: 10px; font-family: var(--serif)">Session expired</h2>
+    <p style="margin: 0 0 18px; color: var(--muted)">Sign once more to prove the wallet is still yours.</p>
+    <button class="btn btn-primary btn-sm" id="reconnect">Reconnect wallet</button>
+  </div>
+
+  <!-- ═══ para yatirma — bakiye sifirken TEK ekran ═══ -->
+  <div id="v-deposit" class="hidden">
+    <h1 style="margin-bottom: 8px">Add funds</h1>
+    <p class="body" style="margin: 0 0 clamp(24px, 4vw, 36px); max-width: 62ch">Send testnet USDC to the address below. Nothing can run until there is a balance.</p>
+
+    <div class="two">
+      <div>
+        <p class="figure-label">Send to</p>
+        <code id="deposit-addr" style="font-size: clamp(11px, 1.25vw, 13.5px)"></code>
+        <button class="btn btn-sm btn-quiet" id="copy-deposit" style="margin-top: 12px"><span class="tag">copy address</span></button>
+
+        <dl class="mono" style="margin: 26px 0 0; display: grid; gap: 12px; font-size: 12.5px">
+          <div style="display: flex; gap: 12px"><dt style="color: var(--dim); min-width: 68px">asset</dt><dd style="margin: 0; color: var(--ink-soft)" id="asset-code">USDC</dd></div>
+          <div style="display: flex; gap: 12px"><dt style="color: var(--dim); min-width: 68px">issuer</dt><dd style="margin: 0; color: var(--faint); word-break: break-all; line-height: 1.6" id="asset-issuer"></dd></div>
+          <div style="display: flex; gap: 12px"><dt style="color: var(--dim); min-width: 68px">network</dt><dd style="margin: 0; color: var(--ink-soft)">Stellar testnet</dd></div>
+        </dl>
+      </div>
+
+      <div>
+        <!-- Kacirilmasi IMKANSIZ olmali: eslesme gonderen adrese gore. -->
+        <div class="banner">
+          <p class="figure-label" style="margin-bottom: 10px">Send from this wallet only</p>
+          <code id="own-addr" style="border: 0; padding: 0; background: none; font-size: 12px"></code>
+          <p class="body" style="margin: 12px 0 0; color: var(--ink-soft); font-size: 12.5px">We work out whose money it is by looking at who sent it. That is why there is no memo to remember — and also why money sent from an exchange arrives but cannot be credited to you.</p>
+        </div>
+
+        <div style="margin-top: 18px; border: 1px solid rgba(236,231,225,0.11); border-radius: 5px; padding: 16px 18px; display: flex; align-items: center; gap: 12px">
+          <span class="pulse" style="width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none"></span>
+          <p class="body" style="margin: 0; font-size: 13px">Watching the chain. A deposit usually shows up here within 20 seconds.</p>
+        </div>
+        <button class="btn btn-sm btn-quiet hidden" id="back-to-campaigns" style="margin-top: 18px">← back to campaigns</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ fonlanmis ═══ -->
+  <div id="v-funded" class="hidden">
+    <div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: clamp(24px, 4vw, 36px)">
+      <div>
+        <p class="figure-label">Balance</p>
+        <p class="figure" id="balance">$0</p>
+        <p class="small hidden" id="reserved-note" style="margin: 12px 0 0; max-width: 54ch"></p>
+      </div>
+      <button class="btn btn-quiet" id="add-funds">Add funds</button>
+    </div>
+
+    <section style="padding-bottom: 0">
+      <h2 style="font-size: clamp(22px, 2.6vw, 30px); margin-bottom: 18px">Campaigns</h2>
+      <p class="small hidden" id="no-campaigns" style="margin: 0 0 26px">None yet. Write your line below.</p>
+      <div class="grid-1px hidden" id="campaigns" style="margin-bottom: clamp(28px, 4vw, 44px)"></div>
+
+      <!-- ── yeni kampanya ── -->
+      <div class="card">
+        <h3 style="margin-bottom: 6px">Write a line</h3>
+        <p class="small" style="margin: 0 0 24px">This is the whole ad. There is no image, no headline, no second line.</p>
+
+        <!-- CANLI ONIZLEME: sinir gonderdikten sonra degil, yazarken gorunur -->
+        <div class="term" style="margin-bottom: 24px">
+          <div class="term-bar"><span>as it will be printed</span><span id="count">0/80</span></div>
+          <div class="term-status" style="border-top: 0; padding: 15px 16px">
+            <span class="ad">
+              <span style="color: var(--accent)">✶</span>
+              <span class="ad-text"><span class="brand-name" id="p-brand">Brand</span><span class="sep"> — <span id="p-text">what you do, in a few words</span> · </span><span class="cta" id="p-cta">yourdomain.com</span></span>
+            </span>
+            <span class="ad-right">Edit · 2.8s</span>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 18px">
+          <label class="field">Brand<input type="text" id="f-brand" placeholder="Firecrawl"></label>
+          <label class="field">Domain<input type="text" id="f-cta" placeholder="firecrawl.dev"></label>
+        </div>
+        <p class="err hidden" id="e-cta"></p>
+
+        <label class="field" style="margin-top: 18px">Message<input type="text" id="f-text" placeholder="docs to LLM-ready markdown"></label>
+        <p class="err hidden" id="e-text"></p>
+
+        <div style="margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 18px; align-items: end">
+          <label class="field">CPM in USD<input type="text" id="f-cpm" placeholder="40" value="40"></label>
+          <div class="mono" style="font-size: 12.5px; line-height: 1.9; color: var(--faint)">
+            <div>per impression <span style="color: var(--ink)" id="f-perimp">—</span></div>
+            <div>publisher gets <span style="color: var(--ink)">50%</span>, fixed</div>
+          </div>
+        </div>
+        <p class="err hidden" id="e-cpm"></p>
+
+        <div style="margin-top: 26px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px">
+          <button class="btn btn-primary" id="create" disabled>
+            <span class="spinner hidden" id="create-spin"></span><span>Create campaign</span>
+          </button>
+          <p class="small" style="margin: 0; max-width: 44ch">It starts paused. You read it once more, then start it — a typo in front of thousands of terminals cannot be taken back, and it has already been paid for.</p>
+        </div>
+        <p class="err hidden" id="e-create"></p>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>✶ dwell — testnet</span>
+    <div style="display: flex; gap: 24px">
+      <a href="https://github.com/ynsmlkc/Dwell" target="_blank" rel="noopener">GitHub</a>
+      <a href="/privacy">Privacy</a>
+    </div>
+  </div>
+</footer>
+
+<script type="module">
+import { $, show, usd, toStroops, short, api, ApiError, session, login, freighter, copyButton } from '/app.js';
+
+const MAX_LINE = 80;
+const MIN_CPM = 1000000n;          // $0.10 / 1000
+const views = ['v-connect', 'v-loading', 'v-neterr', 'v-expired', 'v-deposit', 'v-funded'];
+const view = (id) => views.forEach((v) => show($('#' + v), v === id));
+
+let me = null;
+let forceDeposit = false;
+
+show($('#no-freighter'), !freighter());
+copyButton($('#copy-deposit'), () => me?.deposit?.address || '');
+
+/* ─────────── giris ─────────── */
+
+async function doLogin() {
+  show($('#connect-error'), false);
+  show($('#connect-spin'), true);
+  try {
+    await login('advertiser', (s) => { $('#connect-label').textContent = s; });
+    await load();
+  } catch (e) {
+    $('#connect-error-text').textContent = /reject|denied|closed|declined/i.test(e.message)
+      ? 'Freighter closed without signing. Nothing happened — you can start again.'
+      : e.message;
+    show($('#connect-error'), true);
+  } finally {
+    show($('#connect-spin'), false);
+    $('#connect-label').textContent = 'Connect Freighter';
+  }
+}
+$('#connect').onclick = doLogin;
+$('#retry-connect').onclick = doLogin;
+$('#reconnect').onclick = () => { session.clear(); view('v-connect'); };
+$('#signout').onclick = () => { session.clear(); location.reload(); };
+$('#retry-load').onclick = () => load();
+$('#add-funds').onclick = () => { forceDeposit = true; render(); };
+$('#back-to-campaigns').onclick = () => { forceDeposit = false; render(); };
+
+/* ─────────── veri ─────────── */
+
+async function load() {
+  if (!session.token || session.role !== 'advertiser') { view('v-connect'); return; }
+  $('#who-addr').textContent = short(session.address);
+  show($('#who'), true); show($('#signout'), true);
+  view('v-loading');
+
+  try {
+    me = await api('/v1/advertiser/me');
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) { view('v-expired'); return; }
+    view('v-neterr'); return;
+  }
+  render();
+}
+
+function render() {
+  const balance = BigInt(me.balanceStroops);
+  const spendable = BigInt(me.spendableStroops);
+  const zero = balance === 0n;
+
+  if (zero || forceDeposit) {
+    $('#deposit-addr').textContent = me.deposit?.address || '(payouts are off on this server)';
+    $('#asset-issuer').textContent = me.deposit?.assetIssuer || '—';
+    $('#asset-code').textContent = me.deposit?.assetCode || 'USDC';
+    $('#own-addr').textContent = me.advertiserId;
+    show($('#back-to-campaigns'), !zero);
+    view('v-deposit');
+    if (zero) pollDeposit();
+    return;
+  }
+
+  $('#balance').textContent = usd(me.balanceStroops);
+  const reserved = balance - spendable;
+  show($('#reserved-note'), reserved > 0n);
+  if (reserved > 0n) {
+    $('#reserved-note').textContent =
+      `${usd(spendable.toString())} spendable — ${usd(reserved.toString())} is held for ads already shown but not yet reported.`;
+  }
+
+  const cs = me.campaigns || [];
+  show($('#no-campaigns'), cs.length === 0);
+  show($('#campaigns'), cs.length > 0);
+  $('#campaigns').innerHTML = cs.map((c) => {
+    const active = c.status === 'active';
+    const rate = usd((BigInt(c.bidCpmStroops) / 1000n).toString());
+    return `
+      <div style="padding: 18px 20px; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 16px 20px; align-items: center">
+        <div style="min-width: 0">
+          <div class="term-status" style="border: 1px solid var(--line); border-radius: 4px; padding: 11px 14px; min-height: 0">
+            <span class="ad" style="opacity:${active ? 1 : 0.45}">
+              <span style="color: var(--accent)">✶</span>
+              <span class="ad-text"><span class="brand-name">${esc(c.brand)}</span><span class="sep"> — ${esc(c.text)} · </span><span class="cta">${esc(c.cta)}</span></span>
+            </span>
+            <span class="ad-right">Edit · 2.8s</span>
+          </div>
+          <p class="small" style="margin: 9px 0 0">${usd(c.bidCpmStroops)} CPM · ${rate} per impression</p>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 9px">
+          <span class="mono" style="font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: ${active ? 'var(--accent)' : 'var(--faint)'}">${c.status}</span>
+          <button class="btn btn-sm btn-quiet" data-toggle="${c.id}" data-to="${active ? 'paused' : 'active'}">${active ? 'Pause' : 'Start'}</button>
+        </div>
+        <div class="err hidden" data-err="${c.id}" style="grid-column: 1 / -1"></div>
+      </div>`;
+  }).join('');
+
+  document.querySelectorAll('[data-toggle]').forEach((b) => {
+    b.onclick = () => toggle(b.dataset.toggle, b.dataset.to);
+  });
+
+  view('v-funded');
+  validate();
+}
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+
+async function toggle(id, to) {
+  const errEl = document.querySelector(`[data-err="${id}"]`);
+  show(errEl, false);
+  try {
+    await api(`/v1/advertiser/campaigns/${id}/status`, { method: 'POST', body: { status: to } });
+    await load();
+  } catch (e) {
+    // 402 = bakiye yok. Satir ici gosteriyoruz; modal kullaniciyi kesmek olurdu.
+    errEl.textContent = e.status === 402 ? 'No spendable balance. Add funds, then start it.' : e.message;
+    show(errEl, true);
+  }
+}
+
+/* ─────────── yatirma beklemesi ─────────── */
+
+let pollTimer = null;
+function pollDeposit() {
+  clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    try {
+      const fresh = await api('/v1/advertiser/me');
+      if (BigInt(fresh.balanceStroops) > 0n) {
+        clearInterval(pollTimer);
+        me = fresh; forceDeposit = false; render();
+      }
+    } catch { /* ag gidip gelebilir; bir sonraki turda tekrar */ }
+  }, 6000);
+}
+
+/* ─────────── form ─────────── */
+
+const f = { brand: $('#f-brand'), text: $('#f-text'), cta: $('#f-cta'), cpm: $('#f-cpm') };
+Object.values(f).forEach((el) => el.addEventListener('input', validate));
+
+function validate() {
+  const brand = f.brand.value.trim() || 'Brand';
+  const text = f.text.value.trim() || 'what you do, in a few words';
+  const cta = f.cta.value.trim().toLowerCase() || 'yourdomain.com';
+
+  $('#p-brand').textContent = brand;
+  $('#p-text').textContent = text;
+  $('#p-cta').textContent = cta;
+
+  // Sayac BUTUN satiri sayiyor — kesilen sey o, tek alan degil.
+  const len = `✶ ${brand} — ${text} · ${cta}`.length;
+  $('#count').textContent = `${len}/${MAX_LINE}`;
+  $('#count').style.color = len > MAX_LINE ? 'var(--accent)' : len > 70 ? 'var(--muted)' : 'var(--dim)';
+
+  const tooLong = len > MAX_LINE
+    ? `The whole line is ${len} characters. Past ${MAX_LINE} it gets cut off in narrow terminals and the domain is the first thing to go.`
+    : null;
+  const ctaOk = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(cta);
+  const ctaBad = f.cta.value.trim() && !ctaOk
+    ? 'Just the domain — firecrawl.dev, not a full URL. Developers must land exactly where the line says.'
+    : null;
+
+  const cpmS = toStroops(f.cpm.value);
+  const cpmBad = cpmS === null ? 'Enter a number, e.g. 40'
+    : cpmS < MIN_CPM ? 'Minimum is $0.10 per 1000 impressions.' : null;
+  $('#f-perimp').textContent = cpmS && cpmS > 0n ? usd((cpmS / 1000n).toString()) : '—';
+
+  setErr('#e-text', tooLong, f.text);
+  setErr('#e-cta', ctaBad, f.cta);
+  setErr('#e-cpm', cpmBad, f.cpm);
+
+  const ready = !tooLong && !ctaBad && !cpmBad && f.brand.value.trim() && f.text.value.trim() && f.cta.value.trim();
+  $('#create').disabled = !ready;
+  return ready;
+}
+
+function setErr(sel, msg, input) {
+  show($(sel), !!msg);
+  if (msg) $(sel).textContent = msg;
+  input.classList.toggle('bad', !!msg);
+}
+
+$('#create').onclick = async () => {
+  if (!validate()) return;
+  show($('#e-create'), false);
+  show($('#create-spin'), true);
+  try {
+    await api('/v1/advertiser/campaigns', {
+      method: 'POST',
+      body: {
+        brand: f.brand.value.trim(),
+        text: f.text.value.trim(),
+        cta: f.cta.value.trim().toLowerCase(),
+        bidCpmStroops: toStroops(f.cpm.value).toString(),
+      },
+    });
+    f.brand.value = ''; f.text.value = ''; f.cta.value = '';
+    await load();
+  } catch (e) {
+    // Sunucu hangi alanin bozuk oldugunu soyluyor — o kutuyu isaretle.
+    const field = e.body?.field;
+    if (field === 'text') setErr('#e-text', e.message, f.text);
+    else if (field === 'cta') setErr('#e-cta', e.message, f.cta);
+    else if (field === 'bidCpm') setErr('#e-cpm', e.message, f.cpm);
+    else { $('#e-create').textContent = e.message; show($('#e-create'), true); }
+  } finally {
+    show($('#create-spin'), false);
+  }
+};
+
+validate();
+load();
+</script>
+</body>
+</html>

@@ -17,7 +17,12 @@ import { createApp } from './http/app.js'
 import { hashToken } from './http/auth.js'
 import { WalletAuth, serverKeypair, horizonSigners } from './http/wallet-auth.js'
 import { Sep10, NETWORKS } from '@dwell/payments'
-import { Keypair } from '@stellar/stellar-sdk'
+import {
+  Keypair, Horizon, TransactionBuilder, Operation, Asset, BASE_FEE,
+} from '@stellar/stellar-sdk'
+import { serveStatic } from '@hono/node-server/serve-static'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Pipeline } from './pipeline.js'
 import { Ledger } from './ledger/ledger.js'
 import { CampaignStore } from './ads/campaign-store.js'
@@ -236,6 +241,38 @@ if (payoutRunner) {
   log('odeme KAPALI — DWELL_HOT_SECRET tanimli degil')
 }
 
+/* ─────────────────── cuzdan: USDC kabulu ─────────────────── */
+
+/**
+ * Kullanicinin cuzdanina USDC trustline'i ekleyecek IMZASIZ islem.
+ *
+ * Bunu sunucunun kurmasi bir kolaylik degil, boyut karari: alternatifi
+ * tarayiciya Stellar SDK indirtmekti (~1 MB) ve tek ihtiyacimiz tek bir
+ * operasyon. Imzayi kullanici atiyor, biz hicbir seye dokunmuyoruz.
+ */
+const trustlineXdr = async (address: string) => {
+  if (!/^G[A-Z2-7]{55}$/.test(address)) {
+    return { ok: false as const, reason: 'gecersiz Stellar adresi' }
+  }
+  const hz = new Horizon.Server(HORIZON)
+  let acc
+  try {
+    acc = await hz.loadAccount(address)
+  } catch {
+    // Hesap zincirde yoksa trustline eklenemez — once fonlanmasi gerekiyor.
+    return { ok: false as const, reason: 'hesap zincirde bulunamadi — once biraz XLM gerekiyor' }
+  }
+  const asset = new Asset(
+    process.env['DWELL_ASSET_CODE'] ?? TESTNET_USDC.code,
+    process.env['DWELL_ASSET_ISSUER'] ?? TESTNET_USDC.issuer,
+  )
+  const tx = new TransactionBuilder(acc, { fee: BASE_FEE, networkPassphrase: NETWORKS.testnet })
+    .addOperation(Operation.changeTrust({ asset }))
+    .setTimeout(300)
+    .build()
+  return { ok: true as const, xdr: tx.toXDR(), networkPassphrase: NETWORKS.testnet }
+}
+
 /* ─────────────────── reklamveren para yatirma ─────────────────── */
 
 /**
@@ -291,10 +328,34 @@ const app = createApp({
   payoutThreshold: PAYOUT_THRESHOLD,
   payouts,
   campaigns: campaignStore,
+  trustlineXdr,
   ...(hotAddress ? { depositAddress: hotAddress } : {}),
   assetCode: process.env['DWELL_ASSET_CODE'] ?? TESTNET_USDC.code,
   assetIssuer: process.env['DWELL_ASSET_ISSUER'] ?? TESTNET_USDC.issuer,
 })
+
+/**
+ * Site, API ile AYNI adreste duruyor.
+ *
+ * Ayri bir yere koysaydik her uc nokta icin CORS baslıklari gerekirdi ve
+ * panelin kimlik islemleri gereksiz yere zorlasirdi. Ayrica tek deploy,
+ * tek alan adi, tek sertifika.
+ *
+ * `/v1/*` ve `/health` YUKARIDA tanimli oldugu icin bu yakalama onlarin
+ * onune gecmiyor — Hono sirayla bakiyor.
+ */
+const PUBLIC = join(dirname(fileURLToPath(import.meta.url)), 'public')
+app.use('/*', serveStatic({
+  root: PUBLIC,
+  // Klasor istendiginde `index.html` don: `/app` → `public/app/index.html`
+  rewriteRequestPath: (p) => (p.endsWith('/') ? p + 'index.html' : p),
+}))
+// Uzantisiz yollar (`/app`, `/privacy`) klasor index'ine duser.
+app.use('/*', serveStatic({
+  root: PUBLIC,
+  rewriteRequestPath: (p) => (p.includes('.') ? p : p.replace(/\/*$/, '') + '/index.html'),
+}))
+
 
 const server = serve({ fetch: app.fetch, port: PORT, hostname: HOST }, (info) => {
   const bakiye = ledger.balance(accountId('advertiser', DEV_ADVERTISER))

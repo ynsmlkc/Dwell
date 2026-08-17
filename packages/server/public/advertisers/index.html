@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buy the line — Dwell for advertisers</title>
+<meta name="description" content="One line of plain text in front of developers who are waiting for their AI assistant. 80 characters, no images, no tracking pixels.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28' fill='%23f97335'>✶</text></svg>">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header class="top">
+  <a class="brand" href="/"><span class="star">✶</span>dwell</a>
+  <nav class="nav">
+    <a href="/">for developers</a>
+    <a href="/privacy">privacy</a>
+    <a class="cta" href="/advertisers/app">your campaigns</a>
+    <span class="chip"><span class="dot"></span>testnet</span>
+  </nav>
+</header>
+
+<main class="wrap">
+
+  <section style="padding-top: clamp(52px, 8vw, 96px)">
+    <p class="eyebrow">For advertisers</p>
+    <h1 class="h-hero" style="max-width: 22ch; font-size: clamp(36px, 5.8vw, 68px)">You are buying <em class="hl">one line</em> of plain text. Here it is.</h1>
+
+    <figure class="term" style="margin-top: 34px">
+      <figcaption class="term-bar"><span>status line — as printed</span></figcaption>
+      <div class="term-status" style="border-top: 0">
+        <span class="ad">
+          <span style="color: var(--accent)">✶</span>
+          <span class="ad-text"><span class="brand-name">Firecrawl</span><span class="sep"> — docs to LLM-ready markdown · </span><span class="cta">firecrawl.dev</span></span>
+        </span>
+        <span class="ad-right">Edit · 2.8s</span>
+      </div>
+    </figure>
+    <p class="small" style="margin: 16px 0 0">The dimmed right side is the developer's own activity. We are a guest on their status line.</p>
+  </section>
+
+  <section>
+    <dl style="margin: 0">
+      <div class="fact">
+        <dt>Who sees it</dt>
+        <dd class="body">Developers using Claude Code, at the moment they are idle and waiting for a model to answer. Not a feed, not a page — their own terminal.</dd>
+      </div>
+      <div class="fact">
+        <dt>The format</dt>
+        <dd class="body">One line, plain text, 80 characters maximum including the brand and the domain. No images, no animation, no tracking pixels — there is no image channel to buy.</dd>
+      </div>
+      <div class="fact">
+        <dt>What counts</dt>
+        <dd class="body">Only impressions displayed longer than 10 seconds. A line that flashes for two seconds is not billed.</dd>
+      </div>
+      <div class="fact">
+        <dt>Where the link goes</dt>
+        <dd class="body">A bare domain, exactly as printed. No redirects, no query strings — the developer lands where the line says they will.</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section>
+    <h2 style="font-size: clamp(24px, 2.8vw, 34px); margin-bottom: 22px">What it costs</h2>
+    <p class="body" style="margin: 0 0 26px; max-width: 60ch">You set the CPM. Minimum $0.10 per 1000 impressions; publishers receive 50%. There is no pricing table — the number is yours to choose.</p>
+    <div class="mono" style="border: 1px solid rgba(236,231,225,0.11); background: rgba(236,231,225,0.02); padding: 22px; display: grid; gap: 16px; max-width: 520px; font-size: 13px">
+      <label style="display: grid; gap: 10px; color: var(--faint)">Your CPM (USD per 1000 impressions)
+        <input type="range" min="0.1" max="80" step="0.1" value="40" id="cpm" style="accent-color: var(--accent); width: 100%">
+      </label>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px 28px">
+        <span style="color: var(--faint)">CPM <span style="color: var(--ink)" id="cpm-label"></span></span>
+        <span style="color: var(--faint)">per impression <span style="color: var(--ink)" id="per-imp"></span></span>
+        <span style="color: var(--faint)">publisher gets <span style="color: var(--ink)" id="share"></span></span>
+      </div>
+      <span style="color: var(--dim)">stroops: <span id="stroops"></span></span>
+    </div>
+  </section>
+
+  <section style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px">
+    <p style="margin: 0; max-width: 50ch; font-size: clamp(18px, 2.1vw, 24px); line-height: 1.45; letter-spacing: -0.01em">Self-serve, no contact form. Connect the wallet you will fund campaigns from — deposits are matched by sender address.</p>
+    <a class="btn btn-primary" href="/advertisers/app">Connect wallet to start →</a>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>✶ dwell — testnet</span>
+    <div style="display: flex; gap: 24px">
+      <a href="https://github.com/ynsmlkc/Dwell" target="_blank" rel="noopener">GitHub</a>
+      <a href="/privacy">Privacy</a>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .fact {
+    display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.6fr);
+    gap: clamp(14px, 3vw, 40px); padding: 24px 0;
+    border-top: 1px solid var(--line); align-items: start;
+  }
+  .fact dt { margin: 0; font-size: clamp(19px, 2.1vw, 25px); letter-spacing: -0.01em; }
+  .fact dd { margin: 0; }
+  @media (max-width: 680px) { .fact { grid-template-columns: 1fr; } }
+</style>
+
+<script type="module">
+import { $, usd, toStroops } from '/app.js';
+
+const slider = $('#cpm');
+function paint() {
+  // Dolar → stroop, float'a ugramadan. Panelde ayni hesap yapiliyor;
+  // burada float kullanmak orada da kullanmaya davet olurdu.
+  const s = toStroops(parseFloat(slider.value).toFixed(7));
+  $('#cpm-label').textContent = usd(s.toString()) + ' CPM';
+  $('#per-imp').textContent = usd((s / 1000n).toString());
+  $('#share').textContent = usd((s / 2n).toString()) + ' per 1000';
+  $('#stroops').textContent = s.toString();
+}
+slider.addEventListener('input', paint);
+paint();
+</script>
+</body>
+</html>

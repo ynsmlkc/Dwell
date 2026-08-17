@@ -5,7 +5,7 @@
  * bir sunucu bu yuzden kaynaktan calistirilamiyor.
  */
 import { build } from 'esbuild'
-import { statSync } from 'node:fs'
+import { statSync, cpSync, readdirSync } from 'node:fs'
 
 await build({
   entryPoints: ['src/main.ts'],
@@ -34,4 +34,9 @@ await build({
     ].join('\n'),
   },
 })
+// Statik site derlenmiyor, kopyalaniyor: derleme adimi olmayan bes HTML
+// dosyasi icin bundler kurmak, bakimi olan bir sey eklemek olurdu.
+cpSync('public', 'dist/public', { recursive: true })
+const n = readdirSync('dist/public', { recursive: true }).filter((f) => String(f).includes('.')).length
 console.log(`  dist/server.mjs  ${(statSync('dist/server.mjs').size / 1024).toFixed(1)} KB`)
+console.log(`  dist/public      ${n} dosya`)

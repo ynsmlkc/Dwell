@@ -45,6 +45,9 @@ RUN addgroup -S dwell && adduser -S dwell -G dwell \
 # Tek dosya. Butun bagimliliklar esbuild ile iceri gomulu, bu yuzden
 # `node_modules` TASINMIYOR — imaj ~150 MB yerine ~50 MB.
 COPY --from=build --chown=dwell:dwell /app/packages/server/dist/server.mjs ./server.mjs
+# Site. Sunucu bunlari `/` altinda servis ediyor; API `/v1/*` altinda kaliyor.
+# Ayni adres olmasi CORS'u tamamen ortadan kaldiriyor.
+COPY --from=build --chown=dwell:dwell /app/packages/server/public ./public
 COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Konteynerde 0.0.0.0 SART: 127.0.0.1'e baglanan bir sunucuya disaridan

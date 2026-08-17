@@ -1,107 +1,114 @@
-# dwell
+# dwellsh
 
-AI kodlama araçlarının bekleme anlarını kazanca çevirir.
+Turn the waiting into earnings.
 
-Claude Code'a bir şey sorduğunda cevabı beklerken alt satırda sponsorlu bir
-satır görünür. Gösterim sayılır, kazancın Stellar üzerinden USDC olarak
-ödenir.
+When you ask Claude Code something, one sponsored line of text sits in your
+status line while the model works. When the answer arrives, it is gone. You
+get paid in USDC on Stellar.
 
 ```
 npx dwellsh init
 ```
 
-Kurulduktan sonra komut `dwell`.
+After install, the command is `dwell`.
 
 ---
 
-## Ne yapar
+## What it looks like
 
 ```
-  ✶ Firecrawl — docs to LLM-ready markdown · firecrawl.dev
+✶ Firecrawl — docs to LLM-ready markdown · firecrawl.dev        Edit · 2.8s
 ```
 
-Bu satır Claude Code'un `statusLine` alanında görünür. Yalnızca **sen bir
-şey beklerken** — cevap gelince kaybolur.
+One line, plain text, in the status line at the bottom of Claude Code. It
+shows **only while you are waiting** — it disappears when the answer lands,
+and an idle terminal shows nothing at all.
 
-Reklam gösterilmesi için tek koşul var: bekliyor olman. Boşta duran bir
-terminal reklam göstermez, dolayısıyla gösterim de saymaz.
+That is the only condition: you have to be waiting. No waiting, no line, no
+impression, no payment.
 
-## Kurulum
+## Install
 
 ```bash
-npx dwellsh init          # kur ve başlat
-npx dwellsh init --spinner   # üstteki "Thinking…" kelimelerini de kullan
+npx dwellsh init             # install and start
+npx dwellsh init --spinner   # also use the "Thinking…" words at the top
 ```
 
-Sonra yeni bir Claude Code oturumu aç.
+Then open a new Claude Code session.
 
-## Kazanç
+## Getting paid
 
 ```bash
-dwell login      # cüzdanını bağla — kazanç buraya gider
-dwell balance    # ne kazandın
+dwell login      # connect your wallet — earnings go here
+dwell balance    # what you have earned
 ```
 
-`dwell login` tarayıcında kendi bilgisayarında bir sayfa açar; imzayı
-Freighter'da atarsın. **Özel anahtarın hiçbir zaman bu araca girmez.**
+`dwell login` opens a page on your own machine and you sign with Freighter.
+**Your private key never enters this tool.**
 
-Kimliğin cüzdan adresinin kendisidir. GitHub yok, e-posta yok, şifre yok.
+Your identity *is* your wallet address. No GitHub, no email, no password.
 
-## Komutlar
+## Commands
 
-| Komut | Ne yapar |
+| Command | What it does |
 |---|---|
-| `dwell init` | kur ve başlat |
-| `dwell login` | cüzdanını bağla |
-| `dwell balance` | kazancını göster |
-| `dwell whoami` | bağlı cüzdanı göster |
-| `dwell status` | daemon durumu |
-| `dwell doctor` | kurulumu teşhis et |
-| `dwell pause` / `resume` | reklamı geçici durdur |
-| `dwell logout` | cüzdan bağlantısını kaldır |
-| `dwell uninstall` | kaldır |
+| `dwell init` | install and start |
+| `dwell login` | connect your wallet |
+| `dwell balance` | show earnings |
+| `dwell whoami` | show the connected wallet |
+| `dwell status` | daemon status |
+| `dwell doctor` | diagnose the install |
+| `dwell restart` | restart the daemon |
+| `dwell pause` / `resume` | stop showing ads for now |
+| `dwell logout` | disconnect the wallet |
+| `dwell uninstall` | remove it |
 
-## Kaldırmak
+## Leaving
 
 ```bash
 dwell uninstall
 ```
 
-Yalnızca kendi izimizi sileriz. `settings.json`'da senin kendi ayarların
-varsa onlara dokunmayız — yedekten geri yükleme yapmıyoruz, çünkü yedek
-alındıktan sonra yaptığın değişiklikleri geri almak, senin işini silmek
-olurdu.
+It removes only our own entries. If you have your own settings in
+`settings.json`, they are left exactly as they were — we do not restore from a
+backup, because that would silently undo changes you made after the backup was
+taken.
 
-## Ne alıyoruz
+## What we send
 
-Açık olalım — bir araç makinene bir şey kuruyorsa neyi gördüğünü bilmen
-gerekir.
+Being clear about this matters: if a tool installs something on your machine,
+you should know what it sees.
 
-**Gönderdiğimiz:** gösterim kimliği, kampanya kimliği, süre, oturum kimliği,
-istemci sürümü, işletim sistemi ve mimari.
+**We send:** impression id, campaign id, duration, session id, client version,
+OS and architecture.
 
-**Göndermediğimiz:** dizin yolun, dosya adların, prompt'ların, kodun. Proje
-ayrımı için kullanılan değer makinende üretilen bir tuzla hash'lenir; ham
-yol hiçbir zaman ağa çıkmaz.
+**We never send:** your directory paths, your file names, your prompts, your
+code. The value used to tell projects apart is hashed with a salt generated on
+your machine that never leaves it — raw paths never reach the network.
 
-## Bilmen gerekenler
+## Things you should know
 
-Claude Code özel bir `statusLine` tanımlıyken alt satırdaki bazı klavye
-ipuçlarını göstermiyor (`esc to interrupt` gibi). Bu bizim tercihimiz değil,
-Claude Code'un davranışı — ama sonucunu sen yaşıyorsun, o yüzden yazıyoruz.
+Claude Code hides some of the keyboard hints at the bottom (like
+`esc to interrupt`) while a custom `statusLine` is defined. That is Claude
+Code's behaviour, not our choice — but you are the one who lives with it, so we
+say it up front.
 
-`--spinner` kullanırsan üstteki "Thinking…" kelimeleri de değişir. O alan
-her seferinde tek bir kelime listesi kabul ediyor; başka bir araç da
-yazıyorsa biriniz diğerini eziyor.
+With `--spinner`, the "Thinking…" words at the top change too. That field
+accepts one list at a time, so if another tool writes to it as well, one of you
+overwrites the other.
 
-## Durum
+## Status
 
-Testnet. Gerçek para henüz akmıyor — ödeme mekanizması çalışıyor ve Stellar
-testnet'inde doğrulandı, mainnet kapsam dışı.
+Testnet. The payout mechanism works and has been verified on Stellar testnet;
+mainnet is out of scope for now.
 
-Sunucuya bağlı değilken `dwell` örnek reklamlar gösterir ve **hiçbir kazanç
-kaydedilmez**. `dwell init` bunu söyler.
+Without a server connection `dwell` shows sample ads and **records no
+earnings**. `dwell init` tells you when that is the case.
 
-## Lisans
+## Links
+
+- [github.com/ynsmlkc/Dwell](https://github.com/ynsmlkc/Dwell)
+
+## License
 
 MIT

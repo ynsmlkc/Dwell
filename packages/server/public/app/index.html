@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your earnings — Dwell</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28' fill='%23f97335'>✶</text></svg>">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header class="top">
+  <a class="brand" href="/"><span class="star">✶</span>dwell</a>
+  <nav class="nav">
+    <a href="/">for developers</a>
+    <a href="/advertisers">advertisers</a>
+    <span class="chip hidden" id="who"><span class="dot"></span><span id="who-addr"></span></span>
+    <button class="btn btn-sm btn-quiet hidden" id="signout">sign out</button>
+  </nav>
+</header>
+
+<main class="wrap" style="padding-top: clamp(32px, 5vw, 60px); padding-bottom: 96px">
+
+  <!-- ═══ bagli degil ═══ -->
+  <div id="v-connect" class="card hidden" style="max-width: 460px; margin: clamp(20px, 8vw, 90px) auto 0">
+    <h1 style="font-size: clamp(24px, 3vw, 32px); margin-bottom: 12px">Connect your wallet</h1>
+    <p class="body" style="margin: 0 0 26px">This is the wallet you will be paid into. There is no account and no password — your address is your identity.</p>
+
+    <div class="note note-accent hidden" id="no-freighter" style="margin-bottom: 18px">
+      Freighter is not installed in this browser.
+      <a href="https://freighter.app" target="_blank" rel="noopener" style="color: var(--accent)">Install it</a>, then reload this page.
+    </div>
+
+    <button class="btn btn-primary" id="connect" style="width: 100%">
+      <span class="spinner hidden" id="connect-spin"></span><span id="connect-label">Connect Freighter</span>
+    </button>
+
+    <div class="note note-warn hidden" id="connect-error" style="margin-top: 18px">
+      <p style="margin: 0 0 10px" id="connect-error-text"></p>
+      <button class="btn btn-sm btn-quiet" id="retry-connect">Try again</button>
+    </div>
+
+    <p class="small" style="margin: 22px 0 0">You sign a message to prove the address is yours. It cannot be submitted to the network and it moves nothing. Your private key never leaves Freighter.</p>
+  </div>
+
+  <!-- ═══ yukleniyor ═══ -->
+  <div id="v-loading" class="hidden" style="display: grid; gap: 18px; max-width: 640px">
+    <div style="height: 64px; border-radius: 4px; background: rgba(236,231,225,0.045)"></div>
+    <div style="height: 40px; border-radius: 4px; background: rgba(236,231,225,0.045)"></div>
+    <div style="height: 40px; border-radius: 4px; background: rgba(236,231,225,0.045)"></div>
+    <p class="small" style="margin: 0">Loading your balance…</p>
+  </div>
+
+  <!-- ═══ ag hatasi ═══ -->
+  <div id="v-neterr" class="note note-warn hidden" style="max-width: 520px; padding: 22px 24px">
+    <h2 style="font-size: 22px; margin-bottom: 10px; font-family: var(--serif)">Cannot reach the server</h2>
+    <p style="margin: 0 0 18px; color: var(--muted)">Your earnings are safe — they live on the server, not in this page. Nothing is lost while it is unreachable.</p>
+    <button class="btn btn-sm btn-quiet" id="retry-load">Retry</button>
+  </div>
+
+  <!-- ═══ oturum dustu ═══ -->
+  <div id="v-expired" class="note hidden" style="max-width: 520px; padding: 22px 24px">
+    <h2 style="font-size: 22px; margin-bottom: 10px; font-family: var(--serif)">Session expired</h2>
+    <p style="margin: 0 0 18px; color: var(--muted)">Sign once more to prove the wallet is still yours. Nothing was lost.</p>
+    <button class="btn btn-primary btn-sm" id="reconnect">Reconnect wallet</button>
+  </div>
+
+  <!-- ═══ pano ═══ -->
+  <div id="v-dash" class="hidden">
+
+    <!-- TRUSTLINE: her seyin ustunde. Alamayacagin parayi kazanmak,
+         hic kazanmamaktan kotu. -->
+    <div class="banner hidden" id="trustline" style="margin-bottom: 34px">
+      <h2 style="font-size: clamp(20px, 2.4vw, 26px); margin-bottom: 10px">Your wallet cannot receive USDC yet</h2>
+      <p class="body" style="margin: 0 0 8px; color: var(--ink-soft); max-width: 68ch">On Stellar, a wallet has to accept each kind of token before anyone can send it. Yours has not accepted USDC, so <strong style="color: var(--ink)">payouts will not go out</strong> — you will keep earning and the money will wait here.</p>
+      <p class="small" style="margin: 0 0 20px; max-width: 68ch">Accepting USDC locks 0.5 XLM in your own wallet. You get it back if you ever remove it.</p>
+
+      <button class="btn btn-primary" id="enable-usdc">
+        <span class="spinner hidden" id="trust-spin"></span><span id="trust-label">Accept USDC</span>
+      </button>
+      <p class="body hidden" id="low-xlm" style="margin: 0; color: var(--ink-soft)"></p>
+      <p class="err hidden" id="trust-error" style="margin-top: 12px"></p>
+    </div>
+
+    <h1 style="margin-bottom: 6px">Earnings</h1>
+    <p class="small" style="margin: 0 0 clamp(26px, 4vw, 40px)">Paid in USDC on Stellar testnet.</p>
+
+    <!-- bos -->
+    <div id="v-empty" class="hidden" style="border: 1px solid rgba(236,231,225,0.11); border-radius: 5px; padding: clamp(26px, 5vw, 46px)">
+      <h2 style="font-size: clamp(22px, 2.6vw, 28px); margin-bottom: 12px">No impressions yet</h2>
+      <p class="body" style="margin: 0 0 24px; max-width: 60ch">Install the CLI and start a Claude Code session. The first line can take a few minutes to show up here.</p>
+      <button class="btn" id="copy-install"><span style="color: var(--faint)">$</span>npx dwellsh init<span class="tag">copy</span></button>
+    </div>
+
+    <!-- veri -->
+    <div id="v-data" class="hidden">
+      <div style="display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: clamp(18px, 3vw, 44px); align-items: start" class="dash-grid">
+        <div>
+          <p class="figure-label">Payable</p>
+          <p class="figure" id="payable">$0</p>
+          <p class="small" style="margin: 10px 0 0"><span id="payable-stroops"></span> stroops · verified and yours</p>
+
+          <div style="margin-top: 30px">
+            <div class="bar"><i id="bar" style="width: 0%"></i></div>
+            <p class="body" id="threshold-text" style="margin: 12px 0 0; font-size: 13.5px"></p>
+          </div>
+
+          <div class="note hidden" id="blocked" style="margin-top: 20px"></div>
+        </div>
+
+        <div class="grid-1px" id="rows"></div>
+      </div>
+
+      <section style="margin-top: clamp(38px, 6vw, 64px); padding-bottom: 0">
+        <h2 style="font-size: clamp(20px, 2.3vw, 26px); margin-bottom: 6px">Paid into</h2>
+        <p class="small" style="margin: 0 0 16px">The full address, so you can check it yourself.</p>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px">
+          <code id="address" style="font-size: clamp(11px, 1.25vw, 13.5px)"></code>
+          <button class="btn btn-sm btn-quiet" id="copy-addr"><span class="tag">copy</span></button>
+          <a class="link-under" id="explorer-link" target="_blank" rel="noopener" style="font-size: 12.5px">View on stellar.expert ↗</a>
+        </div>
+        <p class="small" style="margin: 16px 0 0">To be paid into a different wallet, run <span style="color: var(--muted)">dwell login --force</span> in your terminal. Changing it needs a signature, so it cannot be done from a web page.</p>
+      </section>
+
+      <section style="margin-top: clamp(34px, 5vw, 56px); padding-bottom: 0">
+        <h2 style="font-size: clamp(20px, 2.3vw, 26px); margin-bottom: 18px">Payouts</h2>
+        <p class="small hidden" id="no-payouts" style="margin: 0"></p>
+        <div class="table-wrap hidden" id="payouts-wrap">
+          <table>
+            <thead><tr><th>Date</th><th style="text-align:right">Amount</th><th>State</th><th>Transaction</th></tr></thead>
+            <tbody id="payouts"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>✶ dwell — testnet</span>
+    <div style="display: flex; gap: 24px">
+      <a href="https://github.com/ynsmlkc/Dwell" target="_blank" rel="noopener">GitHub</a>
+      <a href="/privacy">Privacy</a>
+    </div>
+  </div>
+</footer>
+
+<style>
+  @media (max-width: 780px) { .dash-grid { grid-template-columns: 1fr !important; } }
+</style>
+
+<script type="module">
+import {
+  $, show, usd, short, api, ApiError, session, login, freighter,
+  walletState, enableUsdc, copyButton, explorer,
+} from '/app.js';
+
+const views = ['v-connect', 'v-loading', 'v-neterr', 'v-expired', 'v-dash'];
+const view = (id) => views.forEach((v) => show($('#' + v), v === id));
+
+copyButton($('#copy-install'), () => 'npx dwellsh init');
+copyButton($('#copy-addr'), () => session.address || '');
+
+/* ─────────── giris ─────────── */
+
+show($('#no-freighter'), !freighter());
+
+async function doLogin() {
+  show($('#connect-error'), false);
+  show($('#connect-spin'), true);
+  try {
+    await login('publisher', (step) => { $('#connect-label').textContent = step; });
+    await load();
+  } catch (e) {
+    // Freighter'in reddi hata degil, KARARDIR. Kullaniciya "bir sey ters
+    // gitti" demek yerine ne oldugunu soyluyoruz.
+    const msg = /reject|denied|closed|User declined/i.test(e.message)
+      ? 'Freighter closed without signing. Nothing happened — you can start again.'
+      : e.message;
+    $('#connect-error-text').textContent = msg;
+    show($('#connect-error'), true);
+  } finally {
+    show($('#connect-spin'), false);
+    $('#connect-label').textContent = 'Connect Freighter';
+  }
+}
+$('#connect').onclick = doLogin;
+$('#retry-connect').onclick = doLogin;
+$('#reconnect').onclick = () => { session.clear(); view('v-connect'); };
+$('#signout').onclick = () => { session.clear(); location.reload(); };
+
+/* ─────────── veri ─────────── */
+
+async function load() {
+  if (!session.token || session.role !== 'publisher') { view('v-connect'); return; }
+
+  $('#who-addr').textContent = short(session.address);
+  show($('#who'), true);
+  show($('#signout'), true);
+  view('v-loading');
+
+  let data;
+  try {
+    data = await api('/v1/me/balance');
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) { view('v-expired'); return; }
+    view('v-neterr'); return;
+  }
+
+  render(data);
+  view('v-dash');
+  void checkTrustline();
+}
+$('#retry-load').onclick = load;
+
+function render(d) {
+  const payable = BigInt(d.payableStroops);
+  const threshold = BigInt(d.payoutThresholdStroops);
+  const lifetime = BigInt(d.lifetimeStroops);
+
+  const empty = lifetime === 0n && BigInt(d.pendingStroops) === 0n;
+  show($('#v-empty'), empty);
+  show($('#v-data'), !empty);
+  if (empty) return;
+
+  $('#payable').textContent = usd(d.payableStroops);
+  $('#payable-stroops').textContent = d.payableStroops.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+
+  // Yuzde tam sayi aritmetigiyle — para hesabinda float yok.
+  const pct = threshold === 0n ? 100 : Number((payable * 100n) / threshold);
+  $('#bar').style.width = Math.max(0, Math.min(100, pct)) + '%';
+
+  const reached = payable >= threshold;
+  const t = $('#threshold-text');
+  t.textContent = reached
+    ? 'Threshold passed — this goes out in the next payout round.'
+    : `${usd((threshold - payable).toString())} to go before the first payout of ${usd(d.payoutThresholdStroops)}.`;
+  t.style.color = reached ? 'var(--accent)' : 'var(--muted)';
+
+  // `blockedReason` yalnizca ESIK DISI bir sebep varsa. Esigi zaten cubuk
+  // anlatiyor; ayni seyi iki kez soylemek gurultu.
+  const other = d.blockedReason && !/esik/i.test(d.blockedReason) ? d.blockedReason : null;
+  show($('#blocked'), !!other);
+  if (other) $('#blocked').textContent = other;
+
+  const rows = [
+    ['Pending', usd(d.pendingStroops), 'counted, not verified yet — may not survive'],
+  ];
+  if (BigInt(d.inFlightStroops) > 0n) {
+    rows.push(['In flight', usd(d.inFlightStroops), 'sent to the chain, waiting for confirmation']);
+  }
+  rows.push(['Lifetime', usd(d.lifetimeStroops), 'everything you have ever earned']);
+
+  $('#rows').innerHTML = rows.map(([k, v, note]) => `
+    <div style="padding: 15px 18px; display: flex; align-items: baseline; justify-content: space-between; gap: 16px">
+      <div><p class="mono" style="margin:0; font-size:13px; color:var(--ink-soft)">${k}</p>
+      <p class="mono" style="margin:3px 0 0; font-size:11.5px; line-height:1.5; color:var(--faint)">${note}</p></div>
+      <span class="mono" style="font-size:15px; white-space:nowrap">${v}</span>
+    </div>`).join('');
+
+  $('#address').textContent = session.address;
+  $('#explorer-link').href = explorer.account(session.address);
+
+  const ps = d.recentPayouts || [];
+  show($('#no-payouts'), ps.length === 0);
+  show($('#payouts-wrap'), ps.length > 0);
+  if (ps.length === 0) {
+    $('#no-payouts').textContent = `Nothing sent yet. The first payout goes out once you pass ${usd(d.payoutThresholdStroops)}.`;
+  } else {
+    $('#payouts').innerHTML = ps.map((p) => `
+      <tr>
+        <td>${new Date(p.at).toISOString().slice(0, 10)}</td>
+        <td class="num">${usd(p.amountStroops)}</td>
+        <td><span style="color:${p.state === 'settled' ? 'var(--good)' : 'var(--muted)'}">${p.state}</span></td>
+        <td><a href="${explorer.tx(p.txHash)}" target="_blank" rel="noopener" style="color:var(--accent)">${p.txHash.slice(0, 10)}… ↗</a></td>
+      </tr>`).join('');
+  }
+}
+
+/* ─────────── trustline ─────────── */
+
+async function checkTrustline() {
+  let st;
+  try { st = await walletState(session.address); } catch { return; }
+  if (!st.exists || st.usdc) { show($('#trustline'), false); return; }
+
+  show($('#trustline'), true);
+  const enough = parseFloat(st.xlm) >= 1;
+  show($('#enable-usdc'), enough);
+  show($('#low-xlm'), !enough);
+  if (!enough) {
+    $('#low-xlm').textContent =
+      `You need a little XLM first — your wallet holds ${st.xlm} XLM and this needs about 1. `
+      + `XLM pays the network's fees; we cannot cover it from here.`;
+  }
+}
+
+$('#enable-usdc').onclick = async () => {
+  show($('#trust-error'), false);
+  show($('#trust-spin'), true);
+  $('#trust-label').textContent = 'Confirm in Freighter…';
+  try {
+    await enableUsdc(session.address);
+    show($('#trustline'), false);
+  } catch (e) {
+    $('#trust-error').textContent = e.message;
+    show($('#trust-error'), true);
+  } finally {
+    show($('#trust-spin'), false);
+    $('#trust-label').textContent = 'Accept USDC';
+  }
+};
+
+load();
+</script>
+</body>
+</html>
