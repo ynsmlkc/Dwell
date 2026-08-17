@@ -15,7 +15,7 @@ import * as daemon from './daemon-control.js'
 import { out, ok, warn, info, fail, rows, dim, bold, green, yellow, red, orange, banner, usdc } from './output.js'
 import { cmdLogin, cmdLogout, cmdWhoami } from './login.js'
 import { cmdBalance } from './balance.js'
-import { loadCredentials } from '../credentials.js'
+import { loadCredentials, shortAddress } from '../credentials.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -214,6 +214,29 @@ async function cmdPause(paused: boolean): Promise<void> {
   out(paused ? `${yellow('⏸')} duraklatildi` : `${green('▶')} devam ediyor`)
 }
 
+/**
+ * Daemon'i durdurup yeniden baslatir.
+ *
+ * `dwell login` sonrasi gerekiyor: daemon token'i YALNIZCA acilista okuyor.
+ * Bu komut olmadan kullanicinin "kapat ac" demesi gerekirdi ve `login`
+ * ciktisi zaten `dwell restart` diyordu — olmayan bir komutu tarif eden
+ * bir mesaj, hic mesaj olmamasindan kotu.
+ */
+async function cmdRestart(): Promise<void> {
+  banner()
+  const durdu = await daemon.stop()
+  if (durdu) ok('daemon durduruldu')
+
+  const started = await daemon.start({ entry: daemonEntry() })
+  if ('error' in started) fail('DWL-1001', 'Daemon baslatilamadi', started.error)
+  ok(`daemon calisiyor (pid ${started.pid})`)
+
+  const creds = loadCredentials()
+  if (creds) info(dim(`cuzdan ${shortAddress(creds.publisherId)}`))
+  else info(dim('cuzdan bagli degil — `dwell login`'))
+  out()
+}
+
 function cmdHelp(): void {
   banner()
   out(`  ${dim('AI kodlama araclarinin bekleme anlarini kazanca cevirir.')}`)
@@ -226,6 +249,7 @@ function cmdHelp(): void {
     ['dwell logout', 'cuzdan baglantisini kaldir'],
     ['dwell doctor', 'kurulumu tesh­is et'],
     ['dwell status', 'daemon durumu'],
+    ['dwell restart', 'daemon\'i yeniden baslat'],
     ['dwell pause', 'reklami gecici durdur'],
     ['dwell resume', 'devam et'],
     ['dwell uninstall', 'kaldir — kendi izimizi sileriz'],
@@ -248,6 +272,7 @@ export async function main(argv: readonly string[]): Promise<void> {
     case 'doctor': return cmdDoctor()
     case 'uninstall': return cmdUninstall()
     case 'status': return cmdStatus()
+    case 'restart': return cmdRestart()
     case 'pause': return cmdPause(true)
     case 'resume': return cmdPause(false)
     case 'login': return cmdLogin(rest)

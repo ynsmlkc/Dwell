@@ -26,6 +26,18 @@ import { loginPage } from './login-page.js'
 
 const LOGIN_TIMEOUT_MS = 5 * 60_000
 
+/**
+ * Sunucu adresi.
+ *
+ * Kendi alan adimiz yok; barindiran platformun verdigi adres bu. Yayina
+ * cikmadan once `api.dwell.dev` yaziyordu ve o adres HIC VAR OLMADI —
+ * paket boyle yayinlansaydi `dwell login` herkeste "sunucuya ulasilamadi"
+ * derdi ve kimse sebebini bulamazdi.
+ *
+ * Alan adi alindiginda burasi degisir; `--server` ile de ezilebiliyor.
+ */
+const DEFAULT_SERVER = 'https://dwellserver-production.up.railway.app'
+
 export interface LoginOptions {
   readonly serverUrl: string
   /** Tarayici acilmasin — CI ve baglantisiz ortamlar icin. */
@@ -40,7 +52,7 @@ export function parseLoginArgs(argv: readonly string[]): LoginOptions {
     return i >= 0 ? argv[i + 1] : undefined
   }
   return {
-    serverUrl: (flag('server') ?? process.env['DWELL_SERVER'] ?? 'https://api.dwell.dev')
+    serverUrl: (flag('server') ?? process.env['DWELL_SERVER'] ?? DEFAULT_SERVER)
       .replace(/\/+$/, ''),
     noBrowser: argv.includes('--no-browser'),
   }
