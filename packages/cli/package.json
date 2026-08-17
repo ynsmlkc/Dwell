@@ -23,7 +23,7 @@
   },
   "type": "module",
   "bin": {
-    "dwell": "./dist/dwell.mjs"
+    "dwell": "dist/dwell.mjs"
   },
   "files": [
     "dist",
