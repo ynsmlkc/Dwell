@@ -220,6 +220,32 @@ bağlanan Volume.
 
 ---
 
+## 7 — Reklamveren para çekme ✅ (2026-08-17)
+
+Denetimde çıktı: para giriyordu, çıkmıyordu. `POST /v1/advertiser/withdraw`
+ve panelde çekme kutusu eklendi. Ödeme makinesinin aynısını kullanıyor —
+ayrı bir akış, test edilmiş mantığın daha az bakımlı bir kopyası olurdu.
+
+Gerçek testnet'te doğrulandı:
+
+```
+2 USDC yatırıldı            → defterde $2, cüzdan 0
+$9,90 çekmeyi dene          → 400 (bakiye yetmiyor)
+$0,00001 çekmeyi dene       → 400 (eşiğin altı)
+$1,50 çek                   → 200 · cüzdan 1.5 USDC · defterde $0,50
+   tx 254163c2519ae86d8254792daebf0db81024a2f957b1b5f7cdc38c7c122dd3a4
+
+9 reklam teslim edildi, raporlanmadı
+çekilebilir $0,50 → $0,32   (rezerve $0,18)
+tüm bakiyeyi çekmeyi dene   → 400 REDDEDİLDİ
+```
+
+Son satır en önemlisi: gösterilmiş ama henüz raporlanmamış reklamların
+karşılığı çekilemiyor. Çekilebilseydi reklamveren reklamını gösterttirip
+parasını geri alır, yayıncı karşılığını alamazdı.
+
+---
+
 ## Küçük ama biriken işler
 
 | # | İş | Nereden |
@@ -228,7 +254,7 @@ bağlanan Volume.
 | 2 | Attribution URL kısaltıcı (`/c/<token>`), uzun URL'ler `MAX_BARE_URL`'i aşıyor | spinner.md §3 |
 | 3 | Zincirleme (chain-capture): mevcut statusLine'ı ezme, altına istifle | PROJECT.md §6.1, spinner.md §4 |
 | 4 | Zincir bütçesi kararı: 200 ms içinde mi, opt-in mi | ADR-003 |
-| 5 | `dwell pause` gerçekten duraklatsın — şu an yalnızca mesaj basıyor | main.ts'te not düşülü |
+| 5 | ~~`dwell pause` gerçekten duraklatsın~~ ✅ 2026-08-17 — diske yazılıyor, yeniden başlatmada sürüyor | denetim |
 | 6 | Link–alan adı eşleşmesi: metinde yazan domain ile tıklama hedefi aynı olmalı | ADR-024 |
 
 **İçerik politikası yazılmayacak** — reklamveren tarafı açık (ADR-024). Yalnızca 6. maddedeki bütünlük kontrolü gerekli: kullanıcı reklamda gördüğü alan adına gitmeli, başka yere değil.
