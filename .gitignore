@@ -8,3 +8,6 @@ packages/*/dist/
 # Gizli anahtarlar — asla commitlenmez
 .env.*
 !.env.example
+
+# Testnet havuz anahtari — git'e girmez
+.testnet-faucet.json

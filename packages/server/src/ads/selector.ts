@@ -61,11 +61,23 @@ export class AdSelector {
   select(publisherId: string): AdSelection | null {
     const eligible = this.deps.campaigns()
       .filter((c) => c.status === 'active')
-      // ADR-021: parasi olmayan kampanya servis EDILMEZ. Bu kontrol olmadan
-      // butce sinirsiz asilir ve acigi platform kapatir.
-      .filter((c) => this.deps.spendableBalance(c.advertiserId) > 0n)
       // Gosterim basina oran sifira dusuyorsa satacak bir sey yok.
       .filter((c) => rateFromCpm(c.bidCpm) > 0n)
+      /**
+       * ADR-021: parasi olmayan kampanya servis EDILMEZ.
+       *
+       * Kosul "bakiyesi var mi" DEGIL, "BU GOSTERIMI karsilayabiliyor mu".
+       * Fark hayati ve gercek dagitimda ortaya cikti:
+       *
+       * Once `> 0n` yaziyordu. Cebinde 16 sent kalmis bir reklamverenin
+       * gosterim basina 20 sentlik kampanyasi "uygun" sayiliyor, en yuksek
+       * teklif oldugu icin seciliyor, sonra asagidaki kontrol "parasi
+       * yetmiyor" deyip `null` donuyordu. Sonuc: parasi TIKIR TIKIR olan
+       * diger kampanyalar hic siraya giremiyor ve BUTUN AG duruyordu.
+       *
+       * Tek bir reklamverenin bakiyesinin dip yapmasi herkesi susturmamali.
+       */
+      .filter((c) => this.deps.spendableBalance(c.advertiserId) >= rateFromCpm(c.bidCpm))
       .sort((a, b) => (b.bidCpm > a.bidCpm ? 1 : b.bidCpm < a.bidCpm ? -1 : 0))
 
     if (eligible.length === 0) return null
@@ -76,10 +88,10 @@ export class AdSelector {
     const fresh = eligible.filter((c) => !recent.slice(-c.frequencyCap).includes(c.id))
     const chosen = fresh[0] ?? eligible[0]!
 
+    // Karsilanabilirlik yukaridaki filtrede kontrol edildi; burasi son
+    // savunma. Tetiklenirse yukaridaki filtre bozulmus demektir.
     const rate = rateFromCpm(chosen.bidCpm)
-    const spendable = this.deps.spendableBalance(chosen.advertiserId)
-    // Kalan bakiye bir gosterimi bile karsilamiyorsa servis etme.
-    if (spendable < rate) return null
+    if (this.deps.spendableBalance(chosen.advertiserId) < rate) return null
 
     this.#remember(publisherId, chosen.id)
 

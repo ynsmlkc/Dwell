@@ -288,8 +288,9 @@ describe('giriste cuzdan baglanmasi', () => {
     const w = new WalletStore({ clock, holdMs: 0, notify: () => {} })
 
     // Giris oncesi: odeme engelli.
-    expect(w.payoutBlock(ADV).blocked).toBe(true)
-    expect(w.payoutBlock(ADV).reason).toContain('bagli degil')
+    const engel = w.payoutBlock(ADV)
+    expect(engel.blocked).toBe(true)
+    expect(engel.blocked && engel.reason).toContain('bagli degil')
 
     // `main.ts`'teki davranis: publisherId adresin kendisi.
     w.bind(ADV, ADV, 'testnet')
@@ -308,5 +309,54 @@ describe('giriste cuzdan baglanmasi', () => {
 
     expect(w.get(ADV)!.holdUntil).toBeNull()
     expect(w.payoutBlock(ADV).blocked).toBe(false)
+  })
+})
+
+/**
+ * Reklam secimi — parasi biten reklamveren digerlerini SUSTURMAMALI.
+ *
+ * Gercek dagitimda bulundu. Cebinde 16 sent kalmis bir reklamverenin
+ * gosterim basina 20 sentlik kampanyasi "parasi var" diye uygun sayiliyor,
+ * en yuksek teklif oldugu icin seciliyor, sonra "yetmiyor" deyip null
+ * donuyordu. Parasi dolu diger kampanyalar hic siraya giremiyordu.
+ *
+ * Tek bir reklamveren butun agi durduruyordu ve hicbir hata gorunmuyordu.
+ */
+describe('reklam secimi — butce tukenmesi', () => {
+  it('parasi yetmeyen YUKSEK teklif, karsilanabilir dusuk teklifi engellemez', async () => {
+    const { AdSelector } = await import('../src/ads/selector.js')
+    const { cryptoIdGenerator } = await import('@dwell/protocol')
+
+    const zengin = 'GZENGIN', fakir = 'GFAKIR'
+    const kampanyalar = [
+      // Gosterim basina 2.000.000 stroop — ama cebinde 1.600.000 var.
+      { id: 'pahali', advertiserId: fakir, bidCpm: stroops(2_000_000_000n), revShareBps: 5000,
+        creative: { brand: 'Pahali', text: 't', cta: 'p.com' }, status: 'active' as const, frequencyCap: 1 },
+      // Gosterim basina 400.000 — ve parasi bol.
+      { id: 'ucuz', advertiserId: zengin, bidCpm: stroops(400_000_000n), revShareBps: 5000,
+        creative: { brand: 'Ucuz', text: 't', cta: 'u.com' }, status: 'active' as const, frequencyCap: 1 },
+    ]
+
+    const sel = new AdSelector({
+      clock, ids: cryptoIdGenerator(clock),
+      campaigns: () => kampanyalar,
+      spendableBalance: (a) => (a === fakir ? stroops(1_600_000n) : stroops(20_000_000n)),
+    })
+
+    const secim = sel.select('GPUB')
+    expect(secim, 'ag durmamali').not.toBeNull()
+    expect(secim!.campaign.id).toBe('ucuz')
+  })
+
+  it('hicbiri karsilanamiyorsa sessizce durur', async () => {
+    const { AdSelector } = await import('../src/ads/selector.js')
+    const { cryptoIdGenerator } = await import('@dwell/protocol')
+    const sel = new AdSelector({
+      clock, ids: cryptoIdGenerator(clock),
+      campaigns: () => [{ id: 'x', advertiserId: 'GA', bidCpm: stroops(2_000_000_000n), revShareBps: 5000,
+        creative: { brand: 'X', text: 't', cta: 'x.com' }, status: 'active' as const, frequencyCap: 1 }],
+      spendableBalance: () => stroops(1n),
+    })
+    expect(sel.select('GPUB')).toBeNull()
   })
 })
