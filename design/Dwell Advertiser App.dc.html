@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; background: #0c0b0a; color: #ece7e1; -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+  a { color: #ece7e1; text-decoration: none; }
+  a:hover { color: oklch(0.74 0.16 52); }
+  :focus-visible { outline: 2px solid oklch(0.74 0.16 52); outline-offset: 3px; }
+  ::selection { background: oklch(0.74 0.16 52 / 0.3); }
+  input, textarea { font-family: ui-monospace, 'SF Mono', Menlo, monospace; }
+  @keyframes dwell-spin { to { transform: rotate(360deg) } }
+  @keyframes dwell-pulse { 0%, 100% { opacity: 0.35 } 50% { opacity: 1 } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important } }
+</style>
+</helmet>
+
+<div style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif; background: #0c0b0a; background-image: linear-gradient(rgba(236,231,225,0.032) 1px, transparent 1px), linear-gradient(90deg, rgba(236,231,225,0.032) 1px, transparent 1px); background-size: 64px 64px; color: #ece7e1; min-height: 100vh; overflow-x: hidden">
+
+  <div style="border-bottom: 1px solid rgba(236,231,225,0.09); background: #060505">
+    <div style="max-width: 1180px; margin: 0 auto; padding: 9px clamp(16px, 4vw, 56px); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11.5px">
+      <span style="color: #57534c; letter-spacing: 0.1em; text-transform: uppercase">preview state</span>
+      <sc-for list="{{ scenes }}" as="sc" hint-placeholder-count="7">
+        <button onClick="{{ sc.pick }}" style="padding: 3px 9px; border-radius: 3px; cursor: pointer; font-family: inherit; font-size: 11.5px; border: 1px solid {{ sc.border }}; background: {{ sc.bg }}; color: {{ sc.fg }}" style-hover="border-color: oklch(0.74 0.16 52)">{{ sc.label }}</button>
+      </sc-for>
+    </div>
+  </div>
+
+  <header style="position: sticky; top: 0; z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px clamp(16px, 4vw, 56px); background: rgba(12,11,10,0.82); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(236,231,225,0.09)">
+    <a href="Dwell%20Landing.dc.html" style="display: flex; align-items: baseline; gap: 9px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px"><span style="color: oklch(0.74 0.16 52); font-size: 15px">✶</span>dwell</a>
+    <nav style="display: flex; align-items: center; gap: clamp(12px, 2vw, 28px); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; color: #9d968d">
+      <a href="Dwell%20Advertisers.dc.html" style="color: #9d968d" style-hover="color: #ece7e1">the placement</a>
+      <sc-if value="{{ connected }}">
+        <span style="display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border: 1px solid rgba(236,231,225,0.16); border-radius: 3px; font-size: 12px; color: #9d968d">
+          <span style="width: 5px; height: 5px; border-radius: 50%; background: oklch(0.74 0.16 52)"></span>{{ shortAddr }}
+        </span>
+      </sc-if>
+    </nav>
+  </header>
+
+  <main style="max-width: 1180px; margin: 0 auto; padding: clamp(32px, 5vw, 60px) clamp(16px, 4vw, 56px) 96px">
+
+    <!-- ═══════════ bagli degil ═══════════ -->
+    <sc-if value="{{ isDisconnected }}">
+      <div style="max-width: 480px; margin: clamp(20px, 8vw, 90px) auto 0; border: 1px solid rgba(236,231,225,0.14); border-radius: 6px; background: rgba(236,231,225,0.02); padding: clamp(26px, 4vw, 38px)">
+        <h1 style="margin: 0 0 12px; font-weight: 400; font-size: clamp(24px, 3vw, 32px); letter-spacing: -0.02em">Connect the wallet you will pay from</h1>
+        <p style="margin: 0 0 20px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; line-height: 1.7; color: #9d968d; text-wrap: pretty">This one matters. Deposits are matched by <strong style="color: #d6d0c8">who sent them</strong>, so the wallet you connect now is the only wallet whose money we can credit to you.</p>
+
+        <sc-if value="{{ hasFreighter }}">
+          <button onClick="{{ connect }}" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 14px 18px; border: 0; border-radius: 4px; background: oklch(0.74 0.16 52); color: #0c0b0a; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; cursor: pointer" style-hover="background: oklch(0.8 0.14 52)">
+            <sc-if value="{{ busy }}"><span style="width: 12px; height: 12px; border: 1.5px solid rgba(12,11,10,0.35); border-top-color: #0c0b0a; border-radius: 50%; display: inline-block; animation: dwell-spin 700ms linear infinite"></span></sc-if>
+            {{ connectLabel }}
+          </button>
+        </sc-if>
+        <sc-if value="{{ noFreighter }}">
+          <div style="border: 1px solid rgba(236,231,225,0.16); border-left: 2px solid oklch(0.74 0.16 52); border-radius: 4px; padding: 14px 16px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; line-height: 1.65; color: #d6d0c8">
+            Freighter is not installed. <a href="https://freighter.app" style="color: oklch(0.74 0.16 52); border-bottom: 1px solid rgba(249,115,53,0.4)">Install it</a>, then reload.
+          </div>
+        </sc-if>
+        <sc-if value="{{ authError }}">
+          <div style="margin-top: 18px; border: 1px solid rgba(236,231,225,0.16); border-left: 2px solid #b8574a; border-radius: 4px; padding: 14px 16px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; line-height: 1.65">
+            <p style="margin: 0 0 10px; color: #d6d0c8">{{ authError }}</p>
+            <button onClick="{{ connect }}" style="padding: 6px 12px; border: 1px solid rgba(236,231,225,0.2); border-radius: 3px; background: transparent; color: #ece7e1; font-family: inherit; font-size: 12.5px; cursor: pointer" style-hover="border-color: oklch(0.74 0.16 52)">Try again</button>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- ═══════════ ag hatasi ═══════════ -->
+    <sc-if value="{{ isNetErr }}">
+      <div style="max-width: 520px; border: 1px solid rgba(236,231,225,0.14); border-left: 2px solid #b8574a; border-radius: 4px; padding: 22px 24px">
+        <h2 style="margin: 0 0 10px; font-weight: 400; font-size: 22px; letter-spacing: -0.01em">Cannot reach the server</h2>
+        <p style="margin: 0 0 18px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13.5px; line-height: 1.7; color: #9d968d">Your balance and your campaigns are untouched. Running campaigns keep running.</p>
+        <button onClick="{{ retry }}" style="padding: 9px 16px; border: 1px solid rgba(236,231,225,0.2); border-radius: 3px; background: transparent; color: #ece7e1; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; cursor: pointer" style-hover="border-color: oklch(0.74 0.16 52)">Retry</button>
+      </div>
+    </sc-if>
+
+    <!-- ═══════════ para yatirma — bakiye sifirken TEK ekran ═══════════ -->
+    <sc-if value="{{ showDeposit }}">
+      <h1 style="margin: 0 0 8px; font-weight: 400; font-size: clamp(28px, 3.6vw, 42px); letter-spacing: -0.02em">Add funds</h1>
+      <p style="margin: 0 0 clamp(24px, 4vw, 36px); max-width: 62ch; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; line-height: 1.7; color: #9d968d; text-wrap: pretty">Send testnet USDC to the address below. Nothing can run until there is a balance.</p>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: clamp(18px, 3vw, 40px); align-items: start">
+        <div>
+          <p style="margin: 0 0 10px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: oklch(0.74 0.16 52)">Send to</p>
+          <code style="display: block; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: clamp(11px, 1.25vw, 13.5px); word-break: break-all; line-height: 1.7; color: #ece7e1; border: 1px solid rgba(236,231,225,0.14); border-radius: 4px; padding: 14px 16px; background: rgba(236,231,225,0.02)">{{ depositAddress }}</code>
+          <button onClick="{{ copyDeposit }}" style="margin-top: 12px; padding: 10px 16px; border: 1px solid rgba(236,231,225,0.2); border-radius: 3px; background: transparent; color: #ece7e1; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; cursor: pointer" style-hover="border-color: oklch(0.74 0.16 52)">{{ depositLabel }}</button>
+
+          <dl style="margin: 26px 0 0; display: grid; gap: 12px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12.5px">
+            <div style="display: flex; gap: 12px"><dt style="margin: 0; color: #57534c; min-width: 68px">asset</dt><dd style="margin: 0; color: #d6d0c8">USDC</dd></div>
+            <div style="display: flex; gap: 12px"><dt style="margin: 0; color: #57534c; min-width: 68px">issuer</dt><dd style="margin: 0; color: #6f6a63; word-break: break-all; line-height: 1.6">{{ assetIssuer }}</dd></div>
+            <div style="display: flex; gap: 12px"><dt style="margin: 0; color: #57534c; min-width: 68px">network</dt><dd style="margin: 0; color: #d6d0c8">Stellar testnet</dd></div>
+          </dl>
+        </div>
+
+        <div>
+          <!-- Kacirilmasi IMKANSIZ olmali: eslesme gonderen adrese gore. -->
+          <div style="border: 1px solid oklch(0.74 0.16 52 / 0.5); border-left: 3px solid oklch(0.74 0.16 52); border-radius: 5px; background: oklch(0.74 0.16 52 / 0.06); padding: 20px 22px">
+            <p style="margin: 0 0 10px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: oklch(0.74 0.16 52)">Send from this wallet only</p>
+            <code style="display: block; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; word-break: break-all; line-height: 1.7; color: #ece7e1">{{ address }}</code>
+            <p style="margin: 12px 0 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12.5px; line-height: 1.7; color: #d6d0c8; text-wrap: pretty">We work out whose money it is by looking at who sent it. That is why there is no memo to remember — and also why money sent from an exchange arrives but cannot be credited to you.</p>
+          </div>
+
+          <div style="margin-top: 18px; border: 1px solid rgba(236,231,225,0.11); border-radius: 5px; padding: 16px 18px; display: flex; align-items: center; gap: 12px">
+            <span style="width: 7px; height: 7px; border-radius: 50%; background: oklch(0.74 0.16 52); animation: dwell-pulse 1.6s ease-in-out infinite; flex: none"></span>
+            <p style="margin: 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; line-height: 1.6; color: #9d968d">Watching the chain. A deposit usually shows up here within 20 seconds.</p>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ═══════════ fonlanmis ═══════════ -->
+    <sc-if value="{{ showFunded }}">
+      <div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: clamp(24px, 4vw, 36px)">
+        <div>
+          <p style="margin: 0 0 4px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: oklch(0.74 0.16 52)">Balance</p>
+          <p style="margin: 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: clamp(36px, 6vw, 62px); line-height: 1; letter-spacing: -0.035em">{{ balance }}</p>
+          <!-- Yalnizca rezerve VARSA gosterilir; yoksa gurultu olur. -->
+          <sc-if value="{{ hasReserved }}">
+            <p style="margin: 12px 0 0; max-width: 54ch; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12.5px; line-height: 1.65; color: #6f6a63; text-wrap: pretty">{{ spendable }} spendable — {{ reserved }} is held for ads already shown but not yet reported.</p>
+          </sc-if>
+        </div>
+        <button onClick="{{ openDeposit }}" style="padding: 11px 18px; border: 1px solid rgba(236,231,225,0.2); border-radius: 4px; background: transparent; color: #ece7e1; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13.5px; cursor: pointer" style-hover="border-color: oklch(0.74 0.16 52)">Add funds</button>
+      </div>
+
+      <!-- ── kampanyalar ── -->
+      <section style="border-top: 1px solid rgba(236,231,225,0.09); padding-top: clamp(24px, 4vw, 34px)">
+        <h2 style="margin: 0 0 18px; font-weight: 400; font-size: clamp(22px, 2.6vw, 30px); letter-spacing: -0.02em">Campaigns</h2>
+
+        <sc-if value="{{ noCampaigns }}">
+          <p style="margin: 0 0 26px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13.5px; color: #6f6a63">None yet. Write your line below.</p>
+        </sc-if>
+
+        <sc-if value="{{ hasCampaigns }}">
+          <div style="display: grid; gap: 1px; background: rgba(236,231,225,0.11); border: 1px solid rgba(236,231,225,0.11); margin-bottom: clamp(28px, 4vw, 44px)">
+            <sc-for list="{{ campaigns }}" as="c" hint-placeholder-count="2">
+              <div style="background: #0c0b0a; padding: 18px 20px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px 20px; align-items: center">
+                <div style="min-width: 0">
+                  <!-- Onizleme satirin KENDISI: satirin gorsel capasi bu. -->
+                  <div style="background: #060505; border: 1px solid rgba(236,231,225,0.09); border-radius: 4px; padding: 11px 14px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: clamp(11.5px, 1.2vw, 13.5px); display: flex; align-items: baseline; justify-content: space-between; gap: 16px">
+                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: {{ c.opacity }}">
+                      <span style="color: oklch(0.74 0.16 52)">✶</span>
+                      <span style="font-weight: 600; color: #ece7e1"> {{ c.brand }}</span><span style="color: #9d968d"> — {{ c.text }} · </span><span style="color: #6f6a63">{{ c.cta }}</span>
+                    </span>
+                    <span style="color: #57534c; white-space: nowrap">Edit · 2.8s</span>
+                  </div>
+                  <p style="margin: 9px 0 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; color: #6f6a63">{{ c.cpm }} CPM · {{ c.perImp }} per impression</p>
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 9px">
+                  <span style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: {{ c.statusColor }}">{{ c.status }}</span>
+                  <button onClick="{{ c.toggle }}" style="padding: 7px 14px; border: 1px solid {{ c.btnBorder }}; border-radius: 3px; background: transparent; color: {{ c.btnColor }}; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12.5px; cursor: pointer; white-space: nowrap" style-hover="border-color: oklch(0.74 0.16 52)">{{ c.action }}</button>
+                </div>
+                <sc-if value="{{ c.error }}">
+                  <div style="grid-column: 1 / -1; border-left: 2px solid oklch(0.74 0.16 52); padding: 10px 14px; background: oklch(0.74 0.16 52 / 0.05); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12.5px; line-height: 1.6; color: #d6d0c8">{{ c.error }}</div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- ── yeni kampanya ── -->
+        <div style="border: 1px solid rgba(236,231,225,0.14); border-radius: 6px; padding: clamp(20px, 3.5vw, 32px)">
+          <h3 style="margin: 0 0 6px; font-weight: 400; font-size: clamp(19px, 2.2vw, 24px); letter-spacing: -0.01em">Write a line</h3>
+          <p style="margin: 0 0 24px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; color: #6f6a63">This is the whole ad. There is no image, no headline, no second line.</p>
+
+          <!-- CANLI ONIZLEME: sinir gonderdikten sonra degil, yazarken gorunur -->
+          <div style="background: #060505; border: 1px solid rgba(236,231,225,0.14); border-radius: 5px; overflow: hidden; margin-bottom: 24px">
+            <div style="padding: 9px 14px; border-bottom: 1px solid rgba(236,231,225,0.09); display: flex; justify-content: space-between; gap: 12px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11.5px; color: #57534c">
+              <span>as it will be printed</span>
+              <span style="color: {{ countColor }}">{{ count }}/80</span>
+            </div>
+            <div style="padding: 15px 16px; display: flex; align-items: baseline; justify-content: space-between; gap: 18px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: clamp(11.5px, 1.3vw, 14px)">
+              <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">
+                <span style="color: oklch(0.74 0.16 52)">✶</span>
+                <span style="font-weight: 600; color: #ece7e1"> {{ fBrand }}</span><span style="color: #9d968d"> — {{ fText }} · </span><span style="color: #6f6a63">{{ fCta }}</span>
+              </span>
+              <span style="color: #57534c; white-space: nowrap">Edit · 2.8s</span>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 18px">
+            <label style="display: grid; gap: 8px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: #6f6a63">Brand
+              <input value="{{ fBrandRaw }}" onInput="{{ onBrand }}" placeholder="Firecrawl" style="padding: 11px 13px; border: 1px solid {{ brandBorder }}; border-radius: 4px; background: rgba(236,231,225,0.03); color: #ece7e1; font-size: 14px; text-transform: none; letter-spacing: 0">
+            </label>
+            <label style="display: grid; gap: 8px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: #6f6a63">Domain
+              <input value="{{ fCtaRaw }}" onInput="{{ onCta }}" placeholder="firecrawl.dev" style="padding: 11px 13px; border: 1px solid {{ ctaBorder }}; border-radius: 4px; background: rgba(236,231,225,0.03); color: #ece7e1; font-size: 14px; text-transform: none; letter-spacing: 0">
+            </label>
+          </div>
+          <sc-if value="{{ ctaError }}">
+            <p style="margin: 8px 0 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12.5px; line-height: 1.6; color: oklch(0.74 0.16 52)">{{ ctaError }}</p>
+          </sc-if>
+
+          <label style="display: grid; gap: 8px; margin-top: 18px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: #6f6a63">Message
+            <input value="{{ fTextRaw }}" onInput="{{ onText }}" placeholder="docs to LLM-ready markdown" style="padding: 11px 13px; border: 1px solid {{ textBorder }}; border-radius: 4px; background: rgba(236,231,225,0.03); color: #ece7e1; font-size: 14px; text-transform: none; letter-spacing: 0">
+          </label>
+          <sc-if value="{{ textError }}">
+            <p style="margin: 8px 0 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12.5px; line-height: 1.6; color: oklch(0.74 0.16 52)">{{ textError }}</p>
+          </sc-if>
+
+          <!-- Fiyat DOLARLA girilir. Kimse stroop diye dusunmuyor. -->
+          <div style="margin-top: 24px; padding-top: 22px; border-top: 1px solid rgba(236,231,225,0.09); display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 18px; align-items: end">
+            <label style="display: grid; gap: 8px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: #6f6a63">CPM in USD
+              <input value="{{ fCpmRaw }}" onInput="{{ onCpm }}" placeholder="40" style="padding: 11px 13px; border: 1px solid {{ cpmBorder }}; border-radius: 4px; background: rgba(236,231,225,0.03); color: #ece7e1; font-size: 14px; text-transform: none; letter-spacing: 0">
+            </label>
+            <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12.5px; line-height: 1.9; color: #6f6a63">
+              <div>per impression <span style="color: #ece7e1">{{ perImp }}</span></div>
+              <div>publisher gets <span style="color: #ece7e1">50%</span>, fixed</div>
+            </div>
+          </div>
+          <sc-if value="{{ cpmError }}">
+            <p style="margin: 8px 0 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12.5px; line-height: 1.6; color: oklch(0.74 0.16 52)">{{ cpmError }}</p>
+          </sc-if>
+
+          <div style="margin-top: 26px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px">
+            <button onClick="{{ submit }}" disabled="{{ cannotSubmit }}" style="padding: 13px 22px; border: 0; border-radius: 4px; background: {{ submitBg }}; color: {{ submitFg }}; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; cursor: {{ submitCursor }}">Create campaign</button>
+            <p style="margin: 0; max-width: 44ch; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12.5px; line-height: 1.6; color: #6f6a63">It starts paused. You read it once more, then start it — a typo in front of thousands of terminals cannot be taken back, and it has already been paid for.</p>
+          </div>
+        </div>
+      </section>
+    </sc-if>
+  </main>
+
+  <footer style="border-top: 1px solid rgba(236,231,225,0.09)">
+    <div style="max-width: 1180px; margin: 0 auto; padding: 26px clamp(16px, 4vw, 56px); display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: center; justify-content: space-between; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12.5px; color: #6f6a63">
+      <span>✶ dwell — testnet</span>
+      <div style="display: flex; gap: 24px">
+        <a href="https://github.com/ynsmlkc/Dwell" style="color: #6f6a63" style-hover="color: #ece7e1">GitHub</a>
+        <a href="Dwell%20Privacy.dc.html" style="color: #6f6a63" style-hover="color: #ece7e1">Privacy</a>
+      </div>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180}}">
+const ADDR = "GBOYXJ4JZLZY72GZIFXZSX7HVKDDITADWUDGDYE3EML24GXDV3K7KX7C";
+const KASA = "GB56NGRB2G66BYYMSRWND4WLGB7H6TTXTL3GGFXRY3ENB65QMCIGDEHN";
+const ISSUER = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
+
+const usd = (s) => {
+  const v = BigInt(s);
+  const whole = v / 10000000n;
+  const frac = (v % 10000000n).toString().padStart(7, "0").replace(/0+$/, "");
+  return "$" + whole.toString() + (frac ? "." + frac : "");
+};
+
+/**
+ * Dolar metnini stroop'a cevirir — float'a HIC ugramadan.
+ * "40.25" → 402500000n. `Math.round(x * 1e7)` yazmak cazip ama para
+ * hesabini float'tan gecirmek tam olarak yapmamamiz gereken sey.
+ */
+const toStroops = (txt) => {
+  const m = /^(\d*)(?:\.(\d{0,7}))?$/.exec(txt.trim());
+  if (!m || (!m[1] && !m[2])) return null;
+  return BigInt(m[1] || "0") * 10000000n + BigInt((m[2] || "").padEnd(7, "0"));
+};
+
+const MIN_CPM = 1000000n;          // $0.10 / 1000
+const MAX_LINE = 80;
+
+const SCENES = [
+  { id: "disconnected", label: "not connected" },
+  { id: "connecting",   label: "connecting" },
+  { id: "autherror",    label: "sign refused" },
+  { id: "deposit",      label: "no balance" },
+  { id: "nocampaigns",  label: "funded, no campaigns" },
+  { id: "campaigns",    label: "running" },
+  { id: "reserved",     label: "funds reserved" },
+  { id: "nobudget",     label: "activate refused" },
+  { id: "toolong",      label: "line too long" },
+  { id: "badcta",       label: "bad domain" },
+  { id: "neterr",       label: "server down" }
+];
+
+const BASE = [
+  { id: "c1", brand: "Resend", text: "email API for developers", cta: "resend.com", bidCpmStroops: "400000000", status: "active" },
+  { id: "c2", brand: "Neon", text: "serverless Postgres with branching", cta: "neon.tech", bidCpmStroops: "250000000", status: "paused" }
+];
+
+class Component extends DCLogic {
+  state = {
+    scene: "campaigns", busy: false, depositCopied: false,
+    brand: "Firecrawl", text: "docs to LLM-ready markdown", cta: "firecrawl.dev", cpm: "40",
+    forceDeposit: false
+  };
+
+  pick(id) {
+    const s = { scene: id, busy: id === "connecting", forceDeposit: false };
+    if (id === "toolong") s.text = "the fastest way to turn any documentation site into clean markdown for your model";
+    if (id === "badcta") s.cta = "https://firecrawl.dev/docs?ref=dwell";
+    if (id !== "toolong") s.text = "docs to LLM-ready markdown";
+    if (id !== "badcta") s.cta = "firecrawl.dev";
+    this.setState(s);
+  }
+
+  copy(text) {
+    if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
+    this.setState({ depositCopied: true });
+    clearTimeout(this.ct);
+    this.ct = setTimeout(() => this.setState({ depositCopied: false }), 2000);
+  }
+  componentWillUnmount() { clearTimeout(this.ct); }
+
+  renderVals() {
+    const s = this.state.scene;
+    const line = "✶ " + this.state.brand + " — " + this.state.text + " · " + this.state.cta;
+    const count = line.length;
+
+    const cpmStroops = toStroops(this.state.cpm);
+    const cpmBad = cpmStroops === null ? "Enter a number, e.g. 40"
+      : cpmStroops < MIN_CPM ? "Minimum is $0.10 per 1000 impressions." : null;
+
+    // Alan adi mi, URL mi? Kullanici satirda ne goruyorsa oraya gitmeli.
+    const ctaOk = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(this.state.cta.trim().toLowerCase());
+    const ctaBad = this.state.cta && !ctaOk
+      ? "Just the domain — firecrawl.dev, not a full URL. Developers must land exactly where the line says."
+      : null;
+    const textBad = count > MAX_LINE
+      ? "The whole line is " + count + " characters. Past 80 it gets cut off in narrow terminals and the domain is the first thing to go."
+      : null;
+
+    const funded = ["nocampaigns", "campaigns", "reserved", "nobudget", "toolong", "badcta"].includes(s);
+    const showDeposit = s === "deposit" || (funded && this.state.forceDeposit);
+    const withCampaigns = ["campaigns", "reserved", "nobudget", "toolong", "badcta"].includes(s);
+
+    const balance = s === "reserved" ? "20000000" : "18400000";
+    const spendable = s === "reserved" ? "16800000" : "18400000";
+    const reserved = (BigInt(balance) - BigInt(spendable)).toString();
+
+    const blocked = cpmBad || ctaBad || textBad || !this.state.brand.trim() || !this.state.text.trim();
+
+    return {
+      scenes: SCENES.map((x) => ({
+        label: x.label,
+        pick: () => this.pick(x.id),
+        border: x.id === s ? "oklch(0.74 0.16 52)" : "rgba(236,231,225,0.16)",
+        bg: x.id === s ? "oklch(0.74 0.16 52 / 0.12)" : "transparent",
+        fg: x.id === s ? "#ece7e1" : "#6f6a63"
+      })),
+
+      isDisconnected: ["disconnected", "connecting", "autherror"].includes(s),
+      isNetErr: s === "neterr",
+      showDeposit,
+      showFunded: funded && !showDeposit,
+      connected: funded || s === "deposit",
+
+      hasFreighter: true,
+      noFreighter: false,
+      busy: this.state.busy,
+      connectLabel: s === "connecting" ? "Waiting for signature…" : "Connect Freighter",
+      authError: s === "autherror" ? "Freighter closed without signing. Nothing happened — you can start again." : null,
+      connect: () => this.pick("connecting"),
+      retry: () => this.pick("campaigns"),
+
+      shortAddr: ADDR.slice(0, 4) + "…" + ADDR.slice(-4),
+      address: ADDR,
+      depositAddress: KASA,
+      assetIssuer: ISSUER,
+      depositLabel: this.state.depositCopied ? "copied" : "copy address",
+      copyDeposit: () => this.copy(KASA),
+      openDeposit: () => this.setState({ forceDeposit: true }),
+
+      balance: usd(balance),
+      spendable: usd(spendable),
+      reserved: usd(reserved),
+      hasReserved: BigInt(reserved) > 0n,
+
+      noCampaigns: s === "nocampaigns",
+      hasCampaigns: withCampaigns,
+      campaigns: BASE.map((c, i) => {
+        const active = c.status === "active";
+        return {
+          brand: c.brand, text: c.text, cta: c.cta,
+          opacity: active ? "1" : "0.45",
+          cpm: usd(c.bidCpmStroops),
+          perImp: usd((BigInt(c.bidCpmStroops) / 1000n).toString()),
+          status: c.status,
+          statusColor: active ? "oklch(0.74 0.16 52)" : "#6f6a63",
+          action: active ? "Pause" : "Start",
+          btnBorder: "rgba(236,231,225,0.2)",
+          btnColor: "#ece7e1",
+          toggle: () => {},
+          // 402: satir ici, modal DEGIL — kullaniciyi kesmeye gerek yok.
+          error: s === "nobudget" && i === 1
+            ? "No spendable balance. Add funds, then start it."
+            : null
+        };
+      }),
+
+      count,
+      countColor: count > MAX_LINE ? "oklch(0.74 0.16 52)" : count > 70 ? "#9d968d" : "#57534c",
+      fBrand: this.state.brand || "Brand",
+      fText: this.state.text || "what you do, in a few words",
+      fCta: this.state.cta || "yourdomain.com",
+      fBrandRaw: this.state.brand,
+      fTextRaw: this.state.text,
+      fCtaRaw: this.state.cta,
+      fCpmRaw: this.state.cpm,
+      onBrand: (e) => this.setState({ brand: e.target.value }),
+      onText: (e) => this.setState({ text: e.target.value }),
+      onCta: (e) => this.setState({ cta: e.target.value }),
+      onCpm: (e) => this.setState({ cpm: e.target.value }),
+
+      textError: textBad,
+      ctaError: ctaBad,
+      cpmError: cpmBad,
+      brandBorder: this.state.brand.trim() ? "rgba(236,231,225,0.16)" : "oklch(0.74 0.16 52 / 0.6)",
+      textBorder: textBad ? "oklch(0.74 0.16 52 / 0.6)" : "rgba(236,231,225,0.16)",
+      ctaBorder: ctaBad ? "oklch(0.74 0.16 52 / 0.6)" : "rgba(236,231,225,0.16)",
+      cpmBorder: cpmBad ? "oklch(0.74 0.16 52 / 0.6)" : "rgba(236,231,225,0.16)",
+
+      perImp: cpmStroops && cpmStroops > 0n ? usd((cpmStroops / 1000n).toString()) : "—",
+      cannotSubmit: blocked ? "true" : null,
+      submitBg: blocked ? "rgba(236,231,225,0.09)" : "oklch(0.74 0.16 52)",
+      submitFg: blocked ? "#6f6a63" : "#0c0b0a",
+      submitCursor: blocked ? "not-allowed" : "pointer",
+      submit: () => {}
+    };
+  }
+}
+</script>
+</body>
+</html>

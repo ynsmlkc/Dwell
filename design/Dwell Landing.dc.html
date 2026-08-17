@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: #0c0b0a; color: #ece7e1; -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+  a { color: #ece7e1; text-decoration: none; }
+  a:hover { color: oklch(0.74 0.16 52); }
+  :focus-visible { outline: 2px solid oklch(0.74 0.16 52); outline-offset: 3px; }
+  ::selection { background: oklch(0.74 0.16 52 / 0.3); }
+  @keyframes dwell-caret { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto } }
+</style>
+</helmet>
+
+<div style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif; background: #0c0b0a; background-image: linear-gradient(rgba(236,231,225,0.032) 1px, transparent 1px), linear-gradient(90deg, rgba(236,231,225,0.032) 1px, transparent 1px); background-size: 64px 64px; color: #ece7e1; min-height: 100vh; overflow-x: hidden">
+
+  <header style="position: sticky; top: 0; z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px clamp(16px, 4vw, 56px); background: rgba(12,11,10,0.82); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(236,231,225,0.09)">
+    <a href="#top" style="display: flex; align-items: baseline; gap: 9px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; letter-spacing: 0.02em">
+      <span style="color: oklch(0.74 0.16 52); font-size: 15px">✶</span>dwell
+    </a>
+    <nav style="display: flex; align-items: center; gap: clamp(12px, 2vw, 28px); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; color: #9d968d">
+      <a href="#how" style="color: #9d968d" style-hover="color: #ece7e1">how it works</a>
+      <a href="#data" style="color: #9d968d" style-hover="color: #ece7e1">what we send</a>
+      <a href="Dwell%20Advertisers.dc.html" style="color: #9d968d" style-hover="color: #ece7e1">advertisers</a>
+      <a href="Dwell%20App.dc.html" style="color: #ece7e1; border-bottom: 1px solid rgba(236,231,225,0.25); padding-bottom: 2px" style-hover="color: oklch(0.74 0.16 52)">your earnings</a>
+      <span style="display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border: 1px solid rgba(236,231,225,0.16); border-radius: 3px; font-size: 12px; color: #9d968d">
+        <span style="width: 5px; height: 5px; border-radius: 50%; background: oklch(0.74 0.16 52)"></span>testnet
+      </span>
+    </nav>
+  </header>
+
+  <main id="top" style="max-width: 1180px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 56px)">
+
+    <section style="padding: clamp(56px, 9vw, 104px) 0 clamp(40px, 6vw, 72px)">
+      <p style="margin: 0 0 26px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: oklch(0.74 0.16 52)">Terminal-native ad marketplace</p>
+      <h1 style="margin: 0; max-width: 20ch; font-weight: 400; font-size: clamp(38px, 6.4vw, 76px); line-height: 1.03; letter-spacing: -0.02em; text-wrap: pretty">One sponsored line while your <em style="font-style: italic; color: oklch(0.74 0.16 52)">agent</em> thinks. You get paid in USDC.</h1>
+      <p style="margin: 26px 0 40px; max-width: 58ch; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 15px; line-height: 1.68; color: #9d968d; text-wrap: pretty">Install a small CLI. While Claude Code is working, a single line of text sits in your status line. When the answer lands, it is gone.</p>
+
+      <figure style="margin: 0; border: 1px solid rgba(236,231,225,0.14); border-radius: 6px; background: #080706; overflow: hidden; box-shadow: 0 24px 70px -30px rgba(0,0,0,0.9)">
+        <figcaption style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-bottom: 1px solid rgba(236,231,225,0.1); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; color: #6f6a63">
+          <span>~/projects/api — claude</span>
+          <span>{{ stateLabel }}</span>
+        </figcaption>
+        <div style="padding: 20px 16px 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: clamp(12px, 1.35vw, 14.5px); line-height: 1.85">
+          <div style="color: #6f6a63">❯ claude</div>
+          <div style="color: #ece7e1; margin-top: 6px">&gt; add rate limiting to the auth middleware</div>
+          <div style="display: flex; gap: 10px; margin-top: 10px; color: #9d968d">
+            <span style="color: oklch(0.74 0.16 52)">●</span>
+            <span>{{ activityText }}</span>
+          </div>
+          <sc-for list="{{ outputLines }}" as="l" hint-placeholder-count="2">
+            <div style="color: #6f6a63; margin-top: 4px; white-space: pre">{{ l }}</div>
+          </sc-for>
+        </div>
+        <div style="margin-top: 22px; border-top: 1px solid rgba(236,231,225,0.1); background: #060505; padding: 12px 16px; min-height: 46px; display: flex; align-items: center; justify-content: space-between; gap: 18px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: clamp(11.5px, 1.3vw, 14px)">
+          <div style="opacity: {{ adOpacity }}; transition: opacity 260ms linear; display: flex; align-items: baseline; gap: 8px; min-width: 0">
+            <span style="color: oklch(0.74 0.16 52)">✶</span>
+            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">
+              <span style="font-weight: 600; color: #ece7e1">{{ ad.brand }}</span><span style="color: #9d968d"> — {{ ad.text }} · </span><span style="color: #6f6a63">{{ ad.cta }}</span>
+            </span>
+          </div>
+          <span style="color: #57534c; white-space: nowrap">{{ statusRight }}</span>
+        </div>
+      </figure>
+
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 32px">
+        <button onClick="{{ copyInstall }}" style="display: flex; align-items: center; gap: 14px; padding: 13px 18px; border: 1px solid rgba(236,231,225,0.2); border-radius: 4px; background: rgba(236,231,225,0.04); color: #ece7e1; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; cursor: pointer" style-hover="border-color: oklch(0.74 0.16 52); background: rgba(249,115,53,0.07)">
+          <span style="color: #6f6a63">$</span>npx dwell-cli init
+          <span style="color: oklch(0.74 0.16 52); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase">{{ copyLabel }}</span>
+        </button>
+        <a href="#how" style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; color: #9d968d; border-bottom: 1px solid rgba(236,231,225,0.2); padding-bottom: 2px" style-hover="color: #ece7e1">How it works ↓</a>
+      </div>
+    </section>
+
+    <section style="border-top: 1px solid rgba(236,231,225,0.09); padding: clamp(36px, 5vw, 56px) 0">
+      <p style="margin: 0; max-width: 62ch; font-size: clamp(19px, 2.3vw, 26px); line-height: 1.5; letter-spacing: -0.01em; text-wrap: pretty; color: #d6d0c8">It only appears while you are waiting. It disappears when the answer arrives. It never interrupts a command, never opens a window, and when you are idle there is nothing there at all.</p>
+    </section>
+
+    <section id="how" style="border-top: 1px solid rgba(236,231,225,0.09); padding: clamp(44px, 6vw, 72px) 0">
+      <h2 style="margin: 0 0 40px; font-weight: 400; font-size: clamp(26px, 3.2vw, 38px); letter-spacing: -0.02em">How it works</h2>
+      <ol style="margin: 0; padding: 0; list-style: none; display: grid; gap: 0">
+        <sc-for list="{{ steps }}" as="s" hint-placeholder-count="3">
+          <li style="display: grid; grid-template-columns: minmax(44px, 56px) minmax(0, 1fr) minmax(0, 1.15fr); gap: clamp(14px, 3vw, 40px); align-items: start; padding: 26px 0; border-top: 1px solid rgba(236,231,225,0.09)">
+            <span style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; color: oklch(0.74 0.16 52); padding-top: 6px">{{ s.no }}</span>
+            <h3 style="margin: 0; font-weight: 400; font-size: clamp(20px, 2.2vw, 27px); letter-spacing: -0.01em">{{ s.title }}</h3>
+            <div>
+              <p style="margin: 0 0 10px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; line-height: 1.7; color: #9d968d; text-wrap: pretty">{{ s.body }}</p>
+              <code style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; color: #6f6a63">{{ s.code }}</code>
+            </div>
+          </li>
+        </sc-for>
+      </ol>
+    </section>
+
+    <section id="data" style="border-top: 1px solid rgba(236,231,225,0.09); padding: clamp(44px, 6vw, 72px) 0">
+      <h2 style="margin: 0 0 8px; font-weight: 400; font-size: clamp(26px, 3.2vw, 38px); letter-spacing: -0.02em">What we send</h2>
+      <p style="margin: 0 0 36px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; color: #9d968d">Every field, in both directions. Nothing else leaves the machine.</p>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1px; background: rgba(236,231,225,0.11); border: 1px solid rgba(236,231,225,0.11)">
+        <div style="background: #0c0b0a; padding: 22px 24px">
+          <p style="margin: 0 0 18px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: oklch(0.74 0.16 52)">We send</p>
+          <ul style="margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; color: #d6d0c8">
+            <sc-for list="{{ sends }}" as="d" hint-placeholder-count="3">
+              <li>{{ d }}</li>
+            </sc-for>
+          </ul>
+        </div>
+        <div style="background: #0c0b0a; padding: 22px 24px">
+          <p style="margin: 0 0 18px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #6f6a63">We never send</p>
+          <ul style="margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; color: #9d968d">
+            <sc-for list="{{ nevers }}" as="d" hint-placeholder-count="3">
+              <li style="text-decoration: line-through; text-decoration-color: rgba(157,150,141,0.45)">{{ d }}</li>
+            </sc-for>
+          </ul>
+        </div>
+      </div>
+      <a href="Dwell%20Privacy.dc.html" style="display: inline-block; margin-top: 18px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; color: #9d968d; border-bottom: 1px solid rgba(236,231,225,0.2); padding-bottom: 2px" style-hover="color: #ece7e1">The full privacy detail →</a>
+    </section>
+
+    <section style="border-top: 1px solid rgba(236,231,225,0.09); padding: clamp(44px, 6vw, 72px) 0">
+      <h2 style="margin: 0 0 8px; font-weight: 400; font-size: clamp(26px, 3.2vw, 38px); letter-spacing: -0.02em">Where this actually stands</h2>
+      <p style="margin: 0 0 30px; max-width: 60ch; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; line-height: 1.7; color: #9d968d; text-wrap: pretty">Stellar testnet. Advertisers deposit, publishers get paid on-chain, the pipeline runs end to end — with test money. No projections here, only the ledger.</p>
+      <div style="border: 1px solid rgba(236,231,225,0.11); background: rgba(236,231,225,0.02); padding: 20px 22px; display: grid; gap: 14px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px">
+        <div style="display: flex; flex-wrap: wrap; gap: 8px 24px; color: #6f6a63">
+          <span style="white-space: nowrap">network <span style="color: #ece7e1">testnet</span></span>
+          <span style="white-space: nowrap">asset <span style="color: #ece7e1">USDC</span></span>
+          <span style="white-space: nowrap">publisher share <span style="color: #ece7e1">50%</span></span>
+        </div>
+        <a href="https://stellar.expert/explorer/testnet/tx/9cbb1a573c4a3eeacefde360280c93d08df1cc0b7522d82e3b411898aae6ad86" style="color: oklch(0.74 0.16 52); word-break: break-all; line-height: 1.6" style-hover="text-decoration: underline">9cbb1a573c4a3eeacefde360280c93d08df1cc0b7522d82e3b411898aae6ad86 ↗</a>
+        <span style="color: #6f6a63">A real payout transaction. Open it and check.</span>
+      </div>
+    </section>
+
+    <section style="border-top: 1px solid rgba(236,231,225,0.09); padding: clamp(44px, 6vw, 72px) 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: clamp(20px, 4vw, 56px); align-items: start">
+      <div>
+        <h2 style="margin: 0 0 14px; font-weight: 400; font-size: clamp(24px, 2.8vw, 32px); letter-spacing: -0.02em">Leaving takes one command</h2>
+        <p style="margin: 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; line-height: 1.7; color: #9d968d; text-wrap: pretty">Uninstall removes only the entries we added to your Claude Code settings. Anything you configured yourself is left exactly as it was.</p>
+      </div>
+      <button onClick="{{ copyUninstall }}" style="justify-self: start; display: flex; align-items: center; gap: 14px; padding: 13px 18px; border: 1px solid rgba(236,231,225,0.2); border-radius: 4px; background: transparent; color: #ece7e1; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; cursor: pointer" style-hover="border-color: oklch(0.74 0.16 52)">
+        <span style="color: #6f6a63">$</span>dwell uninstall
+        <span style="color: oklch(0.74 0.16 52); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase">{{ copyLabel2 }}</span>
+      </button>
+    </section>
+
+    <section id="advertisers" style="border-top: 1px solid rgba(236,231,225,0.09); padding: clamp(40px, 5vw, 64px) 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px">
+      <p style="margin: 0; max-width: 52ch; font-size: clamp(18px, 2.1vw, 24px); line-height: 1.45; letter-spacing: -0.01em">Selling a dev tool? Buy the line — 80 characters, plain text, in front of developers who are waiting.</p>
+      <a href="Dwell%20Advertisers.dc.html" style="padding: 14px 24px; border-radius: 4px; background: oklch(0.74 0.16 52); color: #0c0b0a; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; white-space: nowrap" style-hover="background: oklch(0.8 0.14 52); color: #0c0b0a">For advertisers →</a>
+    </section>
+  </main>
+
+  <footer style="border-top: 1px solid rgba(236,231,225,0.09)">
+    <div style="max-width: 1180px; margin: 0 auto; padding: 26px clamp(16px, 4vw, 56px); display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: center; justify-content: space-between; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12.5px; color: #6f6a63">
+      <span>✶ dwell — testnet</span>
+      <div style="display: flex; gap: 24px">
+        <a href="https://github.com/ynsmlkc/Dwell" style="color: #6f6a63" style-hover="color: #ece7e1">GitHub</a>
+        <a href="Dwell%20Privacy.dc.html" style="color: #6f6a63" style-hover="color: #ece7e1">Privacy</a>
+      </div>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180}}">
+const ADS = [
+  { brand: "Firecrawl", text: "docs to LLM-ready markdown", cta: "firecrawl.dev" },
+  { brand: "Resend", text: "email API for developers", cta: "resend.com" },
+  { brand: "Neon", text: "serverless Postgres with branching", cta: "neon.tech" }
+];
+const ACTS = [
+  { label: "Edit", verb: "Editing src/auth/middleware.ts" },
+  { label: "Search", verb: "Searching for rate limit helpers" },
+  { label: "Thinking", verb: "Thinking about token bucket vs. sliding window" }
+];
+const DONE = ["✓ src/auth/middleware.ts  +34 −6", "✓ tests pass — 18 files, 0 failing"];
+
+class Component extends DCLogic {
+  state = { i: 0, waiting: true, secs: 2.8, copied: false, copied2: false, reduced: false };
+
+  componentDidMount() {
+    const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    this.setState({ reduced });
+    if (reduced) return;
+    this.tick = setInterval(() => {
+      this.setState(s => ({ secs: s.waiting ? +(s.secs + 0.4).toFixed(1) : s.secs }));
+    }, 400);
+    const cycle = () => {
+      this.setState(s => ({ waiting: false }));
+      this.t1 = setTimeout(() => {
+        this.setState(s => ({ waiting: true, i: (s.i + 1) % ADS.length, secs: 0.4 }));
+      }, 2600);
+    };
+    this.loop = setInterval(cycle, 9000);
+  }
+  componentWillUnmount() {
+    clearInterval(this.tick); clearInterval(this.loop); clearTimeout(this.t1);
+    clearTimeout(this.c1); clearTimeout(this.c2);
+  }
+  copy(text, key) {
+    if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
+    this.setState({ [key]: true });
+    this[key === "copied" ? "c1" : "c2"] = setTimeout(() => this.setState({ [key]: false }), 2000);
+  }
+
+  renderVals() {
+    const { i, waiting, secs, reduced } = this.state;
+    const act = ACTS[i % ACTS.length];
+    return {
+      ad: ADS[i],
+      adOpacity: waiting ? 1 : 0,
+      activityText: waiting ? act.verb : "Done — 3 files changed",
+      outputLines: waiting ? [] : DONE,
+      statusRight: waiting ? act.label + " · " + secs.toFixed(1) + "s" : "idle",
+      stateLabel: reduced ? "waiting" : (waiting ? "waiting — the line is shown" : "answer arrived — the line is gone"),
+      copyLabel: this.state.copied ? "copied" : "copy",
+      copyLabel2: this.state.copied2 ? "copied" : "copy",
+      copyInstall: () => this.copy("npx dwell-cli init", "copied"),
+      copyUninstall: () => this.copy("dwell uninstall", "copied2"),
+      steps: [
+        { no: "01", title: "Install", body: "One command. It edits your Claude Code settings and nothing else on the machine.", code: "npx dwell-cli init" },
+        { no: "02", title: "Wait", body: "While the model is working, one line sits in your status line next to what the assistant is doing. Idle means empty.", code: "impressions count after 10s displayed" },
+        { no: "03", title: "Get paid", body: "USDC lands in the Stellar wallet you connect. You sign with Freighter; we never see a private key.", code: "dwell login" }
+      ],
+      sends: ["impression id, campaign id, duration", "session id, client version", "OS and architecture"],
+      nevers: ["your directory path", "your file names", "your prompts, your code"]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; background: #0c0b0a; color: #ece7e1; -webkit-font-smoothing: antialiased; }
+  a { color: #ece7e1; text-decoration: none; }
+  a:hover { color: oklch(0.74 0.16 52); }
+  :focus-visible { outline: 2px solid oklch(0.74 0.16 52); outline-offset: 3px; }
+  ::selection { background: oklch(0.74 0.16 52 / 0.3); }
+</style>
+</helmet>
+
+<div style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif; background: #0c0b0a; color: #ece7e1; min-height: 100vh; overflow-x: hidden">
+
+  <header style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px clamp(16px, 4vw, 56px); border-bottom: 1px solid rgba(236,231,225,0.09)">
+    <a href="Dwell%20Landing.dc.html" style="display: flex; align-items: baseline; gap: 9px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px"><span style="color: oklch(0.74 0.16 52); font-size: 15px">✶</span>dwell</a>
+    <nav style="display: flex; gap: clamp(12px, 2vw, 28px); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px">
+      <a href="Dwell%20Landing.dc.html" style="color: #9d968d" style-hover="color: #ece7e1">for developers</a>
+      <a href="Dwell%20Advertisers.dc.html" style="color: #9d968d" style-hover="color: #ece7e1">advertisers</a>
+      <a href="Dwell%20App.dc.html" style="color: #9d968d" style-hover="color: #ece7e1">your earnings</a>
+    </nav>
+  </header>
+
+  <main style="max-width: 720px; margin: 0 auto; padding: clamp(48px, 7vw, 88px) clamp(16px, 4vw, 40px) 88px">
+    <h1 style="margin: 0 0 28px; font-weight: 400; font-size: clamp(32px, 4.6vw, 52px); letter-spacing: -0.02em">Privacy</h1>
+    <p style="margin: 0 0 40px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 15px; line-height: 1.75; color: #9d968d; text-wrap: pretty">The CLI runs on your machine and talks to one server. This page lists everything that crosses the wire. If something is not on this list, it does not leave your computer.</p>
+
+    <sc-for list="{{ sections }}" as="s" hint-placeholder-count="4">
+      <section style="border-top: 1px solid rgba(236,231,225,0.09); padding: 28px 0">
+        <h2 style="margin: 0 0 14px; font-weight: 400; font-size: clamp(21px, 2.4vw, 27px); letter-spacing: -0.01em">{{ s.title }}</h2>
+        <p style="margin: 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; line-height: 1.75; color: #9d968d; text-wrap: pretty">{{ s.body }}</p>
+      </section>
+    </sc-for>
+
+    <section style="border-top: 1px solid rgba(236,231,225,0.09); padding: 28px 0">
+      <h2 style="margin: 0 0 16px; font-weight: 400; font-size: clamp(21px, 2.4vw, 27px); letter-spacing: -0.01em">The exact fields</h2>
+      <ul style="margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; color: #d6d0c8">
+        <sc-for list="{{ fields }}" as="f" hint-placeholder-count="6">
+          <li style="display: grid; grid-template-columns: minmax(0, 200px) minmax(0, 1fr); gap: 16px">
+            <span>{{ f.name }}</span><span style="color: #6f6a63">{{ f.note }}</span>
+          </li>
+        </sc-for>
+      </ul>
+    </section>
+
+    <section style="border-top: 1px solid rgba(236,231,225,0.09); padding: 28px 0">
+      <h2 style="margin: 0 0 14px; font-weight: 400; font-size: clamp(21px, 2.4vw, 27px); letter-spacing: -0.01em">Removal</h2>
+      <p style="margin: 0 0 18px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; line-height: 1.75; color: #9d968d">One command. It removes only the entries we added; your own settings are untouched.</p>
+      <code style="display: inline-block; padding: 12px 16px; border: 1px solid rgba(236,231,225,0.18); border-radius: 4px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px"><span style="color: #6f6a63">$ </span>dwell uninstall</code>
+    </section>
+  </main>
+
+  <footer style="border-top: 1px solid rgba(236,231,225,0.09)">
+    <div style="max-width: 720px; margin: 0 auto; padding: 26px clamp(16px, 4vw, 40px); display: flex; flex-wrap: wrap; gap: 12px 28px; justify-content: space-between; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12.5px; color: #6f6a63">
+      <span>✶ dwell — testnet</span>
+      <a href="https://github.com/ynsmlkc/Dwell" style="color: #6f6a63" style-hover="color: #ece7e1">GitHub</a>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:720}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      sections: [
+        { title: "Your project stays yours", body: "The project identifier is a hash, salted with a value generated on your machine that never leaves it. Raw directory paths and file names never reach the network — not truncated, not hashed-and-sent-alongside. They are simply not part of any request." },
+        { title: "Prompts and code are never read", body: "The CLI does not read your prompts, your files, or the model's answers. It knows one thing: whether the assistant is currently working. That signal is what decides whether a line is shown." },
+        { title: "IP addresses", body: "Hashed at the edge and used only for fraud checks and rate limiting. The raw address is never written to storage." },
+        { title: "Your keys", body: "The wallet private key never enters the CLI or this site. Login is a signature request handled by the Freighter extension; we receive the signed challenge and nothing else." }
+      ],
+      fields: [
+        { name: "impression_id", note: "random per shown line" },
+        { name: "campaign_id", note: "which ad was shown" },
+        { name: "duration_ms", note: "how long it was visible" },
+        { name: "session_id", note: "rotates per CLI session" },
+        { name: "client_version", note: "e.g. dwell-cli 0.4.2" },
+        { name: "os / arch", note: "e.g. darwin / arm64" },
+        { name: "project_hash", note: "salted locally, one-way" }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
