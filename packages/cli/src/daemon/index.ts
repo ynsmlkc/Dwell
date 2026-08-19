@@ -153,7 +153,10 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
         // Kirli kreatif gelirse renderAdLine firlatir → hicbir sey basilmaz
         // (ADR-007 fail-closed). Daemon ayakta kalir.
         try {
-          const line = renderAdLine(d.ad.creative, req.columns)
+          // `shape` shim'den geliyor: terminalin kimligi yalnizca orada
+          // biliniyor. Eski bir shim shape gondermiyorsa `plain` — yani
+          // hicbir kacis dizisi basilmaz.
+          const line = renderAdLine(d.ad.creative, req.columns, req.shape ?? 'plain')
           return { t: 'render', line: line.ansi, phase: d.phase, reason: d.reason }
         } catch (e) {
           lastError = e instanceof Error ? e.message : String(e)

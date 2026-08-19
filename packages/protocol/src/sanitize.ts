@@ -172,12 +172,50 @@ export function assertClean(creative: Creative): void {
 }
 
 /**
+ * Terminalin OSC 8 (tiklanabilir baglanti) destegi.
+ *
+ * Kararin kendisi shim'de veriliyor — terminalin kimligi yalnizca orada
+ * bilinebilir (bkz. `term-shape.ts`). Burasi yalnizca sonucu uygular.
+ */
+export type LinkShape = 'osc8' | 'plain' | 'hybrid'
+
+/**
+ * Alan adini tiklanabilir yapar — OSC 8.
+ *
+ * Sema ZORUNLU olarak `https://`. Kreatiften gelen metni URL'in sema
+ * kismina koymak, `javascript:` ya da `file:` gibi bir seyi terminale
+ * tiklanabilir olarak sunmak olurdu.
+ *
+ * Desen kontrolu sunucudakinin TEKRARI ve oyle kalmali: burasi agdan gelen
+ * veriyi terminale KACIS DIZISI icinde basan tek yer. Bir noktali virgul
+ * ya da BEL karakteri OSC 8'in disina cikip terminale komut gecirebilir,
+ * ve `assertClean` yalnizca kontrol karakterlerine bakiyor — noktali
+ * virgule bakmiyor. Sunucu tarafi kontrolu bir gun gevserse burasi hala
+ * tutar.
+ */
+const SAFE_DOMAIN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/
+
+function hyperlink(domain: string, label: string): string {
+  if (!SAFE_DOMAIN.test(domain)) return label
+  // ST olarak BEL () kullaniliyor: ESC-backslash bicimini bazi eski
+  // terminaller yutmuyor ve ekranda ham metin birakiyor.
+  return `]8;;https://${domain}${label}]8;;`
+}
+
+/**
  * Kreatifi terminale basilabilir satira cevirir.
  *
  * @param columns Terminal genisligi. statusLine icinde `tput cols` CALISMAZ
  *   (cikti yakalaniyor); `COLUMNS` env degiskeni okunur. Bilinmiyorsa 80.
+ * @param shape Terminal OSC 8 destekliyorsa alan adi tiklanabilir olur.
+ *   Varsayilan `plain`: desteklemeyen terminalde ekrana cop basmaktansa
+ *   duz metin birakmak yeglenir.
  */
-export function renderAdLine(creative: Creative, columns = 80): SanitizedAdLine {
+export function renderAdLine(
+  creative: Creative,
+  columns = 80,
+  shape: LinkShape = 'plain',
+): SanitizedAdLine {
   assertClean(creative)
 
   const brand = truncate(normalize(creative.brand), LIMITS.brand)
@@ -209,11 +247,21 @@ export function renderAdLine(creative: Creative, columns = 80): SanitizedAdLine 
 
   const tail = outCta ? `${CTA_SEP}${outCta}` : ''
   const plain = `${DISCLOSURE_GLYPH} ${brand}${SEP}${outText}${tail}`
+
+  /**
+   * Baglanti YALNIZCA `ansi` tarafina giriyor.
+   *
+   * Genislik `plain`den olculuyor; kacis dizisi oraya girseydi satir
+   * gorunenden onlarca karakter genis sayilir ve kirpma yanlis yerden
+   * keserdi. Ayni sebeple kirpma yukarida duz metin uzerinde yapildi.
+   */
+  const ctaText = outCta && shape !== 'plain' ? hyperlink(outCta, outCta) : outCta
+
   const ansi =
     `${STYLE.glyph}${DISCLOSURE_GLYPH}${STYLE.reset} ` +
     `${STYLE.brand}${brand}${STYLE.reset}` +
     `${SEP}${outText}` +
-    (outCta ? `${STYLE.dim}${CTA_SEP}${outCta}${STYLE.reset}` : '')
+    (outCta ? `${STYLE.dim}${CTA_SEP}${ctaText}${STYLE.reset}` : '')
 
   return { ansi, plain, width: displayWidth(plain) }
 }
