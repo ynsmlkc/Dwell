@@ -85,45 +85,94 @@ function done(publisherId) {
   $('manual').disabled = true
 }
 
+/**
+ * Freighter protokolu — @stellar/freighter-api v6 ile ayni.
+ *
+ * Eklenti window.freighterApi BIRAKMIYOR; o global yalnizca resmi
+ * kutuphanenin UMD paketi script etiketiyle yuklendiginde olusuyor. Ilk
+ * yazdigimda ona bakiyordum ve Freighter kurulu makinede bile
+ * "bulunamadi" diyordu. Eklentinin biraktigi tek sey window.freighter.
+ *
+ * Ayni mantik sitenin app.js dosyasinda da var; biri degisirse digeri de.
+ *
+ * DIKKAT: bu blok bir sablon dizesinin ICINDE — backtick kullanma, diziyi
+ * kapatir ve TypeScript anlasilmaz hatalar verir.
+ */
+const REQ = 'FREIGHTER_EXTERNAL_MSG_REQUEST'
+const RES = 'FREIGHTER_EXTERNAL_MSG_RESPONSE'
+
+function fSend(payload, timeoutMs) {
+  const messageId = Date.now() + Math.random()
+  window.postMessage({ source: REQ, messageId, ...payload }, window.location.origin)
+  return new Promise((resolve) => {
+    let timer = 0
+    const onMsg = (e) => {
+      // Cevapta alan adi "messagedId" — Freighter'in kendi yazim hatasi.
+      // "messageId" diye bakarsak hicbir cevap eslesmez ve her istek
+      // sessizce zaman asimina ugrar.
+      if (e.source !== window) return
+      const d = e.data
+      if (!d || d.source !== RES || d.messagedId !== messageId) return
+      window.removeEventListener('message', onMsg)
+      clearTimeout(timer)
+      resolve(d)
+    }
+    window.addEventListener('message', onMsg, false)
+    // Imza beklerken zaman asimi YOK: kullanici Freighter penceresinde
+    // dusunuyor olabilir.
+    if (timeoutMs) timer = setTimeout(() => {
+      window.removeEventListener('message', onMsg); resolve(null)
+    }, timeoutMs)
+  })
+}
+
+async function freighterReady() {
+  if (window.freighter === true) return true
+  const r = await fSend({ type: 'REQUEST_CONNECTION_STATUS' }, 2000)
+  return !!(r && r.isConnected)
+}
+
+// Eklenti icerik betigi sayfadan SONRA yuklenebiliyor; bir kez daha bak.
+freighterReady().then((ok) => {
+  if (!ok) setTimeout(() => freighterReady().then(showIfMissing), 800)
+  else showIfMissing(true)
+})
+function showIfMissing(ok) {
+  if (ok) return
+  say('Freighter bulunamadi. <a href="https://freighter.app" target="_blank" rel="noopener">freighter.app</a>'
+    + "'ten kur, sayfayi yenile — ya da alttaki elle imzalamayi kullan.", 'err')
+}
+
 $('freighter').onclick = async () => {
   try {
-    // Freighter kendini \`window.freighterApi\` olarak enjekte eder. Eklenti
-    // kurulu degilse bu nesne hic olusmaz — kullaniciya net soylenmeli.
-    const api = window.freighterApi
-    if (!api) {
-      say('Freighter bulunamadı. <a href="https://freighter.app" target="_blank" rel="noopener">freighter.app</a>' +
-          "'ten kur, sayfayı yenile — ya da alttaki elle imzalamayı kullan.", 'err')
+    if (!(await freighterReady())) {
+      say('Freighter bulunamadi. <a href="https://freighter.app" target="_blank" rel="noopener">freighter.app</a>'
+        + "'ten kur ve sayfayi yenile.", 'err')
       return
     }
-    say('Freighter’ın onayını bekliyorum…')
+    say('Freighter\u2019in onayini bekliyorum\u2026')
 
-    // Yeni surumlerde \`requestAccess\`, eskilerde \`getPublicKey\`.
-    let address
-    if (api.requestAccess) {
-      const r = await api.requestAccess()
-      address = typeof r === 'string' ? r : r.address
-      if (r && r.error) throw new Error(r.error)
-    } else {
-      address = await api.getPublicKey()
-    }
+    const acc = await fSend({ type: 'REQUEST_ACCESS' })
+    if (acc?.apiError) throw new Error(acc.apiError.message || 'erisim reddedildi')
+    const address = acc?.publicKey
     if (!address) throw new Error('Freighter adres vermedi')
 
     const ch = await post('/challenge', { address })
-    say('İmzalaman için Freighter açıldı…')
+    say('Imzalaman icin Freighter acildi\u2026')
 
-    const signed = await api.signTransaction(ch.transaction, {
+    const signed = await fSend({
+      type: 'SUBMIT_TRANSACTION',
+      transactionXdr: ch.transaction,
       networkPassphrase: ch.network_passphrase,
-      address,
+      accountToSign: address,
     })
-    // Surume gore string veya { signedTxXdr } doner.
-    const xdr = typeof signed === 'string' ? signed : (signed.signedTxXdr || signed.signedXDR)
-    if (signed && signed.error) throw new Error(signed.error)
-    if (!xdr) throw new Error('İmza alınamadı')
+    if (signed?.apiError) throw new Error(signed.apiError.message || 'imza reddedildi')
+    if (!signed?.signedTransaction) throw new Error('Imza alinamadi')
 
-    const res = await post('/verify', { address, transaction: xdr })
+    const res = await post('/verify', { address, transaction: signed.signedTransaction })
     done(res.publisherId)
   } catch (e) {
-    say('✗ ' + (e && e.message ? e.message : String(e)), 'err')
+    say('\u2717 ' + (e && e.message ? e.message : String(e)), 'err')
   }
 }
 

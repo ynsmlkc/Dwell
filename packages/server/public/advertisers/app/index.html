@@ -187,7 +187,7 @@
 </footer>
 
 <script type="module">
-import { $, show, usd, toStroops, short, api, ApiError, session, login, freighter, copyButton } from '/app.js';
+import { $, show, usd, toStroops, short, api, ApiError, session, login, freighterReady, copyButton } from '/app.js';
 
 const MAX_LINE = 80;
 const MIN_CPM = 1000000n;          // $0.10 / 1000
@@ -197,7 +197,8 @@ const view = (id) => views.forEach((v) => show($('#' + v), v === id));
 let me = null;
 let forceDeposit = false;
 
-show($('#no-freighter'), !freighter());
+// Eklenti tespiti ASENKRON: `postMessage` el sikismasi gerekiyor.
+freighterReady().then((ok) => show($('#no-freighter'), !ok));
 copyButton($('#copy-deposit'), () => me?.deposit?.address || '');
 
 /* ─────────── giris ─────────── */

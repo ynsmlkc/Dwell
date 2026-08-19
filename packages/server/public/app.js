@@ -89,51 +89,83 @@ export async function api(path, { method = 'GET', body, auth = true } = {}) {
 
 /* ─────────────────────────── cuzdan ─────────────────────────── */
 
-/** Freighter eklentisi kendini `window.freighterApi` olarak enjekte eder. */
-export const freighter = () => window.freighterApi || null;
+/**
+ * Freighter ile konusma — `@stellar/freighter-api` v6'nin protokolu.
+ *
+ * Eklenti `window.freighterApi` diye bir nesne BIRAKMIYOR. O global yalnizca
+ * resmi kutuphanenin UMD paketini <script> ile yuklersen olusuyor. Ilk
+ * yazdigimda ona bakiyordum ve Freighter kurulu olan makinede bile
+ * "bulunamadi" diyordu.
+ *
+ * Eklentinin gercekte biraktigi tek sey `window.freighter = true`. Geri
+ * kalan her sey `postMessage` uzerinden.
+ *
+ * 10 KB'lik resmi paketi gomebilirdik; protokol degisirse ikisi de ayni
+ * sekilde kirilacagi icin kazanci yok. Kodun kendisi burada duruyor ve ne
+ * yaptigi okunabiliyor.
+ *
+ * NOT: Ayni mantik CLI'nin `login-page.ts` dosyasinda da var — o sayfa
+ * kullanicinin kendi makinesinde, bu sunucudan bagimsiz calisiyor. Biri
+ * degisirse digeri de degismeli.
+ */
+
+const FREIGHTER_REQ = 'FREIGHTER_EXTERNAL_MSG_REQUEST';
+const FREIGHTER_RES = 'FREIGHTER_EXTERNAL_MSG_RESPONSE';
+
+function freighterSend(payload, timeoutMs = 0) {
+  const messageId = Date.now() + Math.random();
+  window.postMessage({ source: FREIGHTER_REQ, messageId, ...payload }, window.location.origin);
+
+  return new Promise((resolve) => {
+    let timer = 0;
+    const onMsg = (e) => {
+      // DIKKAT: cevapta alan adi `messagedId` — Freighter'in kendi yazim
+      // hatasi. `messageId` diye bakarsak hicbir cevap eslesmez ve her
+      // istek sessizce zaman asimina ugrar.
+      if (e.source !== window) return;
+      const d = e.data;
+      if (!d || d.source !== FREIGHTER_RES || d.messagedId !== messageId) return;
+      window.removeEventListener('message', onMsg);
+      clearTimeout(timer);
+      resolve(d);
+    };
+    window.addEventListener('message', onMsg, false);
+
+    // Yalnizca "orada misin" turu sorularda zaman asimi: imza beklerken
+    // kullanici Freighter penceresinde dusunuyor olabilir, onu kesmeyiz.
+    if (timeoutMs > 0) {
+      timer = setTimeout(() => {
+        window.removeEventListener('message', onMsg);
+        resolve(null);
+      }, timeoutMs);
+    }
+  });
+}
+
+/** Eklenti var mi? Once hizli global, sonra el sikisma. */
+export async function freighterReady() {
+  if (window.freighter === true) return true;
+  const r = await freighterSend({ type: 'REQUEST_CONNECTION_STATUS' }, 2000);
+  return !!(r && r.isConnected);
+}
 
 export async function walletAddress() {
-  const api_ = freighter();
-  if (!api_) throw new Error('Freighter not found');
-  if (api_.requestAccess) {
-    const r = await api_.requestAccess();
-    if (r && r.error) throw new Error(r.error);
-    return typeof r === 'string' ? r : r.address;
-  }
-  return api_.getPublicKey();
+  const r = await freighterSend({ type: 'REQUEST_ACCESS' });
+  if (r?.apiError) throw new Error(r.apiError.message || 'Freighter refused access');
+  if (!r?.publicKey) throw new Error('Freighter returned no address');
+  return r.publicKey;
 }
 
 async function signXdr(xdr, networkPassphrase, address) {
-  const api_ = freighter();
-  const signed = await api_.signTransaction(xdr, { networkPassphrase, address });
-  if (signed && signed.error) throw new Error(signed.error);
-  const out = typeof signed === 'string' ? signed : signed.signedTxXdr || signed.signedXDR;
-  if (!out) throw new Error('Freighter returned no signature');
-  return out;
-}
-
-/**
- * SEP-10 girisi.
- *
- * Sunucu bir "meydan okuma" uretir, kullanici cuzdaniyla imzalar, sunucu
- * dogrular. Imzalanan islem aga GONDERILEMEZ — sira numarasi sifirdir,
- * yalnizca kimlik kanitidir. Bunu kullaniciya soylemek onemli: cuzdani
- * "islem imzala" dedigi anda insanlar hakli olarak duruyor.
- */
-export async function login(role, onStep) {
-  onStep?.('Requesting access…');
-  const address = await walletAddress();
-
-  onStep?.('Waiting for signature…');
-  const ch = await api('/v1/auth/challenge', { method: 'POST', auth: false, body: { address } });
-  const signedXdr = await signXdr(ch.transaction, ch.network_passphrase, address);
-
-  const out = await api('/v1/auth/verify', {
-    method: 'POST', auth: false,
-    body: { address, transaction: signedXdr, role },
+  const r = await freighterSend({
+    type: 'SUBMIT_TRANSACTION',
+    transactionXdr: xdr,
+    networkPassphrase,
+    accountToSign: address,
   });
-  session.save(out.token, out.role || role, out.publisherId);
-  return out;
+  if (r?.apiError) throw new Error(r.apiError.message || 'Freighter refused to sign');
+  if (!r?.signedTransaction) throw new Error('Freighter returned no signature');
+  return r.signedTransaction;
 }
 
 /* ─────────────────── trustline (yalnizca yayinci) ─────────────────── */

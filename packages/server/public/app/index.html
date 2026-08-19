@@ -153,7 +153,7 @@
 
 <script type="module">
 import {
-  $, show, usd, short, api, ApiError, session, login, freighter,
+  $, show, usd, short, api, ApiError, session, login, freighterReady,
   walletState, enableUsdc, copyButton, explorer,
 } from '/app.js';
 
@@ -165,7 +165,8 @@ copyButton($('#copy-addr'), () => session.address || '');
 
 /* ─────────── giris ─────────── */
 
-show($('#no-freighter'), !freighter());
+// Eklenti tespiti ASENKRON: `postMessage` el sikismasi gerekiyor.
+freighterReady().then((ok) => show($('#no-freighter'), !ok));
 
 async function doLogin() {
   show($('#connect-error'), false);
