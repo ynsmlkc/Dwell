@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { startDaemon, type Daemon } from '../src/daemon/index.js'
 import type { AdPayload } from '@dwell/protocol'
+import type { CompletedImpression } from '../src/daemon/turns.js'
 
 const SHIM = resolve(import.meta.dirname, '../dist/statusline.mjs')
 
@@ -134,6 +135,7 @@ describe('uctan uca — tam tur', () => {
     dir = mkdtempSync(join(tmpdir(), 'dwell-e2e-'))
     const sock = join(dir, 'd.sock')
     const seen: string[] = []
+    const sayilan: CompletedImpression[] = []
     daemon = await startDaemon({
       socketPath: sock,
       dataDir: dir,
@@ -149,7 +151,7 @@ describe('uctan uca — tam tur', () => {
         configPollSec: 300,
         reportIntervalSec: 60,
       },
-      onImpression: (i) => seen.push(i.campaignId),
+      onImpression: (i) => { seen.push(i.campaignId); sayilan.push(i) },
     })
 
     daemon.hook('UserPromptSubmit', 's1')
@@ -162,9 +164,15 @@ describe('uctan uca — tam tur', () => {
     await new Promise((r) => setTimeout(r, 80))
     daemon.tick('s1')
 
-    const imps = daemon.impressions()
-    expect(imps.length, 'rotasyonla birden fazla gosterim').toBeGreaterThan(1)
+    expect(sayilan.length, 'rotasyonla birden fazla gosterim').toBeGreaterThan(1)
     expect(new Set(seen).size, 'reklamlar donmus olmali').toBeGreaterThan(1)
-    expect(imps.every((i) => i.surface === 'statusline')).toBe(true)
+    expect(sayilan.every((i) => i.surface === 'statusline')).toBe(true)
+
+    // Sunucu YOK — gosterimler sayiliyor ama diske YAZILMIYOR.
+    //
+    // Onceden buraya yaziliyorlardi ve gercek bir kurulumda 3.152 gecersiz
+    // kayit birikmisti; kullanici giris yapinca hepsi sunucuya gidip
+    // reddedildi ve gercek kazanci onlarin arkasinda siraya girdi.
+    expect(daemon.impressions(), 'sunucusuz kuyruk bos kalir').toHaveLength(0)
   })
 })

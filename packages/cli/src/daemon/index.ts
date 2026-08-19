@@ -128,7 +128,17 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
    */
   const drain = (): void => {
     for (const imp of machine.drainImpressions()) {
-      queue.add(imp)
+      // Sunucu YOKSA kuyruga ALMIYORUZ.
+      //
+      // Demo modunda gosterilen reklamin karsiligi yok: hicbir reklamveren
+      // odemedi, sunucudan nonce gelmedi. Onlari biriktirmek iki zarar
+      // veriyordu — kullanici giris yaptiginda binlerce gecersiz kayit
+      // sunucuya gidip toptan reddediliyor, ve GERCEK kazanci o yiginin
+      // arkasinda siraya giriyor. Bir kullanicida 3.152 kayit birikmisti.
+      //
+      // Sayilmaya devam ediyorlar (log ve `dwell status` icin), yalnizca
+      // diske yazilmiyorlar.
+      if (sync) queue.add(imp)
       opts.onImpression?.(imp)
     }
   }

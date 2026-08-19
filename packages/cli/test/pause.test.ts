@@ -29,7 +29,7 @@ async function kur() {
   dirs.push(dir)
   const socketPath = join(dir, 's.sock')
   const daemon = await startDaemon({
-    ads: ADS, socketPath, syncSpinner: false,
+    ads: ADS, socketPath, dataDir: dir, syncSpinner: false,
     config: { ...FALLBACK_CONFIG, renderEnabled: true, surfaces: { statusline: true, spinnerVerb: true, spinnerTip: true }, minImpressionMs: 1000, rotateMs: 20_000, idleGraceMs: 4_000 },
   })
   return { daemon, socketPath, dir }
@@ -78,7 +78,7 @@ describe('duraklatma', () => {
     expect(existsSync(join(dir, 'paused')), 'diske yazilmali').toBe(true)
 
     const yeni = await startDaemon({
-      ads: ADS, socketPath, syncSpinner: false,
+      ads: ADS, socketPath, dataDir: dir, syncSpinner: false,
       config: { ...FALLBACK_CONFIG, renderEnabled: true, surfaces: { statusline: true, spinnerVerb: true, spinnerTip: true }, minImpressionMs: 1000, rotateMs: 20_000, idleGraceMs: 4_000 },
     })
     try {

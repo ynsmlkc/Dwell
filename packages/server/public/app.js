@@ -168,6 +168,45 @@ async function signXdr(xdr, networkPassphrase, address) {
   return r.signedTransaction;
 }
 
+/* ─────────────────────────── giris (SEP-10) ─────────────────────────── */
+
+/**
+ * Cuzdanla giris. Sifre yok, hesap yok — adres kimligin kendisi.
+ *
+ * Uc adim: sunucudan bir challenge iste, Freighter'a imzalat, imzayi geri
+ * gonder. Sunucu imzayi dogrularsa token verir.
+ *
+ * Imzalanan sey `sequence = 0` olan bir transaction: aga gonderilmesi
+ * PROTOKOL GEREGI imkansiz. Yani bu imza hicbir zaman para hareket
+ * ettiremez, yalnizca "bu adres benim"i kanitlar.
+ *
+ * `onStep` her adimda dugmenin yazisini degistiriyor. Freighter penceresi
+ * acilmadan once kullanicinin ne bekledigini bilmesi gerekiyor — yoksa
+ * donen bir dugmeye bakip sayfanin dondugunu saniyor.
+ */
+export async function login(role, onStep = () => {}) {
+  onStep('Waiting for Freighter…');
+  const address = await walletAddress();
+
+  onStep('Preparing…');
+  const challenge = await api('/v1/auth/challenge', {
+    method: 'POST', auth: false, body: { address },
+  });
+
+  onStep('Sign in Freighter…');
+  const signed = await signXdr(challenge.transaction, challenge.network_passphrase, address);
+
+  onStep('Verifying…');
+  // Rolu SUNUCU dogruluyor; buradaki deger yalnizca hangi yetkilerin
+  // istendigini soyluyor, kendi kendine yetki vermiyor.
+  const { token } = await api('/v1/auth/verify', {
+    method: 'POST', auth: false, body: { address, transaction: signed, role },
+  });
+
+  session.save(token, role, address);
+  return { address, role };
+}
+
 /* ─────────────────── trustline (yalnizca yayinci) ─────────────────── */
 
 const HORIZON = 'https://horizon-testnet.stellar.org';
