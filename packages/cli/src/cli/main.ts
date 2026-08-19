@@ -16,6 +16,7 @@ import { out, ok, warn, info, fail, rows, dim, bold, green, yellow, red, orange,
 import { cmdLogin, cmdLogout, cmdWhoami } from './login.js'
 import { cmdBalance } from './balance.js'
 import { loadCredentials, shortAddress } from '../credentials.js'
+import { VERSION } from '../version.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -263,6 +264,7 @@ function cmdHelp(): void {
     ['dwell pause', 'reklami gecici durdur'],
     ['dwell resume', 'devam et'],
     ['dwell uninstall', 'kaldir — kendi izimizi sileriz'],
+    ['dwell version', 'surumu yaz'],
   ])
   out()
   rows([
@@ -290,6 +292,17 @@ export async function main(argv: readonly string[]): Promise<void> {
     case 'whoami': return cmdWhoami()
     case 'balance': return cmdBalance(rest)
     case 'help': case '--help': case '-h': return cmdHelp()
+    /**
+     * Surum. Daemon'a SORMAZ — herkesin ilk denedigi komut bu ve daemon
+     * calismiyorken de cevap vermeli. `dwell status` daemon'dan okuyor,
+     * o ayri bir sey.
+     *
+     * Cikti suslenmemis tek satir: hata bildiren biri bunu kopyalayip
+     * yapistiriyor, betikler de bunu ayristiriyor.
+     */
+    case 'version': case '--version': case '-v':
+      out(VERSION)
+      return
     default:
       fail('DWL-9001', `bilinmeyen komut: ${cmd}`, '`dwell help` ile komutlari gor')
   }

@@ -7,7 +7,14 @@
  * gerekiyor; Node'un tip siyirma modu `.js` importlarini `.ts`'e cozemiyor.
  */
 import { build } from 'esbuild'
-import { chmodSync } from 'node:fs'
+import { chmodSync, readFileSync } from 'node:fs'
+
+/**
+ * Surum `package.json`'dan gomuluyor — elle yazilan bir sabit kacinilmaz
+ * olarak eskiyor ve sessizce yanlis surum bildiren bir istemci uretiyor
+ * (bkz. `src/version.ts`).
+ */
+const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
 
 const targets = [
   { in: 'src/shim/statusline.ts', out: 'dist/statusline.mjs' },
@@ -24,6 +31,7 @@ for (const t of targets) {
     platform: 'node',
     target: 'node20',
     format: 'esm',
+    define: { __DWELL_VERSION__: JSON.stringify(version) },
     // Shim'in kucuk kalmasi onemli: her cagrida parse ediliyor.
     minify: t.out.includes('statusline') || t.out.includes('hook'),
     // Banner EKLEMIYORUZ: kaynak dosyalarda zaten shebang var ve esbuild

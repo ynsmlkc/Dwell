@@ -16,6 +16,7 @@ import { ServerSync } from './sync.js'
 import { writeFileSync, existsSync, unlinkSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { SOCKET_PATH, DWELL_HOME, type Request, type Response, type HookEvent } from '../ipc.js'
+import { VERSION } from '../version.js'
 
 export interface DaemonOptions {
   readonly socketPath?: string
@@ -57,7 +58,7 @@ export interface Daemon {
   readonly phase: () => string
 }
 
-export const VERSION = '0.0.0'
+export { VERSION }
 
 export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
   const clock = opts.clock ?? systemClock
