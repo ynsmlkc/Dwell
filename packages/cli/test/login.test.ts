@@ -260,14 +260,14 @@ describe('trustline kontrolu', () => {
   it('USDC kabulu VARSA true doner', async () => {
     const { url } = start(withHorizon({ balances: [{ asset_type: 'native' }, USDC] }))
     const b = await browse(await url)
-    const r = await (await b.post('/trustline', { address: GOOD })).json()
+    const r = (await (await b.post('/trustline', { address: GOOD })).json()) as { usdc: boolean; known: boolean }
     expect(r).toEqual({ usdc: true, known: true })
   })
 
   it('USDC kabulu YOKSA false doner', async () => {
     const { url } = start(withHorizon({ balances: [{ asset_type: 'native' }] }))
     const b = await browse(await url)
-    const r = await (await b.post('/trustline', { address: GOOD })).json()
+    const r = (await (await b.post('/trustline', { address: GOOD })).json()) as { usdc: boolean; known: boolean }
     expect(r.usdc).toBe(false)
   })
 
@@ -277,7 +277,7 @@ describe('trustline kontrolu', () => {
       balances: [{ asset_code: 'USDC', asset_issuer: 'GSAHTE' }],
     }))
     const b = await browse(await url)
-    const r = await (await b.post('/trustline', { address: GOOD })).json()
+    const r = (await (await b.post('/trustline', { address: GOOD })).json()) as { usdc: boolean; known: boolean }
     expect(r.usdc).toBe(false)
   })
 
@@ -288,14 +288,14 @@ describe('trustline kontrolu', () => {
   it('zincire ulasilamazsa "bilinmiyor" doner', async () => {
     const { url } = start((async () => { throw new Error('ag yok') }) as unknown as typeof fetch)
     const b = await browse(await url)
-    const r = await (await b.post('/trustline', { address: GOOD })).json()
+    const r = (await (await b.post('/trustline', { address: GOOD })).json()) as { usdc: boolean; known: boolean }
     expect(r).toEqual({ usdc: false, known: false })
   })
 
   it('hesap zincirde yoksa "bilinmiyor" doner', async () => {
     const { url } = start(withHorizon({}, 404))
     const b = await browse(await url)
-    const r = await (await b.post('/trustline', { address: GOOD })).json()
+    const r = (await (await b.post('/trustline', { address: GOOD })).json()) as { usdc: boolean; known: boolean }
     expect(r.known).toBe(false)
   })
 
