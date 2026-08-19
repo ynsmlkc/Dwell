@@ -32,7 +32,7 @@
          basladiginda beliriyor, cevap gelince kayboluyor. -->
     <figure class="term" style="box-shadow: 0 24px 70px -30px rgba(0,0,0,0.9)">
       <figcaption class="term-bar">
-        <span>~/projects/api — claude</span>
+        <span>~/projects/api — claude · example ad</span>
         <span id="phase">waiting — the line is shown</span>
       </figcaption>
       <div class="term-body">
@@ -47,7 +47,7 @@
         <span class="ad" id="ad">
           <span style="color: var(--accent)">✶</span>
           <span class="ad-text">
-            <span class="brand-name" id="ad-brand">Firecrawl</span><span class="sep"> — <span id="ad-text">docs to LLM-ready markdown</span> · </span><span class="cta" id="ad-cta">firecrawl.dev</span>
+            <span class="brand-name" id="ad-brand">Your product</span><span class="sep"> — <span id="ad-text">what it does, in a few words</span> · </span><span class="cta" id="ad-cta">yourdomain.com</span>
           </span>
         </span>
         <span class="ad-right" id="ad-right">Edit · 2.8s</span>
@@ -174,10 +174,15 @@
 
   /* Hero animasyonu — urunun gercek davranisi.
      Bekleme basliyor → satir beliriyor → cevap geliyor → satir gidiyor. */
+  /* Ornek satirlar — GERCEK marka DEGIL.
+     Onceden burada Firecrawl, Resend, Neon yaziyordu. Hicbiri musterimiz
+     degil ve izin vermediler; siteye koymak "bunlar bize para veriyor"
+     demekti. Yerlerine bicimi ogreten yer tutucular kondu. Gercek bir
+     reklamveren geldiginde, IZNIYLE, adi buraya gelir. */
   const ADS = [
-    { brand: 'Firecrawl', text: 'docs to LLM-ready markdown', cta: 'firecrawl.dev' },
-    { brand: 'Resend', text: 'email API for developers', cta: 'resend.com' },
-    { brand: 'Neon', text: 'serverless Postgres with branching', cta: 'neon.tech' },
+    { brand: 'Your product', text: 'what it does, in a few words', cta: 'yourdomain.com' },
+    { brand: 'Your API', text: 'one line, plain text, no images', cta: 'yourdomain.com' },
+    { brand: 'Your tool', text: '80 characters including the domain', cta: 'yourdomain.com' },
   ];
   const ACTS = [
     { label: 'Edit', verb: 'Editing src/auth/middleware.ts' },

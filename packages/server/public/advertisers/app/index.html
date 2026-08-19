@@ -147,12 +147,12 @@
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 18px">
-          <label class="field">Brand<input type="text" id="f-brand" placeholder="Firecrawl"></label>
-          <label class="field">Domain<input type="text" id="f-cta" placeholder="firecrawl.dev"></label>
+          <label class="field">Brand<input type="text" id="f-brand" placeholder="Your product"></label>
+          <label class="field">Domain<input type="text" id="f-cta" placeholder="yourdomain.com"></label>
         </div>
         <p class="err hidden" id="e-cta"></p>
 
-        <label class="field" style="margin-top: 18px">Message<input type="text" id="f-text" placeholder="docs to LLM-ready markdown"></label>
+        <label class="field" style="margin-top: 18px">Message<input type="text" id="f-text" placeholder="what it does, in a few words"></label>
         <p class="err hidden" id="e-text"></p>
 
         <div style="margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 18px; align-items: end">
@@ -410,7 +410,7 @@ function validate() {
     : null;
   const ctaOk = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(cta);
   const ctaBad = f.cta.value.trim() && !ctaOk
-    ? 'Just the domain — firecrawl.dev, not a full URL. Developers must land exactly where the line says.'
+    ? 'Just the domain — just the domain, not a full URL. Developers must land exactly where the line says.'
     : null;
 
   const cpmS = toStroops(f.cpm.value);

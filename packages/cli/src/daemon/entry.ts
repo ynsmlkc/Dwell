@@ -11,14 +11,27 @@ import { FALLBACK_CONFIG } from '@dwell/protocol'
 import type { AdPayload } from '@dwell/protocol'
 import { loadCredentials, shortAddress } from '../credentials.js'
 
-/** Gelistirme reklamlari. Uretimde `/v1/ads/next`'ten gelecek. */
+/**
+ * Giris yapilmamisken gosterilen ornek satirlar.
+ *
+ * Bunlar KENDIMIZI anlatiyor, baska markalari degil.
+ *
+ * Onceden burada Firecrawl, Resend ve Neon yaziyordu — gercek sirketler ve
+ * hicbiri bize izin vermedi. Paket npm'de: kuran herkes o markalarin bize
+ * para verdigini sanardi. Var olmayan bir musteri iliskisini ima etmek,
+ * hem o sirketlere hem kullaniciya karsi durust degil.
+ *
+ * Ikinci fayda: demo artik gercekten ayirt ediliyor. Kullanici satiri
+ * okudugu anda kazanmadigini ve ne yapmasi gerektigini biliyor — daha once
+ * `dwell init` ciktisindaki uyariyi kacirdiysa burada yakaliyor.
+ */
 const DEV_ADS: AdPayload[] = [
-  { campaignId: 'dev-1', nonce: '0'.repeat(32), nonceExpiresAt: 9e12,
-    creative: { brand: 'Firecrawl', text: 'docs to LLM-ready markdown', cta: 'firecrawl.dev' } },
-  { campaignId: 'dev-2', nonce: '1'.repeat(32), nonceExpiresAt: 9e12,
-    creative: { brand: 'Resend', text: 'email API for developers', cta: 'resend.com' } },
-  { campaignId: 'dev-3', nonce: '2'.repeat(32), nonceExpiresAt: 9e12,
-    creative: { brand: 'Neon', text: 'serverless Postgres', cta: 'neon.tech' } },
+  { campaignId: 'sample-1', nonce: '0'.repeat(32), nonceExpiresAt: 9e12,
+    creative: { brand: 'Dwell', text: 'sample line — you are not earning yet', cta: 'dwell login' } },
+  { campaignId: 'sample-2', nonce: '1'.repeat(32), nonceExpiresAt: 9e12,
+    creative: { brand: 'Dwell', text: 'connect a wallet to show real ads', cta: 'dwell login' } },
+  { campaignId: 'sample-3', nonce: '2'.repeat(32), nonceExpiresAt: 9e12,
+    creative: { brand: 'Dwell', text: 'no server connected — nothing is recorded', cta: 'dwell login' } },
 ]
 
 const log = (m: string): void => {
