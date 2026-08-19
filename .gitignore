@@ -11,3 +11,8 @@ packages/*/dist/
 
 # Testnet havuz anahtari — git'e girmez
 .testnet-faucet.json
+
+# Bilinen sorunlar notu — YEREL KALIR.
+# Icinde saldiri senaryolari ve savunmalarin nerede tutmadigi yaziyor;
+# depoyu goren birine yol tarifi olurdu.
+PROBLEMS.md
