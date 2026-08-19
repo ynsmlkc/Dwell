@@ -238,3 +238,82 @@ describe('credentials', () => {
     expect(loadCredentials(p)).toBeNull()
   })
 })
+
+/**
+ * Trustline kontrolu.
+ *
+ * Tasarimda bu alan sabit "var" yaziyordu. Odemeyi engelleyen tek sey bu
+ * ve kullanicinin baska turlu ogrenme yolu yok — yanlis "var" demek,
+ * kazanip alamayan birini haftalarca bekletir.
+ */
+describe('trustline kontrolu', () => {
+  const withHorizon = (yanit: unknown, status = 200) =>
+    (async (url: any, init: any) => {
+      if (String(url).includes('/accounts/')) {
+        return new Response(JSON.stringify(yanit), { status })
+      }
+      return new Response(JSON.stringify({ transaction: 'x', network_passphrase: 'n' }), { status: 200 })
+    }) as unknown as typeof fetch
+
+  const USDC = { asset_code: 'USDC', asset_issuer: 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5' }
+
+  it('USDC kabulu VARSA true doner', async () => {
+    const { url } = start(withHorizon({ balances: [{ asset_type: 'native' }, USDC] }))
+    const b = await browse(await url)
+    const r = await (await b.post('/trustline', { address: GOOD })).json()
+    expect(r).toEqual({ usdc: true, known: true })
+  })
+
+  it('USDC kabulu YOKSA false doner', async () => {
+    const { url } = start(withHorizon({ balances: [{ asset_type: 'native' }] }))
+    const b = await browse(await url)
+    const r = await (await b.post('/trustline', { address: GOOD })).json()
+    expect(r.usdc).toBe(false)
+  })
+
+  /** Ayni kodu tasiyan farkli issuer FARKLI varliktir — §8 tuzak #8. */
+  it('yanlis issuer\'in USDC\'si sayilmaz', async () => {
+    const { url } = start(withHorizon({
+      balances: [{ asset_code: 'USDC', asset_issuer: 'GSAHTE' }],
+    }))
+    const b = await browse(await url)
+    const r = await (await b.post('/trustline', { address: GOOD })).json()
+    expect(r.usdc).toBe(false)
+  })
+
+  /**
+   * Zincire ulasilamadiginda "yok" DEMIYORUZ. Bilmedigimizi soyluyoruz:
+   * olmayan bir sorunu bildirmek, olani kacirmak kadar kotu.
+   */
+  it('zincire ulasilamazsa "bilinmiyor" doner', async () => {
+    const { url } = start((async () => { throw new Error('ag yok') }) as unknown as typeof fetch)
+    const b = await browse(await url)
+    const r = await (await b.post('/trustline', { address: GOOD })).json()
+    expect(r).toEqual({ usdc: false, known: false })
+  })
+
+  it('hesap zincirde yoksa "bilinmiyor" doner', async () => {
+    const { url } = start(withHorizon({}, 404))
+    const b = await browse(await url)
+    const r = await (await b.post('/trustline', { address: GOOD })).json()
+    expect(r.known).toBe(false)
+  })
+
+  it('nonce\'suz trustline sorgusu reddedilir', async () => {
+    const { url } = start(withHorizon({ balances: [USDC] }))
+    const b = await browse(await url)
+    const r = await b.post('/trustline', { address: GOOD }, null)
+    expect(r.status).toBe(403)
+  })
+})
+
+/** Sayfa dogru portu gosteriyor mu — kullanici adresi oradan okuyor. */
+describe('giris sayfasi', () => {
+  it('kendi portunu gosterir', async () => {
+    const { url } = start(fakeServer().impl)
+    const u = await url
+    const port = new URL(u).port
+    const html = await (await fetch(u)).text()
+    expect(html).toContain(`127.0.0.1:${port}`)
+  })
+})

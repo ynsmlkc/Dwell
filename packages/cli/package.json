@@ -1,6 +1,6 @@
 {
   "name": "dwellsh",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "AI kodlama araclarinin bekleme anlarini kazanca cevirir. Terminal reklamlari, Stellar uzerinden USDC odemesi.",
   "keywords": [
     "claude-code",

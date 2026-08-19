@@ -38,6 +38,11 @@ const LOGIN_TIMEOUT_MS = 5 * 60_000
  */
 const DEFAULT_SERVER = 'https://dwellserver-production.up.railway.app'
 
+/** Trustline kontrolu icin. Odeme rayiyla ayni varlik. */
+const HORIZON = process.env['DWELL_HORIZON'] ?? 'https://horizon-testnet.stellar.org'
+const USDC_ISSUER = process.env['DWELL_ASSET_ISSUER']
+  ?? 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5'
+
 export interface LoginOptions {
   readonly serverUrl: string
   /** Tarayici acilmasin — CI ve baglantisiz ortamlar icin. */
@@ -104,6 +109,9 @@ interface LoginResult {
 export function runLoginServer(opts: LoginOptions): Promise<LoginResult> {
   const nonce = randomBytes(16).toString('hex')
   const f = opts.fetchImpl ?? fetch
+  // Port isletim sisteminden geliyor (0 = bos bir tane ver). Sayfada
+  // gostermek icin yakaliyoruz; istekler zaten `listen`'dan sonra geliyor.
+  let port = 0
 
   return new Promise<LoginResult>((resolve, reject) => {
     let settled = false
@@ -138,7 +146,7 @@ export function runLoginServer(opts: LoginOptions): Promise<LoginResult> {
       const url = req.url ?? '/'
 
       if (req.method === 'GET' && (url === '/' || url.startsWith('/?'))) {
-        const html = loginPage({ nonce })
+        const html = loginPage({ nonce, port })
         res.writeHead(200, {
           'content-type': 'text/html; charset=utf-8',
           'content-length': Buffer.byteLength(html),
@@ -163,6 +171,31 @@ export function runLoginServer(opts: LoginOptions): Promise<LoginResult> {
           body: JSON.stringify({ address: body?.['address'] }),
         })
         json(res, r.status, await r.json().catch(() => ({ message: 'sunucu cevabi okunamadi' })))
+        return
+      }
+
+      /**
+       * Cuzdan USDC kabul ediyor mu?
+       *
+       * Sayfa Horizon'a DOGRUDAN gitmiyor: gitseydi CSP'de `connect-src`
+       * disariya acilirdi ve sayfa istedigi yere baglanabilirdi. Proxy'den
+       * gecince `'self'` kalabiliyor.
+       */
+      if (url === '/trustline') {
+        const address = String(body?.['address'] ?? '')
+        try {
+          const r = await f(`${HORIZON}/accounts/${address}`, { signal: AbortSignal.timeout(8000) })
+          if (!r.ok) { json(res, 200, { usdc: false, known: false }); return }
+          const acc = (await r.json()) as { balances: { asset_code?: string; asset_issuer?: string }[] }
+          const usdc = acc.balances.some(
+            (b) => b.asset_code === 'USDC' && b.asset_issuer === USDC_ISSUER,
+          )
+          json(res, 200, { usdc, known: true })
+        } catch {
+          // Zincire ulasilamadi. "Yok" DEMIYORUZ — bilmedigimizi soyluyoruz;
+          // olmayan bir sorunu bildirmek, olani kacirmak kadar kotu.
+          json(res, 200, { usdc: false, known: false })
+        }
         return
       }
 
@@ -196,7 +229,8 @@ export function runLoginServer(opts: LoginOptions): Promise<LoginResult> {
         finish(() => reject(new Error('yerel sunucu baslatilamadi')))
         return
       }
-      const url = `http://127.0.0.1:${addr.port}/`
+      port = addr.port
+      const url = `http://127.0.0.1:${port}/`
 
       out()
       out(`  ${orange('◆')} ${bold('Cuzdanini bagla')}`)
