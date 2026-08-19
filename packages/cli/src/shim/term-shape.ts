@@ -56,9 +56,14 @@ export function termShape(env: NodeJS.ProcessEnv = process.env): TermShape {
   switch (env['TERM_PROGRAM']) {
     case 'vscode':
     case 'iTerm.app':
+    // Warp `plain` olarak isaretliydi ve bu YANLISTI: OSC 8 destekliyor,
+    // gozlemle dogrulandi (2026-08-19). Yanlis siniflandirmanin belirtisi
+    // sessiz — link basmayiz, kimse bir hata gormez, reklamveren tiklama
+    // alamaz.
+    case 'WarpTerminal':
     case 'WezTerm': return 'osc8'
-    case 'Apple_Terminal':
-    case 'WarpTerminal': return 'plain'
+    // Apple Terminal OSC 8 bilmiyor; basarsak ekranda ham metin kalir.
+    case 'Apple_Terminal': return 'plain'
     case 'ghostty': return 'hybrid'
   }
 
