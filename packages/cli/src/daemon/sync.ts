@@ -67,6 +67,22 @@ export class ServerSync {
     return ad
   }
 
+  /**
+   * Siradaki reklama BAKAR — kuyruktan almaz.
+   *
+   * Spinner icin. Spinner yalnizca bir gorunurluk katmani: sayim ve odeme
+   * tamamen `statusLine`'dan geliyor (ADR-001). Marka adini yazmak icin
+   * reklami TUKETMEK, gosterilmeyecek bir reklamin nonce'unu yakmak ve
+   * kuyrugu statusline'in altindan cekmek demekti — kuyruk dibe vurdugu
+   * anda gosterilecek reklam kalmiyordu.
+   */
+  peekAd(): AdPayload | null {
+    const now = Date.now()
+    while (this.#ads.length > 0 && this.#ads[0]!.nonceExpiresAt <= now) this.#ads.shift()
+    if (this.#ads.length < 2) void this.#prefetch()
+    return this.#ads[0] ?? null
+  }
+
   start(): void {
     void this.#pollConfig()
     void this.#prefetch()

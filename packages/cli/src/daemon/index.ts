@@ -70,9 +70,17 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
   let adCursor = 0
   /** Siradaki reklami TUKETMEDEN gosterir — spinner on yuklemesi icin. */
   const peekAd = (): AdPayload | null => (ads.length === 0 ? null : ads[adCursor % ads.length]!)
-  /** Spinner on yuklemesi: sunucu modunda siradaki reklami TUKETIR (spinner
-   *  sayilmadigi icin bir reklamin harcanmasi sorun degil), yerelde peek. */
-  const spinnerAd = (): AdPayload | null => (sync ? sync.nextAd() : peekAd())
+  /**
+   * Spinner on yuklemesi — reklami TUKETMEZ, yalnizca bakar.
+   *
+   * Onceden `nextAd()` cagiriyordu ve gerekcesi "spinner sayilmadigi icin
+   * bir reklamin harcanmasi sorun degil" idi. Harcanan reklam bedava
+   * degilmis: spinner ile statusline AYNI kuyruktan besleniyor, yani her
+   * tur sonunda statusline'in gosterecegi bir reklam gosterilmeden
+   * siliniyordu. Doluluk dusukken (frekans kurali + az kampanya, sunucu
+   * 204 donuyor) kuyruk dibe vurdugu anda statusline bos kaliyor.
+   */
+  const spinnerAd = (): AdPayload | null => (sync ? sync.peekAd() : peekAd())
   // Acilista diskteki duraklatma durumunu geri yukle.
   const pausePath = (): string => join(dirname(opts.socketPath ?? SOCKET_PATH), 'paused')
   let paused = existsSync(pausePath())
