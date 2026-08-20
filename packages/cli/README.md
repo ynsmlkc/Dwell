@@ -7,7 +7,7 @@ status line while the model works. When the answer arrives, it is gone. You
 get paid in USDC on Stellar.
 
 ```
-npx dwellsh init
+npm i -g dwellsh && dwell init
 ```
 
 After install, the command is `dwell`.
@@ -30,8 +30,8 @@ impression, no payment.
 ## Install
 
 ```bash
-npx dwellsh init             # install and start
-npx dwellsh init --spinner   # also use the "Thinking…" words at the top
+npm i -g dwellsh && dwell init             # install and start
+dwell init --spinner   # also use the "Thinking…" words at the top
 ```
 
 Then open a new Claude Code session.

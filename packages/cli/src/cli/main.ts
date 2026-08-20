@@ -51,10 +51,43 @@ const statusLineCommand = (): string => `${process.execPath} ${shimPath()}`
 
 /* ─────────────────────────── komutlar ─────────────────────────── */
 
+/**
+ * Paket GECICI bir konumdan mi calisiyor?
+ *
+ * `npx dwellsh init` paketi `~/.npm/_npx/<hash>/` altina indirir. Kurulum
+ * oraya MUTLAK YOL yazar — statusLine, uc hook ve daemon girisi hep o
+ * klasoru gosterir.
+ *
+ * O klasor gecicidir: `npm cache clean`, farkli bir surum cekmek ya da bir
+ * disk temizleyici silebilir. Silindigi gun statusLine olmayan bir dosyayi
+ * cagirmaya baslar. Kullanici hicbir sey degistirmemistir, reklam durur ve
+ * sebebi gorunmez — ay sonra "bir ara calisiyordu" diye geri gelir.
+ *
+ * Bu yuzden kurmayi REDDEDIYORUZ. Bugun calisip yarin sessizce bozulan bir
+ * kurulum, en bastan kurulmamis olmaktan kotudur.
+ */
+function geciciKonum(): string | null {
+  const p = PKG_ROOT
+  if (p.includes('/_npx/') || p.includes('\\_npx\\')) return 'npx onbellegi'
+  if (p.includes('/.npm/_cacache') || p.includes('/tmp/') || p.startsWith('/private/tmp/')) {
+    return 'gecici klasor'
+  }
+  return null
+}
+
 async function cmdInit(argv: string[]): Promise<void> {
   banner()
   const force = argv.includes('--force')
   const withSpinner = argv.includes('--spinner')
+
+  const gecici = geciciKonum()
+  if (gecici && !argv.includes('--allow-temp')) {
+    fail(
+      'DWL-1004',
+      `Dwell ${gecici} icinden calisiyor — buradan kurulmaz`,
+      'Kalici olarak kur:  npm i -g dwellsh && dwell init',
+    )
+  }
 
   // 1. Cakisma var mi? ONCE sor, sonra yaz.
   let settings

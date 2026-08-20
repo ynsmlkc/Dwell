@@ -18,7 +18,7 @@
 
 import { describe, it, expect, beforeAll } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, symlinkSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, symlinkSync, rmSync, mkdirSync, copyFileSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -92,3 +92,69 @@ if (derlenmis) {
   // Vitest surec sonunda temizlesin.
   process.on('exit', () => { try { rmSync(dizin, { recursive: true, force: true }) } catch { /* onemsiz */ } })
 }
+
+/**
+ * Gecici konumdan kurulum REDDEDILMELI.
+ *
+ * `npx dwellsh init` paketi `~/.npm/_npx/<hash>/` altina indirir ve kurulum
+ * settings.json'a O YOLU yazar. Klasor gecicidir; silindigi gun statusLine
+ * olmayan bir dosyayi cagirir, reklam durur ve sebebi gorunmez.
+ *
+ * Bugun calisip yarin sessizce bozulan bir kurulum, hic kurulmamis
+ * olmaktan kotudur — o yuzden basta durduruyoruz.
+ */
+describe.skipIf(!derlenmis)('gecici konumdan kurulum', () => {
+  function initDene(paketKoku: string): { kod: number; cikti: string } {
+    const claude = mkdtempSync(join(tmpdir(), 'dwell-cfg-'))
+    try {
+      const out = execFileSync(process.execPath, [join(paketKoku, 'dist', 'dwell.mjs'), 'init'], {
+        encoding: 'utf8', stdio: 'pipe',
+        env: { ...process.env, CLAUDE_CONFIG_DIR: claude, DWELL_HOME: mkdtempSync(join(tmpdir(), 'dwell-h-')) },
+      })
+      return { kod: 0, cikti: out }
+    } catch (e) {
+      const err = e as { status?: number; stdout?: string; stderr?: string }
+      return { kod: err.status ?? -1, cikti: (err.stdout ?? '') + (err.stderr ?? '') }
+    }
+  }
+
+  it('_npx onbelleginden kurulmaz ve NEDEN oldugunu soyler', () => {
+    // npm'in npx yerlesimini taklit et.
+    const sahte = mkdtempSync(join(tmpdir(), 'dwell-npxsim-'))
+    const kok = join(sahte, '_npx', 'abc123', 'node_modules', 'dwellsh')
+    mkdirSync(join(kok, 'dist'), { recursive: true })
+    copyFileSync(DIST, join(kok, 'dist', 'dwell.mjs'))
+    writeFileSync(join(kok, 'package.json'), JSON.stringify({ name: 'dwellsh', version: '0.0.0' }))
+
+    const r = initDene(kok)
+    expect(r.kod).not.toBe(0)                       // sessizce basarili DONMEZ
+    expect(r.cikti).toContain('npm i -g dwellsh')   // ne yapacagini soyler
+  })
+})
+
+/** Sitedeki komut ile paketin gercekten sagladigi sey ayni olmali. */
+describe('sitedeki kurulum komutu', () => {
+  const oku = (p: string) =>
+    readFileSync(fileURLToPath(new URL(p, import.meta.url)), 'utf8')
+
+  it('site kalici kurulum komutu gosteriyor, npx degil', () => {
+    for (const p of ['../../server/public/index.html', '../../server/public/app/index.html']) {
+      const h = oku(p)
+      expect(h).toContain('npm i -g dwellsh')
+      expect(h).not.toContain('npx dwellsh init')
+    }
+  })
+
+  it('README de ayni komutu veriyor', () => {
+    const r = oku('../README.md')
+    expect(r).toContain('npm i -g dwellsh')
+    expect(r).not.toContain('npx dwellsh init')
+  })
+
+  it('kopyalanan metin ile ekranda yazan ayni', () => {
+    const h = oku('../../server/public/index.html')
+    // Ekranda `&amp;&amp;`, panoda `&&` — ikisi de ayni komut olmali.
+    expect(h).toContain('npm i -g dwellsh &amp;&amp; dwell init')
+    expect(h).toContain("'npm i -g dwellsh && dwell init'")
+  })
+})

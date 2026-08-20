@@ -55,7 +55,7 @@
     </figure>
 
     <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 32px">
-      <button class="btn" id="copy-install"><span style="color: var(--faint)">$</span>npx dwellsh init<span class="tag">copy</span></button>
+      <button class="btn" id="copy-install"><span style="color: var(--faint)">$</span>npm i -g dwellsh &amp;&amp; dwell init<span class="tag">copy</span></button>
       <a class="link-under" href="#how" style="font-size: 14px">How it works ↓</a>
     </div>
   </section>
@@ -72,7 +72,7 @@
         <h3>Install</h3>
         <div>
           <p class="body" style="margin: 0 0 10px">One command. It edits your Claude Code settings and nothing else on the machine.</p>
-          <span class="mono" style="font-size: 13px; color: var(--faint)">npx dwellsh init</span>
+          <span class="mono" style="font-size: 13px; color: var(--faint)">npm i -g dwellsh &amp;&amp; dwell init</span>
         </div>
       </li>
       <li class="step">
@@ -169,7 +169,7 @@
 <script type="module">
   import { copyButton, $ } from '/app.js';
 
-  copyButton($('#copy-install'), () => 'npx dwellsh init');
+  copyButton($('#copy-install'), () => 'npm i -g dwellsh && dwell init');
   copyButton($('#copy-uninstall'), () => 'dwell uninstall');
 
   /* Hero animasyonu — urunun gercek davranisi.
