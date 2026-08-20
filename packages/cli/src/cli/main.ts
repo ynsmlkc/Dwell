@@ -320,7 +320,14 @@ export async function main(argv: readonly string[]): Promise<void> {
     case 'restart': return cmdRestart()
     case 'pause': return cmdPause(true)
     case 'resume': return cmdPause(false)
-    case 'login': return cmdLogin(rest)
+    // Daemon'i yeniden baslatma yetenegi ICERI VERILIYOR: kimlik degisince
+    // daemon'in onu almasi sart, yoksa kazanc eski cuzdana yazilir.
+    // Calismiyorsa `null` — o zaman baslatacak bir sey yok.
+    case 'login': return cmdLogin(rest, async () => {
+      if (!(await daemon.isAlive())) return null
+      await daemon.stop()
+      return daemon.start({ entry: daemonEntry() })
+    })
     case 'logout': return cmdLogout()
     case 'whoami': return cmdWhoami()
     case 'balance': return cmdBalance(rest)

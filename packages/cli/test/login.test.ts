@@ -10,7 +10,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, readFileSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { runLoginServer, parseLoginArgs } from '../src/cli/login.js'
+import { runLoginServer, parseLoginArgs, kimligiTazele } from '../src/cli/login.js'
 import { saveCredentials, loadCredentials, clearCredentials } from '../src/credentials.js'
 
 const dirs: string[] = []
@@ -315,5 +315,62 @@ describe('giris sayfasi', () => {
     const port = new URL(u).port
     const html = await (await fetch(u)).text()
     expect(html).toContain(`127.0.0.1:${port}`)
+  })
+})
+
+/**
+ * Giristen sonra daemon yeni kimligi ALMALI.
+ *
+ * Gercekte yasandi: kullanici cuzdanini degistirip yeniden giris yapti,
+ * "giris yapildi" gordu, reklam donmeye devam etti — ama daemon eski
+ * kimlikle calistigi icin kazanc ESKI cuzdana yaziliyordu. Kimlik dosyadan
+ * yalnizca acilista okunuyor.
+ *
+ * Onceden burada "daemon calisiyorsa `dwell restart` yap" diye bir dipnot
+ * vardi. Dipnot, sessizce yanlis hesaba para yazan bir durumu cozmez.
+ */
+describe('giristen sonra daemon kimligi', () => {
+  const yakala = () => {
+    const satirlar: string[] = []
+    const orijinal = process.stdout.write.bind(process.stdout)
+    process.stdout.write = ((s: string) => { satirlar.push(String(s)); return true }) as typeof process.stdout.write
+    return { satirlar, bitir: () => { process.stdout.write = orijinal } }
+  }
+
+  it('daemon calisiyorsa yeniden baslatilir', async () => {
+    let cagrildi = 0
+    const c = yakala()
+    await kimligiTazele(async () => { cagrildi++; return { pid: 4242 } })
+    c.bitir()
+    expect(cagrildi).toBe(1)
+    expect(c.satirlar.join('')).toContain('4242')
+  })
+
+  it('daemon calismiyorsa hicbir sey soylenmez', async () => {
+    const c = yakala()
+    await kimligiTazele(async () => null)
+    c.bitir()
+    expect(c.satirlar.join('')).toBe('')
+  })
+
+  /**
+   * En onemlisi: basarisizlik SESSIZ GECILEMEZ. Kullanici bu durumda
+   * kazancinin eski cuzdana gittigini bilmeli.
+   */
+  it('yeniden baslatilamazsa UYARIR ve ne yapacagini soyler', async () => {
+    const c = yakala()
+    await kimligiTazele(async () => ({ error: 'port mesgul' }))
+    c.bitir()
+    const cikti = c.satirlar.join('')
+    expect(cikti).toContain('port mesgul')
+    expect(cikti).toContain('dwell restart')
+    expect(cikti).toContain('ESKI')          // sonucunu acikca yazar
+  })
+
+  it('basarisizlikta sessizce basarili gibi davranmaz', async () => {
+    const c = yakala()
+    await kimligiTazele(async () => ({ error: 'x' }))
+    c.bitir()
+    expect(c.satirlar.join('')).not.toContain('yeni kimlikle calisiyor')
   })
 })

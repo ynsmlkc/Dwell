@@ -65,7 +65,18 @@ export function parseLoginArgs(argv: readonly string[]): LoginOptions {
 
 /* ─────────────────────────── login ─────────────────────────── */
 
-export async function cmdLogin(argv: readonly string[]): Promise<void> {
+/**
+ * Giristen sonra daemon'i yeni kimlikle yeniden baslatan islev.
+ *
+ * Disaridan veriliyor cunku daemon'in dosya yolunu `main.ts` cozuyor;
+ * burada cozmeye kalkmak iki yerde ayni mantigi tutmak olurdu.
+ */
+export type DaemonYeniden = () => Promise<{ pid: number } | { error: string } | null>
+
+export async function cmdLogin(
+  argv: readonly string[],
+  daemonYeniden?: DaemonYeniden,
+): Promise<void> {
   const opts = parseLoginArgs(argv)
   const existing = loadCredentials()
   if (existing && !argv.includes('--force')) {
@@ -88,8 +99,42 @@ export async function cmdLogin(argv: readonly string[]): Promise<void> {
   info(dim(`token ${credentialsPath()} icinde (yalnizca sen okuyabilirsin)`))
   out()
   info(`kazanc bu adrese gidecek. ${dim('dwell balance')} ile takip et.`)
-  // Daemon token'i baslangicta okur; calisiyorsa yeniden baslatilmali.
-  info(`daemon calisiyorsa ${dim('dwell restart')} ile yeni kimligi al.`)
+
+  /**
+   * Daemon'i BIZ yeniden baslatiyoruz.
+   *
+   * Kimlik dosyadan yalnizca ACILISTA okunuyor. Onceden burada "daemon
+   * calisiyorsa `dwell restart` yap" diye bir dipnot vardi ve bu YETMIYOR:
+   * kullanici cuzdanini degistirip yeniden giris yapiyor, ekranda "giris
+   * yapildi" goruyor, reklam donmeye devam ediyor — ama kazanc ESKI
+   * cuzdana yaziliyor. Fark etmesinin bir yolu yok.
+   *
+   * Kullaniciya birakilan bir adim degil; sessizce yanlis hesaba para
+   * yazan bir durum. O yuzden otomatik.
+   */
+  if (daemonYeniden) await kimligiTazele(daemonYeniden)
+}
+
+/**
+ * Daemon'i yeni kimlikle yeniden baslatir ve sonucu kullaniciya bildirir.
+ *
+ * Ayri islev cunku `cmdLogin`'in tamami tarayici ve yerel sunucu
+ * gerektiriyor; bu davranisin kendisi ise tek basina test edilebilmeli.
+ */
+export async function kimligiTazele(daemonYeniden: DaemonYeniden): Promise<void> {
+  const r = await daemonYeniden()
+  if (r === null) return                      // daemon zaten calismiyordu
+
+  if ('error' in r) {
+    // Basarisizlik SESSIZ GECILMEZ: kullanici ne yapacagini bilmeli, cunku
+    // bu haliyle kazanci eski cuzdana yazilmaya devam eder.
+    out()
+    warn('daemon yeni kimlikle yeniden baslatilamadi')
+    info(dim(r.error))
+    info(`elle: ${bold('dwell restart')} — bunu yapmadan kazanc ESKI cuzdana yazilir`)
+    return
+  }
+  ok(`daemon yeni kimlikle calisiyor (pid ${r.pid})`)
 }
 
 interface LoginResult {
