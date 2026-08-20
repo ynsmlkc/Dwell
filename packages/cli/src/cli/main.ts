@@ -8,7 +8,7 @@
 
 import { resolve, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { install, uninstall, diagnose, readSettings, detectConflicts, SETTINGS_PATH } from '../settings.js'
 import { DWELL_HOME, SOCKET_PATH } from '../ipc.js'
 import * as daemon from './daemon-control.js'
@@ -308,8 +308,39 @@ export async function main(argv: readonly string[]): Promise<void> {
   }
 }
 
-// Dogrudan calistirildiysa
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop() ?? '')) {
+/**
+ * Bu dosya dogrudan mi calistirildi, yoksa import mu edildi?
+ *
+ * Onceden dosya ADINI karsilastiriyordu:
+ *
+ *     import.meta.url.endsWith(process.argv[1].split('/').pop())
+ *
+ * Ve bu, paketin npm'den kurulan halini TAMAMEN ISLEVSIZ birakiyordu.
+ * `bin` girdisi `dwell` adinda bir sembolik bag uretiyor — uzantisiz. O
+ * zaman karsilastirma `".../dwell.mjs".endsWith("dwell")` oluyor, yani
+ * false; `main()` hic cagrilmiyor. Program cikis kodu 0 ile, TEK BIR
+ * KARAKTER BASMADAN sonlaniyordu.
+ *
+ * Belirtisi yoktu: hata yok, uyari yok, cikis kodu basarili. `npx dwellsh
+ * init` yazan biri hicbir sey olmadigini goruyordu. Gelistirmede hic
+ * gorunmedi cunku orada `node dist/dwell.mjs` ile, yani dosya adiyla
+ * cagriliyor.
+ *
+ * Simdi iki yolun da SEMBOLIK BAGLARI COZULMUS hali karsilastiriliyor.
+ */
+function dogrudanCalistirildi(): boolean {
+  const argv1 = process.argv[1]
+  if (!argv1) return false
+  try {
+    return realpathSync(argv1) === realpathSync(fileURLToPath(import.meta.url))
+  } catch {
+    // Yol okunamiyorsa calistirmiyoruz: yanlis tarafta hata yapmak,
+    // import edilen bir modulun kendini calistirmasi olurdu.
+    return false
+  }
+}
+
+if (dogrudanCalistirildi()) {
   main(process.argv.slice(2)).catch((e: unknown) => {
     // Stack trace ASLA kullaniciya gitmez.
     fail('DWL-9001', 'Beklenmeyen hata', e instanceof Error ? e.message : String(e))
