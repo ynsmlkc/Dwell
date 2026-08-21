@@ -151,10 +151,26 @@ describe('sitedeki kurulum komutu', () => {
     expect(r).not.toContain('npx dwellsh init')
   })
 
+  /**
+   * Ekranda yazan ile panoya kopyalanan AYNI komut olmali.
+   *
+   * Ikisi ayri yerde duruyor: biri HTML govdesinde (`&amp;&amp;` kacisli),
+   * digeri JS dizesinde (`&&` ciplak). Birini guncelleyip otekini unutmak
+   * kolay, ve sonucu sinsi: kullanici ekranda dogru komutu gorur, panoya
+   * eskisi yapisir.
+   */
   it('kopyalanan metin ile ekranda yazan ayni', () => {
     const h = oku('../../server/public/index.html')
-    // Ekranda `&amp;&amp;`, panoda `&&` — ikisi de ayni komut olmali.
-    expect(h).toContain('npm i -g dwellsh &amp;&amp; dwell init')
-    expect(h).toContain("'npm i -g dwellsh && dwell init'")
+    const panoda = /copyButton\(\$\('#copy-install'\), \(\) => '([^']+)'/.exec(h)?.[1]
+    expect(panoda).toBeTruthy()
+    expect(h).toContain(panoda!.replace(/&/g, '&amp;'))
+  })
+
+  /** Spinner katmani ISTENIYORSA komutta bayragi olmali — init onu varsayilan kurmuyor. */
+  it('spinner isteniyorsa komut --spinner tasiyor', () => {
+    const h = oku('../../server/public/index.html')
+    const panoda = /copyButton\(\$\('#copy-install'\), \(\) => '([^']+)'/.exec(h)?.[1] ?? ''
+    expect(panoda).toContain('--spinner')
+    expect(oku('../README.md')).toContain('--spinner')
   })
 })

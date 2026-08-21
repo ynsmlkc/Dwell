@@ -7,7 +7,7 @@ status line while the model works. When the answer arrives, it is gone. You
 get paid in USDC on Stellar.
 
 ```
-npm i -g dwellsh && dwell init
+npm i -g dwellsh && dwell init --spinner
 ```
 
 After install, the command is `dwell`.
@@ -30,7 +30,7 @@ impression, no payment.
 ## Install
 
 ```bash
-npm i -g dwellsh && dwell init             # install and start
+npm i -g dwellsh && dwell init --spinner             # install and start
 dwell init --spinner   # also use the "Thinking…" words at the top
 ```
 

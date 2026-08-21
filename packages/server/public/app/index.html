@@ -90,7 +90,7 @@
     <div id="v-empty" class="hidden" style="border: 1px solid rgba(236,231,225,0.11); border-radius: 5px; padding: clamp(26px, 5vw, 46px)">
       <h2 style="font-size: clamp(22px, 2.6vw, 28px); margin-bottom: 12px">No impressions yet</h2>
       <p class="body" style="margin: 0 0 24px; max-width: 60ch">Install the CLI and start a Claude Code session. The first line can take a few minutes to show up here.</p>
-      <button class="btn" id="copy-install"><span style="color: var(--faint)">$</span>npm i -g dwellsh &amp;&amp; dwell init<span class="tag">copy</span></button>
+      <button class="btn" id="copy-install"><span style="color: var(--faint)">$</span>npm i -g dwellsh &amp;&amp; dwell init --spinner<span class="tag">copy</span></button>
     </div>
 
     <!-- veri -->
@@ -160,7 +160,7 @@ import {
 const views = ['v-connect', 'v-loading', 'v-neterr', 'v-expired', 'v-dash'];
 const view = (id) => views.forEach((v) => show($('#' + v), v === id));
 
-copyButton($('#copy-install'), () => 'npm i -g dwellsh && dwell init');
+copyButton($('#copy-install'), () => 'npm i -g dwellsh && dwell init --spinner');
 copyButton($('#copy-addr'), () => session.address || '');
 
 /* ─────────── giris ─────────── */
