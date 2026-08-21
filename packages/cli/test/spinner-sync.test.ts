@@ -214,3 +214,48 @@ describe('tur basina rotasyon — yalnizca tur bitiminde yazilir', () => {
     rmSync(tmp, { recursive: true, force: true }); rmSync(dir2, { recursive: true, force: true })
   })
 })
+
+/**
+ * Daemon DURDURULUNCA spinner listesi bosalmamali.
+ *
+ * Gercekte yasandi: `stop()` icinde `spinner.clear()` cagriliyordu, yani
+ * her `dwell restart`, her makine kapanisi ve her SIGTERM listeyi
+ * bosaltiyordu. `clear()` kendi aciklamasinda "yalnizca uninstall cagirir"
+ * dedigi halde.
+ *
+ * Zarari dolayli ve o yuzden gorunmezdi: liste bosken acilan bir Claude
+ * Code oturumu varsayilan kelimelere duser ve deger canli okunmadigi icin
+ * O OTURUM BOYUNCA oyle kalir. Bir yeniden baslatma, sonraki oturumun
+ * tamaminda reklami susturuyordu.
+ */
+describe('daemon durunca spinner', () => {
+  it('stop() listeyi BOSALTMAZ', async () => {
+    const { startDaemon } = await import('../src/daemon/index.js')
+    write({
+      statusLine: { type: 'command', command: 'x' },
+      spinnerVerbs: { mode: 'replace', verbs: ['✶ Marka'], [MARKER]: true },
+    })
+    const dizin = mkdtempSync(join(tmpdir(), 'dwell-stop-'))
+
+    const d = await startDaemon({
+      dataDir: dizin,
+      socketPath: join(dizin, 's.sock'),
+      syncSpinner: true,
+      settingsPath: path,
+    })
+    await d.stop()
+
+    expect(read().spinnerVerbs?.verbs).toEqual(['✶ Marka'])   // dokunulmadi
+    rmSync(dizin, { recursive: true, force: true })
+  })
+
+  it('kaldirma yolu alani zaten siliyor — clear() gereksiz', async () => {
+    const { uninstall } = await import('../src/settings.js')
+    write({
+      statusLine: { type: 'command', command: 'x', [MARKER]: true },
+      spinnerVerbs: { mode: 'replace', verbs: ['✶ Marka'], [MARKER]: true },
+    })
+    uninstall(path)
+    expect(read().spinnerVerbs).toBeUndefined()
+  })
+})

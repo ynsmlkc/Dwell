@@ -265,7 +265,22 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
       // Sonra son bir gonderim denenir; basarisiz olursa kuyruk diskte kalir
       // ve bir sonraki acilista gonderilir.
       if (sync) { await sync.flushNow(); sync.stop() }
-      spinner?.clear()
+
+      /**
+       * Spinner listesi BOSALTILMAZ.
+       *
+       * Burada `spinner.clear()` vardi ve her durusta — `dwell restart`,
+       * makine kapanisi, SIGTERM — listeyi bosaltiyordu. Oysa `clear()`
+       * kendi aciklamasinda "yalnizca uninstall cagirir" diyor.
+       *
+       * Zarari `sync()` icinde zaten yaziliydi: liste bosken acilan bir
+       * Claude Code oturumu varsayilan kelimelere duser ve o oturum
+       * BOYUNCA oyle kalir — deger canli okunmuyor. Yani bir yeniden
+       * baslatma, sonraki oturumun tamaminda reklami susturuyordu.
+       *
+       * `dwell uninstall` icin de gerekli degil: `settings.ts` alanin
+       * kendisini siliyor.
+       */
       await server.close()
     },
     phase: () => machine.phase,
