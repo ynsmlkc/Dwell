@@ -217,6 +217,24 @@ async function cmdUninstall(): Promise<void> {
   for (const f of r.removed) ok(`${f} kaldirildi`)
   if (r.backupPath) info(dim(`yedek: ${r.backupPath}`))
 
+  /**
+   * Spinner ACIK OTURUMDA hemen kaybolmaz — bunu SOYLEMEK zorundayiz.
+   *
+   * Claude Code `spinnerVerbs`'u canli okumuyor; acik oturum, dosyadan
+   * silinmis olsa bile son okudugu degerle devam ediyor. statusLine ise
+   * her tikta yeniden calistigi icin aninda gidiyor.
+   *
+   * Sonuc: "spinnerVerbs kaldirildi" yazip kullanicinin ekraninda markayi
+   * birakmak. Kaldirma komutunun isini yapmadigini dusunur, hakli olarak.
+   * Dosyada yapacak bir sey kalmadi; tek dogru davranis ne oldugunu
+   * soylemek.
+   */
+  if (r.removed.includes('spinnerVerbs')) {
+    out()
+    info(`Spinner kelimeleri ${bold('acik oturumda')} degismez —`)
+    info(dim('Claude Code onlari yeniden okumuyor. Yeni oturumda kendi kelimeleri doner.'))
+  }
+
   out()
   info('Senin diger ayarlarina dokunulmadi.')
   info(`Kazancin duruyor — ${bold('dwell init')} ile geri donebilirsin.`)
