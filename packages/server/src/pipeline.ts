@@ -59,6 +59,7 @@ export class Pipeline {
       ids: opts.ids,
       campaigns: opts.campaigns,
       spendableBalance: (advertiserId) => this.spendable(advertiserId),
+      spentToday: (campaignId) => this.spentToday(campaignId),
     })
 
     this.ingest = new ImpressionIngest({
@@ -127,6 +128,33 @@ export class Pipeline {
 
     const left = sub(balance, reserved)
     return left > 0n ? left : ZERO
+  }
+
+  /**
+   * Bir kampanyanin BUGUN harcadigi tutar — PROBLEMS.md #8c.
+   *
+   * `pending` + `verified` toplanir, yalnizca `verified` DEGIL. Sebep
+   * `spendable()`'daki ile ayni: dogrulama `pendingMs` kadar (uretimde
+   * 24 saat) gecikiyor, yalnizca `verified` sayilsaydi bir kampanya gun
+   * icinde tavanin cok ustune cikip bunu ancak ertesi gun, dogrulama
+   * calisinca fark ederdik — tavan o ana kadar hicbir sey yapmamis olurdu.
+   *
+   * Gun sinirini BELIRLEYEN alan `serverTs` (gosterim raporlandigi an),
+   * dogrulamanin NE ZAMAN calistigi degil — dogrulama gecikse bile
+   * gosterim dogru gune yazilmis olarak kalir.
+   */
+  spentToday(campaignId: string): Stroops {
+    const now = this.opts.clock.now()
+    const dayStart = now - (now % 86_400_000)
+    let spent = ZERO
+    for (const i of this.#impressions.values()) {
+      if (i.campaignId === campaignId
+        && (i.state === 'pending' || i.state === 'verified')
+        && i.serverTs >= dayStart && i.serverTs < dayStart + 86_400_000) {
+        spent = add(spent, stroops(i.rateStroops))
+      }
+    }
+    return spent
   }
 
   /** `POST /v1/ads/next` — teslimat kaydedilir ki nonce dogrulanabilsin. */

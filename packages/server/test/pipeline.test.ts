@@ -175,6 +175,35 @@ describe('gunluk tavan boru hattinda', () => {
   })
 })
 
+describe('PROBLEMS.md #8c — kampanya gunluk harcama tavani', () => {
+  it('tavan asilinca o gun icin servis durur, ertesi gun otomatik acilir', () => {
+    ledger.deposit({ advertiserId: ADV, amount: stroops(100_000_000n), topupId: 't1' })
+    // $30 CPM -> gosterim basina 300.000 stroop. Tavan 700.000: 2 gosterim
+    // (600.000) sigar, 3. gosterim (900.000) tavani asar.
+    campaigns[0] = { ...campaigns[0]!, dailyBudgetStroops: stroops(700_000n) }
+
+    expect(impress()).not.toBeNull()
+    expect(impress()).not.toBeNull()
+    expect(pipe.serveAd(PUB), '3. gosterim gunluk tavani asar').toBeNull()
+
+    // Henuz dogrulanmamis (pending) gosterimler de sayiliyor — ADR-021'deki
+    // rezervasyon mantigi ile ayni sebep: 24 saatlik dogrulama gecikmesi
+    // sirasinda tavan hicbir ise yaramamali.
+    expect(pipe.spentToday('c1')).toBe(600_000n)
+
+    clock.advance(86_400_000)                 // ertesi gun
+    expect(pipe.spentToday('c1'), 'yeni gun, sayac sifirlandi').toBe(0n)
+    expect(pipe.serveAd(PUB), 'ertesi gun tekrar servis edilir').not.toBeNull()
+  })
+
+  it('tavan yoksa (varsayilan) davranis hic degismez', () => {
+    ledger.deposit({ advertiserId: ADV, amount: stroops(100_000_000n), topupId: 't1' })
+    expect(impress()).not.toBeNull()
+    expect(impress()).not.toBeNull()
+    expect(impress()).not.toBeNull()
+  })
+})
+
 describe('fiyat dondurma — ADR-011', () => {
   it('kampanya teklifi degisse bile gecmis gosterim eski fiyatla kaydedilir', () => {
     ledger.deposit({ advertiserId: ADV, amount: stroops(100_000_000n), topupId: 't1' })

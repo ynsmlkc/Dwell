@@ -364,6 +364,18 @@ Bir kreatifte ESC bulunması "biraz dağınık girdi" değil, saldırı denemesi
 
 **Gerekçe:** Talep tarafında 3-5 kampanya varken auction motoru yazmak kod borcudur. Arayüz (`AdSelector`) korunur, içi sonradan doldurulur.
 
+---
+
+> ## ⟳ Bu karar revize edildi — 2026-09-01
+>
+> **Yeni karar: `ORDER BY bid DESC` yerine SWRR (pürüzsüz ağırlıklı sıra).** Eski kural "en yüksek teklif her zaman kazanır, bir önceki tekrarı elenir" idi — bu, iki kampanyalı her senaryoyu fiyat farkından bağımsız **%50/%50'ye kilitliyordu** (PROBLEMS.md #8). $50 CPM veren ile $10 CPM veren aynı payı alıyordu; fazla ödemek hiçbir şey satın almıyordu.
+>
+> SWRR nginx'in yük dengelemede kullandığı algoritmadır: her tikte her uygun kampanyanın biriken ağırlığı kendi teklifi kadar artar, en yüksek birikimli seçilir ve toplam ağırlık kadar geri düşürülür. Uzun vadede pay `teklif / toplam_teklif` oranına yakınsar — deterministik, kümelenme yapmaz.
+>
+> **`frequencyCap` (ADR bu bölümde tanımlı değildi, `AdSelector`'da vardı) varsayılanı `1`'den `0`'a çekildi.** `0` = kısıtlama yok, SWRR'nin doğal oranına tam güveniliyor. `N > 0` hâlâ mevcut ve payı `1/(N+1)`'e kilitliyor — artık varsayılan değil, kampanya bazında bilinçli bir tercih ("bu reklam art arda çok sık görünmesin").
+>
+> Auction motoru hâlâ yok — bu, "kim kazanır" sorusunu rastgele/sabit sıradan **orantılı**'ya taşıyan bir değişiklik, gerçek bir ihale mekanizması değil. Arayüz (`AdSelector.select`) değişmedi, PROBLEMS.md #8'deki (b) ve (c) maddeleri (çok kampanyada ortalama fiyatın düşmesi, bütçenin 4 kat hızlı bitmesi) hâlâ açık.
+
 ### ADR-010 — Kimlik: hesap açmanın bir maliyeti olmalı
 
 **Karar:** Publisher hesabı **GitHub OAuth** ile açılır. Her cihaz için ayrı, iptal edilebilir bir **device token** üretilir; `~/.dwell/credentials.json` içinde `0600` izinle saklanır. Tüm API çağrıları bu token ile authenticate olur.

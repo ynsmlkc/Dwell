@@ -341,6 +341,7 @@ describe('reklam secimi — butce tukenmesi', () => {
       clock, ids: cryptoIdGenerator(clock),
       campaigns: () => kampanyalar,
       spendableBalance: (a) => (a === fakir ? stroops(1_600_000n) : stroops(20_000_000n)),
+      spentToday: () => stroops(0n),
     })
 
     const secim = sel.select('GPUB')
@@ -356,6 +357,7 @@ describe('reklam secimi — butce tukenmesi', () => {
       campaigns: () => [{ id: 'x', advertiserId: 'GA', bidCpm: stroops(2_000_000_000n), revShareBps: 5000,
         creative: { brand: 'X', text: 't', cta: 'x.com' }, status: 'active' as const, frequencyCap: 1 }],
       spendableBalance: () => stroops(1n),
+      spentToday: () => stroops(0n),
     })
     expect(sel.select('GPUB')).toBeNull()
   })

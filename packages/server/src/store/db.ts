@@ -154,6 +154,8 @@ function migrate(db: Db): void {
       cta            TEXT NOT NULL,
       status         TEXT NOT NULL,
       frequency_cap  INTEGER NOT NULL,
+      -- NULL = tavan yok. PROBLEMS.md #8c.
+      daily_budget_stroops TEXT,
       created_at     INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS ix_campaigns_advertiser ON campaigns (advertiser_id);
@@ -184,6 +186,19 @@ function migrate(db: Db): void {
     );
     CREATE INDEX IF NOT EXISTS ix_deliveries_expires ON deliveries (expires_at);
   `)
+
+  // Ilk gercek ALTER TABLE — Railway'deki canli DB bu sutun olmadan acildi.
+  // `CREATE TABLE IF NOT EXISTS` yalnizca sifirdan acilan DB'lere isliyor;
+  // var olan tabloya sutun boyle eklenir. SQLite'ta `ADD COLUMN IF NOT
+  // EXISTS` yok, bu yuzden once sema okunuyor.
+  addColumnIfMissing(db, 'campaigns', 'daily_budget_stroops', 'TEXT')
+}
+
+function addColumnIfMissing(db: Db, table: string, column: string, ddl: string): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
+  if (!cols.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl}`)
+  }
 }
 
 /* ─────────────────────────── yardimcilar ─────────────────────────── */

@@ -69,6 +69,7 @@ export class CampaignStore {
         creative: { brand: String(r.brand), text: String(r.text), cta: String(r.cta) },
         status: String(r.status) as CampaignStatus,
         frequencyCap: Number(r.frequency_cap),
+        dailyBudgetStroops: r.daily_budget_stroops == null ? null : (BigInt(r.daily_budget_stroops as string) as Stroops),
       })
     }
   }
@@ -101,7 +102,14 @@ export class CampaignStore {
       // yayina almak, yazim hatasiyla dolu bir reklamin binlerce kisiye
       // gosterilmesi demek — ve gosterim geri alinamaz, parasi odenmistir.
       status: 'paused',
-      frequencyCap: 1,
+      // 0 = kisitlama yok. Secim artik SWRR ile teklife orantili (PROBLEMS.md
+      // #8); sabit 1 iki kampanyayi fiyat farkindan bagimsiz %50/%50'ye
+      // kilitliyordu. Bir reklamverenin ayni satiri arka arkaya cok sik
+      // gormek istememesi durumunda bu alan ileride panelden ayarlanabilir.
+      frequencyCap: 0,
+      // PROBLEMS.md #8c. Panelden ayarlanabilir hale getirilmedi (frequencyCap
+      // ile ayni durumda); su an yalnizca kod/DB seviyesinde bir alan.
+      dailyBudgetStroops: null,
     }
 
     this.#write(campaign)
@@ -126,14 +134,15 @@ export class CampaignStore {
   #write(c: Campaign): void {
     this.db.prepare(`
       INSERT INTO campaigns
-        (id, advertiser_id, bid_cpm, rev_share_bps, brand, text, cta, status, frequency_cap, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (id, advertiser_id, bid_cpm, rev_share_bps, brand, text, cta, status, frequency_cap, daily_budget_stroops, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         bid_cpm = excluded.bid_cpm, brand = excluded.brand, text = excluded.text,
         cta = excluded.cta, status = excluded.status
     `).run(
       c.id, c.advertiserId, c.bidCpm.toString(), c.revShareBps,
       c.creative.brand, c.creative.text, c.creative.cta ?? '', c.status, c.frequencyCap,
+      c.dailyBudgetStroops == null ? null : c.dailyBudgetStroops.toString(),
       this.clock.now(),
     )
   }
