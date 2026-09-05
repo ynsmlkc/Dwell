@@ -1,0 +1,26 @@
+[workspace]
+resolver = "2"
+members = [
+  "contracts/*",
+]
+
+[workspace.dependencies]
+# Testnet protokol 28'de (getVersionInfo ile dogrulandi, 2026-09-05).
+# SDK majoru protokolu takip eder; 28 henuz -rc asamasinda oldugu icin
+# tam surum stringiyle sabitleniyor (bkz. stellar-dev:smart-contracts skill).
+soroban-sdk = "28.0.0-rc.1"
+
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+debug = 0
+strip = "symbols"
+debug-assertions = false
+panic = "abort"
+codegen-units = 1
+lto = true
+
+# For more information about this profile see https://developers.stellar.org/docs/build/smart-contracts/example-contracts/logging#cargotoml-profile
+[profile.release-with-logs]
+inherits = "release"
+debug-assertions = true
