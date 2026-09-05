@@ -325,6 +325,18 @@ Mikro-ödemeyi ekonomik kılan şey batch değil, Stellar'ın operation başına
 
 **İleride:** Submit→settle p95 süresi 60 saniyeyi aşarsa veya bir pencerede 200'den fazla transaction gerekirse channel account havuzuna geçilir. MVP'de tek source account + advisory lock yeterlidir.
 
+---
+
+> ## ⟳ Bu karar revize edildi — 2026-09-05
+>
+> **Yeni karar: periyodik otomatik ödeme job'ı zamanlanmıyor; yayıncı istediği an cekiyor.** `main.ts` artık `schedulePayouts(...)`'u hiç çağırmıyor. Sebep bu ADR'nin kendi tespiti: batch'lemenin ücret avantajı **hiç yoktu** — o zaman sabit bir eşikte (eskiden $1) herkesi otomatik ödemeye zorlamanın da tek faydası operasyonel rahatlıktı, bedeli ise kullanıcıya "param ne zaman gelecek" belirsizliği bırakmaktı.
+>
+> `packages/server/src/payouts/withdraw.ts`'deki `WithdrawService` artık hem reklamveren hem yayıncı için aynı makine (`kind: 'advertiser' | 'publisher'`). Reklamverenin `/v1/advertiser/withdraw`'ı zaten bu deseni kullanıyordu (ADR-021); yayıncı tarafı `/v1/publisher/withdraw` ile aynı deseni aldı — `withdraw:balance` kapsamı, hedef her zaman token sahibinin kendi cüzdanı (ADR-010'un doğal sonucu: çalınmış bir token en kötü ihtimalle erken bir çekimi *tetikler*, parayı başka bir adrese *yönlendiremez*).
+>
+> **`PayoutRunner` silinmedi.** `resumeUnresolved()` hâlâ gerekli: sunucu `payouts_in_flight`'ta askıda bir batch bırakıp düşerse (otomatik eski turdan kalma ya da yeni istege bağlı çekimden), yeniden başlatmada zincire sorup karar veren tek yer burası. Yalnızca periyodik tetikleme (`schedulePayouts`) kaldırıldı; sınıfın kendisi ve testleri (`payout-runner.test.ts`) duruyor — ileride "hesabına hiç bakmayan kullanıcılar için opsiyonel otomatik çekim" olarak geri gelebilir.
+>
+> **Minimum tutar artık `MIN_WITHDRAW` ($0.10, toz koruması) — eski $1 eşiği değil.** `payoutThresholdStroops`/`blockedReason` alanları `/v1/me/balance`'ta geriye dönük uyumluluk için (ADR-016) kaldırılmadı ama artık anlamsızlar; gerçek sinyal yeni `withdrawableStroops` alanı.
+
 ### ADR-007 — Reklam metni düşman girdisidir
 
 **Karar:** Sunucudan gelen reklam metni, terminale basılmadan önce hem sunucuda hem istemcide sanitize edilir.
@@ -450,6 +462,13 @@ toplam      0                            ← ADR-005 invariant'ı
 ```
 
 `rejected` gösterimde hiçbir kayıt yazılmaz — reklamveren faturalanmaz (§9).
+
+> **Ek (2026-09-05) — platform payı biriktiği yerde kalıyordu, çekilemiyordu.** Denetimde bulundu: `platform` hesabına yukarıdaki gibi doğru yazılıyordu ama bu hesabı okuyan/çeken **tek bir satır kod bile yoktu** — ne bir HTTP endpoint'i, ne CLI komutu, ne panel. Kapatıldı:
+>
+> - `Ledger.payoutSubmit`'in `kind` alanı `'platform_revenue'`'yu da kabul ediyor artık (`accounts.ts`'teki `PLATFORM_REVENUE` sahipsiz, tekil hesabına yazıyor — `accountId(kind, owner)` deseni burada uygulanmıyor).
+> - `WithdrawService` (ADR-006 revizyonundaki aynı sınıf) `kind: 'platform_revenue'` ile de çalışıyor — `spendable` PLATFORM_REVENUE bakiyesini okuyacak şekilde enjekte ediliyor, `id` parametresi artık ledger hesabını değil yalnızca **hedef adresi** belirliyor.
+> - `POST /v1/admin/withdraw` + `GET /v1/admin/overview` — cüzdan tabanlı SEP-10 akışına girmiyor (ortada "admin cüzdanı" diye bir kimlik yok), `DWELL_ADMIN_SECRET` paylaşılan sırrıyla korunuyor, tıpkı `DWELL_HOT_SECRET` gibi.
+> - `packages/server/public/admin/` — platform operatörünün ilk kez göreceği panel: platform payı + çekme kutusu, tüm ağdaki kampanyalar (yalnızca kendi kampanyasını gören reklamveren panelinin aksine), doğrulanmış/bekleyen/reddedilen gösterim özeti.
 
 ### ADR-012 — Makine başına aynı anda tek aktif gösterim
 
@@ -628,6 +647,24 @@ toplam           0          ← ADR-005 invariant'ı
 **Omurgada:** Kampanya tek ve sabit yazılıdır, dolayısıyla yatırma akışı da elle yapılır — ama **ledger kaydı yine de yazılır.** Bu iki satırlık iş, yukarıdaki deliği baştan kapatır.
 
 **İleride:** Reklamverenin yatırmayı programatik yapması (x402 / MPP Charge üzerinden agent-native top-up) değerlendirilebilir. Stellar tarafında bu bugün kullanılabilir durumda, ama tek noktalı bir facilitator bağımlılığı getiriyor ve paket ekosistemi genç. Omurga kapsamı dışındadır.
+
+### ADR-025 — Reklamveren emanet kasası (Soroban vault)
+
+**Karar:** ADR-021'deki "reklamveren cüzdanından yatırır" akışının hedefi artık platformun sıcak cüzdanı değil, `contracts/vault/` altındaki bir Soroban kontratı olabilir. Kontrat reklamveren bazında bir bakiye tutuyor (`Balance(Address)`, `persistent()` depoda) — herkes `balance(advertiser)` ile zincirde sorgulayabiliyor, Dwell'in veritabanına güvenmeden.
+
+**Gerekçe — §15.4/§15.10'un düzeltmesi:** ADR-021 parayı ledger'a doğru şekilde yazıyordu ama paranın **kendisi** hâlâ tek bir opak sıcak cüzdanda (`DWELL_HOT_SECRET`) toplu duruyordu — "zincirdeki USDC ≥ borcum" hiçbir yerde hesaplanmıyordu (§15.10). Vault bunu tersine çeviriyor: kontratın kendi token bakiyesi ile tüm `Balance` kayıtlarının toplamı arasındaki eşitlik zincirde doğrudan sorgulanabilir bir invariant (kontratın kendi test dosyasında `solvency_invariant_karisik_islemler_sonrasi_da_saglam` testiyle korunuyor — ADR-005'teki ledger invariant felsefesinin zincir karşılığı).
+
+**Fonksiyonlar:** `deposit(advertiser, amount)` (reklamverenin kendi imzası), `release(advertiser, publisher, amount)` (yalnızca admin — doğrulanmış gösterim batch'i sonrası), `withdraw(advertiser, amount)` (reklamverenin kendi imzası, **platformun onayına gerek yok**), `balance(advertiser)` (herkes, view).
+
+**Platform payı artık zincirde, otomatik ve anlık — ayrı bir "biriken payı çek" akışına gerek kalmadı.** `release` içeride `publisher_bps` (constructor'da sabitlenmiş, sonradan değiştirilemez) ile ADR-011'deki formülün BİREBİR aynısını uyguluyor (`publisher = amount × bps / 10000`, yuvarlama artığı platformda) ve **iki ayrı transfer** yapıyor: yayıncıya payı, platforma kalanı, tek çağrıda. Bunun sebebi §1'de sorulan gerçek bir soru: hot-wallet sisteminde `PLATFORM_REVENUE` hesabı her gösterimde büyüyordu ama onu okuyan/çeken **tek bir satır kod bile yoktu** — platformun kendi payı, denetlenene kadar, sessizce hot wallet'ın içinde kaybolmuş durumdaydı. Vault'ta bu yapısal olarak imkânsız: platform payı release anında platformun kendi cüzdanına düşüyor.
+
+**Neyin değişmediği — önemli:** `release`'i çağıran `admin` hâlâ sunucuda duran sıcak bir anahtar. Bu kontrat imza-custody riskini sıfırlamıyor; hesap sorulabilirliği (kimin ne kadar hakkı olduğu zincirde doğrulanabilir) kazandırıyor. Çalınan bir `admin` anahtarı hâlâ `release`'i kötüye kullanabilir — fark, artık bunun izinin zincirde, herkesin görebileceği bir `Released` event'i olarak kalması.
+
+**Reklamverenin kendi çekimi artık sunucudan bağımsız:** ADR-021'in akışında reklamveren `/v1/advertiser/withdraw`'a bağımlı — sunucu kapalıysa parasına erişemiyor. Vault'ta `withdraw` doğrudan kontrata yapılan bir çağrı; sunucu o an ayakta olmasa bile çalışır.
+
+**Durum (2026-09-05):** Kontrat yazıldı, 12 unit test (deposit, release'in bölünmesi, yuvarlama artığı, %100 bps sınır durumu, geçersiz bps'in constructor'da reddi, solvency invariant, withdraw) geçiyor, testnet'e deploy edildi ve gerçek bir `deposit → release` akışında %50/%50 otomatik bölünme zincirde kanıtlandı (bkz. `contracts/vault/README.md`). TS tarafı entegrasyonu (**`packages/payments`'a `VaultRail`**, `main.ts`'e config flag'li kablolama, yeni reklamveren yatırmalarının vault'a yönlendirilmesi) henüz yapılmadı — kontrat şu an mevcut hot-wallet akışının **yanında**, bağımsız duruyor. Publisher tarafındaki (ADR-006 revizyonundaki istege bağlı çekim) klasik `Payment` üzerinde kalmaya devam ediyor; Soroban'a taşınması gerekmiyor.
+
+**Reddedilen alternatif — mevcut akışı doğrudan söküp yerine koymak:** 2 haftalık bir hackathon penceresinde test edilmiş, gerçek testnet parası taşıyan bir sistemi söküp yerine yeni yazılmış bir entegrasyon koymak, bir şey ters giderse elde çalışmayan bir ödeme sistemi bırakma riski taşıyordu. Testnet'te gerçek para riski olmadığı için (bkz. `PROBLEMS.md` başlığı) vault'un yeni yatırmalar için varsayılan yol olması hedefleniyor, ama eski kod silinmeden — bir şey ters giderse tek satırlık bir flag'le geri dönülebilir olacak.
 
 ### ADR-015 — Anahtar yönetimi ve sıcak cüzdan sınırı
 
@@ -995,6 +1032,8 @@ dwell/
 │   │   └── src/{routes,auth,fraud,ledger,jobs}/
 │   └── payments/                Stellar modülü (interface arkasında)
 │       └── src/{rail,batch,reconcile,signature}.ts
+├── contracts/                    Rust/Soroban — ayrı toolchain, pnpm disinda
+│   └── vault/                    reklamveren emanet kasasi (ADR-025)
 └── docs/adr/                    ADR'ler büyürse buraya taşınır
 ```
 
