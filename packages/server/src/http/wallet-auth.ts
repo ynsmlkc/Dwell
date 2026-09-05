@@ -58,7 +58,7 @@ export interface WalletAuthDeps {
 export type Role = 'publisher' | 'advertiser'
 
 export const SCOPES_BY_ROLE: Record<Role, readonly TokenScope[]> = {
-  publisher: ['report:impressions', 'read:balance'],
+  publisher: ['report:impressions', 'read:balance', 'withdraw:balance'],
   advertiser: ['manage:campaigns', 'read:spend'],
 }
 

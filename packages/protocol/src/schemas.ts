@@ -163,6 +163,13 @@ export const FALLBACK_CONFIG: RemoteConfig = {
 export const tokenScopeSchema = z.enum([
   'report:impressions',
   'read:balance',
+  /**
+   * Istege bagli cekim tetikler. Daemon token'ina (uzun omurlu, diskte
+   * `~/.dwell/credentials.json`) verilmesi guvenli: hedef HER ZAMAN token
+   * sahibinin kendi cuzdanidir (ADR-010) — calinmis bir token en kotu
+   * ihtimalle erken bir cekimi TETIKLER, parayi baskasina YONLENDIREMEZ.
+   */
+  'withdraw:balance',
   'wallet:write',
   'devices:manage',
   // Reklamveren tarafi. Yayinci token'i bunlari ASLA tasimaz: calinmis bir
@@ -172,7 +179,7 @@ export const tokenScopeSchema = z.enum([
 ])
 export type TokenScope = z.infer<typeof tokenScopeSchema>
 
-export const DAEMON_SCOPES: readonly TokenScope[] = ['report:impressions', 'read:balance']
+export const DAEMON_SCOPES: readonly TokenScope[] = ['report:impressions', 'read:balance', 'withdraw:balance']
 export const ADVERTISER_SCOPES: readonly TokenScope[] = ['manage:campaigns', 'read:spend']
 
 export const deviceTokenSchema = z.object({

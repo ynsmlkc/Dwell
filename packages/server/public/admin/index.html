@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — Dwell</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28' fill='%23f97335'>✶</text></svg>">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header class="top">
+  <a class="brand" href="/"><span class="star">✶</span>dwell</a>
+  <nav class="nav">
+    <a href="/">for developers</a>
+    <a href="/advertisers">advertisers</a>
+    <span class="chip hidden" id="who"><span class="dot"></span>admin</span>
+    <button class="btn btn-sm btn-quiet hidden" id="signout">sign out</button>
+  </nav>
+</header>
+
+<main class="wrap" style="padding-top: clamp(32px, 5vw, 60px); padding-bottom: 96px">
+
+  <!-- ═══ sir girisi ═══ -->
+  <div id="v-connect" class="card hidden" style="max-width: 460px; margin: clamp(20px, 8vw, 90px) auto 0">
+    <h1 style="font-size: clamp(24px, 3vw, 32px); margin-bottom: 12px">Admin</h1>
+    <p class="body" style="margin: 0 0 26px">Not wallet-based — this is a shared secret only the platform operator has, same pattern as <code>DWELL_HOT_SECRET</code>.</p>
+
+    <label class="field" style="margin-bottom: 18px">Admin secret<input type="password" id="secret-input" placeholder="•••••••••••••••••••••" autocomplete="off"></label>
+    <button class="btn btn-primary" id="connect" style="width: 100%">Enter</button>
+
+    <div class="note note-warn hidden" id="connect-error" style="margin-top: 18px">
+      <p style="margin: 0" id="connect-error-text"></p>
+    </div>
+  </div>
+
+  <!-- ═══ yukleniyor ═══ -->
+  <div id="v-loading" class="hidden" style="display: grid; gap: 18px; max-width: 640px">
+    <div style="height: 64px; border-radius: 4px; background: rgba(236,231,225,0.045)"></div>
+    <div style="height: 40px; border-radius: 4px; background: rgba(236,231,225,0.045)"></div>
+    <p class="small" style="margin: 0">Loading overview…</p>
+  </div>
+
+  <!-- ═══ ag hatasi / kapali ═══ -->
+  <div id="v-neterr" class="note note-warn hidden" style="max-width: 520px; padding: 22px 24px">
+    <h2 style="font-size: 22px; margin-bottom: 10px; font-family: var(--serif)">Cannot reach the admin API</h2>
+    <p style="margin: 0 0 18px; color: var(--muted)" id="neterr-text">Either the server is unreachable, the secret is wrong, or <code>DWELL_ADMIN_SECRET</code> is not set on this deployment.</p>
+    <button class="btn btn-sm btn-quiet" id="retry-load">Retry</button>
+    <button class="btn btn-sm btn-quiet" id="back-to-connect">Re-enter secret</button>
+  </div>
+
+  <!-- ═══ pano ═══ -->
+  <div id="v-dash" class="hidden">
+    <h1 style="margin-bottom: 6px">Platform overview</h1>
+    <p class="small" style="margin: 0 0 clamp(26px, 4vw, 40px)">Everything the operator side of Dwell has never had a screen for.</p>
+
+    <div style="display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: clamp(18px, 3vw, 44px); align-items: start" class="dash-grid">
+      <div>
+        <p class="figure-label">Platform revenue</p>
+        <p class="figure" id="revenue">$0</p>
+        <p class="small" style="margin: 10px 0 0">Your 50% cut, credited on every verified impression. Nothing collected it until this page existed.</p>
+
+        <div style="margin-top: 22px">
+          <button class="btn btn-quiet hidden" id="withdraw">Withdraw</button>
+          <p class="small hidden" id="nothing-to-withdraw" style="margin: 8px 0 0">Nothing to withdraw yet.</p>
+        </div>
+
+        <div class="card hidden" id="withdraw-box" style="margin-top: 18px">
+          <h3 style="margin-bottom: 6px">Withdraw platform revenue</h3>
+          <p class="small" style="margin: 0 0 18px; max-width: 50ch">There is no stored destination for platform revenue — paste your own wallet address each time. That friction is deliberate: it is the one payout with no per-account identity to default to.</p>
+          <div style="display: grid; gap: 14px; max-width: 420px">
+            <label class="field">Destination address<input type="text" id="w-dest" placeholder="G..."></label>
+            <div style="display: flex; flex-wrap: wrap; align-items: end; gap: 14px">
+              <label class="field" style="max-width: 200px">Amount in USD<input type="text" id="w-amount" placeholder="0.00"></label>
+              <button class="btn btn-sm btn-quiet" id="w-max">Max</button>
+              <button class="btn btn-primary" id="w-send">
+                <span class="spinner hidden" id="w-spin"></span><span>Withdraw</span>
+              </button>
+              <button class="btn btn-sm btn-quiet" id="w-cancel">Cancel</button>
+            </div>
+          </div>
+          <p class="small" style="margin: 12px 0 0" id="w-avail"></p>
+          <p class="err hidden" id="w-error"></p>
+          <div class="note hidden" id="w-done" style="margin-top: 14px; border-left-color: var(--accent)"></div>
+        </div>
+      </div>
+
+      <div class="grid-1px" id="rows"></div>
+    </div>
+
+    <section style="margin-top: clamp(38px, 6vw, 64px); padding-bottom: 0">
+      <h2 style="font-size: clamp(20px, 2.3vw, 26px); margin-bottom: 6px">Campaigns</h2>
+      <p class="small" style="margin: 0 0 16px">Every campaign on the network, not just one advertiser's.</p>
+      <p class="small hidden" id="no-campaigns" style="margin: 0">None yet.</p>
+      <div class="table-wrap hidden" id="campaigns-wrap">
+        <table>
+          <thead><tr>
+            <th>Advertiser</th><th>Line</th><th style="text-align:right">Bid CPM</th>
+            <th>Status</th><th>Freq. cap</th><th>Daily budget</th>
+          </tr></thead>
+          <tbody id="campaigns"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>✶ dwell — testnet</span>
+    <div style="display: flex; gap: 24px">
+      <a href="https://github.com/ynsmlkc/Dwell" target="_blank" rel="noopener">GitHub</a>
+      <a href="/privacy">Privacy</a>
+    </div>
+  </div>
+</footer>
+
+<style>
+  @media (max-width: 780px) { .dash-grid { grid-template-columns: 1fr !important; } }
+</style>
+
+<script type="module">
+import { $, show, usd, short, api, ApiError, session, toStroops } from '/app.js';
+
+const views = ['v-connect', 'v-loading', 'v-neterr', 'v-dash'];
+const view = (id) => views.forEach((v) => show($('#' + v), v === id));
+
+/* ─────────── giris ─────────── */
+// Admin cuzdan tabanli degil (bkz. AppDeps.adminSecret dokumani) — bu
+// yuzden `session` mekanizmasi cuzdan yerine sadece paylasilan sirri
+// tasiyor. `role: 'admin'` baska hicbir yerde kontrol edilmiyor, yalnizca
+// bu sayfanin kendi state'i icin.
+function doConnect() {
+  show($('#connect-error'), false);
+  const secret = $('#secret-input').value.trim();
+  if (!secret) {
+    $('#connect-error-text').textContent = 'Enter the secret.';
+    show($('#connect-error'), true);
+    return;
+  }
+  session.save(secret, 'admin', 'admin');
+  load();
+}
+$('#connect').onclick = doConnect;
+$('#secret-input').onkeydown = (e) => { if (e.key === 'Enter') doConnect(); };
+$('#back-to-connect').onclick = () => { session.clear(); view('v-connect'); };
+$('#signout').onclick = () => { session.clear(); location.reload(); };
+
+/* ─────────── veri ─────────── */
+
+let me = { withdrawableStroops: '0' };
+
+async function load() {
+  if (!session.token || session.role !== 'admin') { view('v-connect'); return; }
+  show($('#who'), true);
+  show($('#signout'), true);
+  view('v-loading');
+
+  let data;
+  try {
+    data = await api('/v1/admin/overview');
+  } catch (e) {
+    if (e instanceof ApiError && (e.status === 401 || e.status === 404)) {
+      $('#neterr-text').textContent = e.status === 401
+        ? 'Wrong secret.'
+        : 'DWELL_ADMIN_SECRET is not configured on this deployment.';
+    }
+    view('v-neterr');
+    return;
+  }
+  render(data);
+  view('v-dash');
+}
+$('#retry-load').onclick = load;
+
+function render(d) {
+  me = d;
+  $('#revenue').textContent = usd(d.platformRevenueStroops);
+
+  const canWithdraw = BigInt(d.withdrawableStroops || '0') > 0n;
+  show($('#withdraw'), canWithdraw);
+  show($('#nothing-to-withdraw'), !canWithdraw);
+  if (!canWithdraw) show($('#withdraw-box'), false);
+
+  const rows = [
+    ['Verified impressions', String(d.impressions.verified), 'billed and paid out'],
+    ['Pending', String(d.impressions.pending), 'reported, not yet verified'],
+    ['Rejected', String(d.impressions.rejected), 'failed fraud checks — never billed'],
+  ];
+  $('#rows').innerHTML = rows.map(([k, v, note]) => `
+    <div style="padding: 15px 18px; display: flex; align-items: baseline; justify-content: space-between; gap: 16px">
+      <div><p class="mono" style="margin:0; font-size:13px; color:var(--ink-soft)">${k}</p>
+      <p class="mono" style="margin:3px 0 0; font-size:11.5px; line-height:1.5; color:var(--faint)">${note}</p></div>
+      <span class="mono" style="font-size:15px; white-space:nowrap">${v}</span>
+    </div>`).join('');
+
+  const cs = d.campaigns || [];
+  show($('#no-campaigns'), cs.length === 0);
+  show($('#campaigns-wrap'), cs.length > 0);
+  if (cs.length > 0) {
+    $('#campaigns').innerHTML = cs.map((c) => `
+      <tr>
+        <td class="mono">${short(c.advertiserId)}</td>
+        <td>${c.preview}</td>
+        <td class="num">${usd((BigInt(c.bidCpmStroops) / 1000n).toString())}</td>
+        <td>${c.status}</td>
+        <td>${c.frequencyCap === 0 ? 'none' : c.frequencyCap}</td>
+        <td>${c.dailyBudgetStroops ? usd(c.dailyBudgetStroops) : '—'}</td>
+      </tr>`).join('');
+  }
+}
+
+/* ─────────── para cekme ─────────── */
+
+const wBox = $('#withdraw-box');
+$('#withdraw').onclick = () => {
+  show(wBox, true);
+  $('#w-avail').textContent = `${usd(me.withdrawableStroops)} available to withdraw.`;
+  show($('#w-error'), false); show($('#w-done'), false);
+  wBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
+$('#w-cancel').onclick = () => show(wBox, false);
+$('#w-max').onclick = () => { $('#w-amount').value = usd(me.withdrawableStroops).replace('$', ''); };
+
+$('#w-send').onclick = async () => {
+  show($('#w-error'), false);
+  const dest = $('#w-dest').value.trim();
+  const amount = toStroops($('#w-amount').value);
+  if (!dest) {
+    $('#w-error').textContent = 'Enter a destination wallet address.';
+    show($('#w-error'), true); return;
+  }
+  if (amount === null || amount <= 0n) {
+    $('#w-error').textContent = 'Enter an amount, e.g. 12.50';
+    show($('#w-error'), true); return;
+  }
+  if (amount > BigInt(me.withdrawableStroops)) {
+    $('#w-error').textContent = `Only ${usd(me.withdrawableStroops)} can be withdrawn right now.`;
+    show($('#w-error'), true); return;
+  }
+
+  show($('#w-spin'), true);
+  $('#w-send').disabled = true;
+  try {
+    const r = await api('/v1/admin/withdraw', {
+      method: 'POST', body: { amountStroops: amount.toString(), destination: dest },
+    });
+    $('#w-done').innerHTML = `Sent ${usd(r.amountStroops)}. `
+      + `<a href="https://stellar.expert/explorer/testnet/tx/${r.txHash}" target="_blank" rel="noopener" style="color: var(--accent)">View on the chain ↗</a>`;
+    show($('#w-done'), true);
+    $('#w-amount').value = '';
+    await load();
+    show(wBox, true);
+  } catch (e) {
+    $('#w-error').textContent = e.message;
+    show($('#w-error'), true);
+  } finally {
+    show($('#w-spin'), false);
+    $('#w-send').disabled = false;
+  }
+};
+
+load();
+</script>
+</body>
+</html>

@@ -8,12 +8,15 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { fixedClock, stroops, FALLBACK_CONFIG, PROTOCOL_HEADER } from '@dwell/protocol'
 import type { RemoteConfig, ImpressionEvent } from '@dwell/protocol'
+import type { PaymentRail, PayoutBatch, SubmissionReceipt } from '@dwell/payments'
 import { createApp } from '../src/http/app.js'
 import { TokenStore, hashToken } from '../src/http/auth.js'
 import { Pipeline } from '../src/pipeline.js'
 import { Ledger } from '../src/ledger/ledger.js'
 import { MemoryLedgerStore } from '../src/ledger/memory-store.js'
-import { accountId } from '../src/ledger/accounts.js'
+import { accountId, PLATFORM_REVENUE } from '../src/ledger/accounts.js'
+import { WithdrawService } from '../src/payouts/withdraw.js'
+import { MemoryPayoutStore } from '../src/payouts/store.js'
 import type { Campaign } from '../src/ads/selector.js'
 
 const PUB = 'pub-1'
@@ -27,6 +30,7 @@ let app: ReturnType<typeof createApp>
 let pipeline: Pipeline
 let ledger: Ledger
 let config: RemoteConfig
+let tokens: TokenStore
 let seq = 0
 
 beforeEach(() => {
@@ -49,9 +53,9 @@ beforeEach(() => {
     pendingMs: 24 * 3600_000, dailyCap: 400,
   })
 
-  const tokens = new TokenStore()
+  tokens = new TokenStore()
   tokens.add({ id: 'tok-daemon', publisherId: PUB, tokenHash: hashToken(DAEMON_TOKEN),
-    scopes: ['report:impressions', 'read:balance'], clientVersion: null, revokedAt: null, lastSeenAt: null })
+    scopes: ['report:impressions', 'read:balance', 'withdraw:balance'], clientVersion: null, revokedAt: null, lastSeenAt: null })
   tokens.add({ id: 'tok-wallet', publisherId: PUB, tokenHash: hashToken(WALLET_TOKEN),
     scopes: ['wallet:write', 'read:balance'], clientVersion: null, revokedAt: null, lastSeenAt: null })
   tokens.add({ id: 'tok-revoked', publisherId: PUB, tokenHash: hashToken(REVOKED_TOKEN),
@@ -265,6 +269,240 @@ describe('GET /v1/me/balance', () => {
     const b = await asJson(await app.request('/v1/me/balance', { headers: auth() }))
     expect(b.payableStroops).toBe('20000000')
     expect(b.blockedReason).toBeNull()
+  })
+})
+
+describe('POST /v1/publisher/withdraw', () => {
+  /** Zinciri taklit eder — mutlu yol sabit, ariza modlari withdraw.test.ts'te. */
+  class FakeRail implements PaymentRail {
+    gonderilen: PayoutBatch[] = []
+    #n = 0
+    now() { return clock.now() }
+    async validateDestinations(addrs: readonly string[]) {
+      return addrs.map((address) => ({
+        address, exists: true, trustlineOk: true, authorized: true,
+        memoRequired: false, trustlineLimit: 10n ** 15n, trustlineBalance: 0n,
+      }))
+    }
+    async sourceStatus() {
+      return { address: 'GHOT', usdcBalance: stroops(10n ** 12n), availableXlm: 10n ** 9n, sequence: '1' }
+    }
+    async prepare(batch: PayoutBatch): Promise<SubmissionReceipt> {
+      this.gonderilen.push(batch)
+      return {
+        batchId: batch.batchId, txHash: `h${++this.#n}`.padEnd(64, '0'),
+        envelopeXdr: `xdr-${batch.batchId}`, sourceSeq: String(this.#n),
+        maxTime: clock.now() + 180_000, feeBid: 100n,
+        opIndex: batch.items.map((it, index) => ({ publisherId: it.publisherId, index })),
+      }
+    }
+    async send() {}
+    async reconcile(r: SubmissionReceipt) {
+      return { state: 'settled' as const, txHash: r.txHash, ledger: 1, feeCharged: 100n, opResults: [] }
+    }
+  }
+
+  function appWithWithdraw() {
+    const rail = new FakeRail()
+    const publisherWithdraw = new WithdrawService({
+      clock, ledger, rail, store: new MemoryPayoutStore(),
+      kind: 'publisher',
+      spendable: (p) => ledger.balance(accountId('publisher', p)),
+      newBatchId: () => `w-${seq++}`,
+      log: () => {},
+    })
+    const withApp = createApp({
+      clock, ids: { impressionId: () => `id-${seq++}`, randomHex: (n) => String(seq++).padStart(n * 2, 'a') },
+      pipeline, ledger, tokens,
+      config: () => config, ipSalt: 'test-salt',
+      payoutThreshold: stroops(10_000_000n),
+      publisherWithdraw,
+    })
+    return { withApp, rail, publisherWithdraw }
+  }
+
+  it('withdraw:balance kapsami olmayan token reddedilir', async () => {
+    ledger.postImpression({
+      impressionId: 'i1', advertiserId: ADV, publisherId: PUB, campaignId: 'c1',
+      rate: stroops(20_000_000n), revShareBps: 5000,
+    })
+    const { withApp } = appWithWithdraw()
+    // WALLET_TOKEN: 'wallet:write' + 'read:balance' tasir, 'withdraw:balance' YOK.
+    const r = await withApp.request('/v1/publisher/withdraw', {
+      method: 'POST', headers: auth(WALLET_TOKEN),
+      body: JSON.stringify({ amountStroops: '1000000' }),
+    })
+    expect(r.status).toBe(403)
+    expect(ledger.balance(accountId('publisher', PUB))).toBe(10_000_000n)   // hicbir sey hareket etmedi
+  })
+
+  it('verified kazanc istege bagli cekilir, iki panelin cevabi da tutarli', async () => {
+    ledger.postImpression({
+      impressionId: 'i1', advertiserId: ADV, publisherId: PUB, campaignId: 'c1',
+      rate: stroops(20_000_000n), revShareBps: 5000,
+    })
+    const { withApp } = appWithWithdraw()
+
+    const before = await asJson(await withApp.request('/v1/me/balance', { headers: auth() }))
+    expect(before.withdrawableStroops).toBe('10000000')
+
+    const r = await withApp.request('/v1/publisher/withdraw', {
+      method: 'POST', headers: auth(),
+      body: JSON.stringify({ amountStroops: '10000000' }),
+    })
+    expect(r.status).toBe(200)
+    const body = await asJson(r)
+    expect(body.amountStroops).toBe('10000000')
+    expect(ledger.balance(accountId('publisher', PUB))).toBe(0n)
+  })
+
+  it('bakiyenin ustunde istenirse 400 doner, para hareket etmez', async () => {
+    ledger.postImpression({
+      impressionId: 'i1', advertiserId: ADV, publisherId: PUB, campaignId: 'c1',
+      rate: stroops(20_000_000n), revShareBps: 5000,
+    })
+    const { withApp } = appWithWithdraw()
+    const r = await withApp.request('/v1/publisher/withdraw', {
+      method: 'POST', headers: auth(),
+      body: JSON.stringify({ amountStroops: '999999999' }),
+    })
+    expect(r.status).toBe(400)
+    expect(ledger.balance(accountId('publisher', PUB))).toBe(10_000_000n)
+  })
+
+  it('publisherWithdraw baglanmamissa 404 doner', async () => {
+    const r = await app.request('/v1/publisher/withdraw', {
+      method: 'POST', headers: auth(),
+      body: JSON.stringify({ amountStroops: '1000000' }),
+    })
+    expect(r.status).toBe(404)
+  })
+})
+
+describe('/v1/admin/*', () => {
+  const ADMIN_SECRET = 'test-admin-secret-0123456789'
+  const PLATFORM_ADDR = 'GP' + 'P'.repeat(53) + 'RVNU'
+
+  class FakeRail implements PaymentRail {
+    gonderilen: PayoutBatch[] = []
+    #n = 0
+    now() { return clock.now() }
+    async validateDestinations(addrs: readonly string[]) {
+      return addrs.map((address) => ({
+        address, exists: true, trustlineOk: true, authorized: true,
+        memoRequired: false, trustlineLimit: 10n ** 15n, trustlineBalance: 0n,
+      }))
+    }
+    async sourceStatus() {
+      return { address: 'GHOT', usdcBalance: stroops(10n ** 12n), availableXlm: 10n ** 9n, sequence: '1' }
+    }
+    async prepare(batch: PayoutBatch): Promise<SubmissionReceipt> {
+      this.gonderilen.push(batch)
+      return {
+        batchId: batch.batchId, txHash: `h${++this.#n}`.padEnd(64, '0'),
+        envelopeXdr: `xdr-${batch.batchId}`, sourceSeq: String(this.#n),
+        maxTime: clock.now() + 180_000, feeBid: 100n,
+        opIndex: batch.items.map((it, index) => ({ publisherId: it.publisherId, index })),
+      }
+    }
+    async send() {}
+    async reconcile(r: SubmissionReceipt) {
+      return { state: 'settled' as const, txHash: r.txHash, ledger: 1, feeCharged: 100n, opResults: [] }
+    }
+  }
+
+  function appWithAdmin() {
+    const platformWithdraw = new WithdrawService({
+      clock, ledger, rail: new FakeRail(), store: new MemoryPayoutStore(),
+      kind: 'platform_revenue',
+      spendable: () => ledger.balance(PLATFORM_REVENUE),
+      newBatchId: () => `w-${seq++}`,
+      log: () => {},
+    })
+    const withApp = createApp({
+      clock, ids: { impressionId: () => `id-${seq++}`, randomHex: (n) => String(seq++).padStart(n * 2, 'a') },
+      pipeline, ledger, tokens,
+      config: () => config, ipSalt: 'test-salt',
+      payoutThreshold: stroops(10_000_000n),
+      platformWithdraw, adminSecret: ADMIN_SECRET,
+    })
+    return { withApp, platformWithdraw }
+  }
+
+  it('sir olmadan reddedilir', async () => {
+    const { withApp } = appWithAdmin()
+    const r = await withApp.request('/v1/admin/overview')
+    expect(r.status).toBe(401)
+  })
+
+  it('yanlis sirla reddedilir', async () => {
+    const { withApp } = appWithAdmin()
+    const r = await withApp.request('/v1/admin/overview', {
+      headers: { authorization: 'Bearer yanlis-sir' },
+    })
+    expect(r.status).toBe(401)
+  })
+
+  it('dogru sirla platform payi gorunur — denetimde bulunan eksik burada kapaniyor', async () => {
+    ledger.postImpression({
+      impressionId: 'i1', advertiserId: ADV, publisherId: PUB, campaignId: 'c1',
+      rate: stroops(20_000_000n), revShareBps: 5000,
+    })
+    const { withApp } = appWithAdmin()
+    const r = await withApp.request('/v1/admin/overview', {
+      headers: { authorization: `Bearer ${ADMIN_SECRET}` },
+    })
+    expect(r.status).toBe(200)
+    const body = await asJson(r)
+    expect(body.platformRevenueStroops).toBe('10000000')
+    expect(body.withdrawableStroops).toBe('10000000')
+  })
+
+  it('gosterim ozeti gercek pipeline durumunu yansitir', async () => {
+    const { withApp } = appWithAdmin()
+    const { nonce } = await asJson(await withApp.request('/v1/ads/next', { method: 'POST', headers: auth() }))
+    await withApp.request('/v1/impressions', {
+      method: 'POST', headers: auth(),
+      body: JSON.stringify({ events: [{
+        id: '01HQRS7X8N9P2K3M4V5W6Y7Z8B', campaignId: 'c1', nonce, sessionId: 's1',
+        surface: 'statusline', durationMs: 15_000, clientTs: clock.now(),
+        projectKey: 'f'.repeat(64), clientVersion: '1.0.0', os: 'darwin', arch: 'arm64',
+      }] }),
+    })
+
+    const beforeVerify = await asJson(await withApp.request('/v1/admin/overview', {
+      headers: { authorization: `Bearer ${ADMIN_SECRET}` },
+    }))
+    expect(beforeVerify.impressions.pending).toBe(1)
+    expect(beforeVerify.impressions.verified).toBe(0)
+
+    clock.advance(24 * 3600_000 + 1)
+    pipeline.runVerification()
+
+    const afterVerify = await asJson(await withApp.request('/v1/admin/overview', {
+      headers: { authorization: `Bearer ${ADMIN_SECRET}` },
+    }))
+    expect(afterVerify.impressions.verified).toBe(1)
+    expect(afterVerify.impressions.pending).toBe(0)
+  })
+
+  it('platform payi kendi cuzdanina cekilir', async () => {
+    ledger.postImpression({
+      impressionId: 'i1', advertiserId: ADV, publisherId: PUB, campaignId: 'c1',
+      rate: stroops(20_000_000n), revShareBps: 5000,
+    })
+    const { withApp } = appWithAdmin()
+    const r = await withApp.request('/v1/admin/withdraw', {
+      method: 'POST', headers: { authorization: `Bearer ${ADMIN_SECRET}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ amountStroops: '10000000', destination: PLATFORM_ADDR }),
+    })
+    expect(r.status).toBe(200)
+    expect(ledger.balance(PLATFORM_REVENUE)).toBe(0n)
+  })
+
+  it('adminSecret verilmemisse tum ucu 404 doner', async () => {
+    const r = await app.request('/v1/admin/overview')
+    expect(r.status).toBe(404)
   })
 })
 

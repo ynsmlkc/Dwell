@@ -19,7 +19,7 @@ import {
 import type { Clock, IdGenerator } from '@dwell/protocol'
 import type { Pipeline } from '../pipeline.js'
 import type { Ledger } from '../ledger/ledger.js'
-import { accountId } from '../ledger/accounts.js'
+import { accountId, PLATFORM_REVENUE } from '../ledger/accounts.js'
 import { bearerToken, type AuthContext, type TokenLookup } from './auth.js'
 import type { WalletAuth } from './wallet-auth.js'
 import type { PayoutStore } from '../payouts/store.js'
@@ -48,7 +48,23 @@ export interface AppDeps {
   /** Cuzdanla giris. Verilmezse `/v1/auth/*` uclari acilmaz. */
   readonly walletAuth?: WalletAuth
   /** Reklamverenin harcamadigi butceyi geri cekmesi. */
-  readonly withdraw?: import('../advertisers/withdraw.js').WithdrawService
+  readonly withdraw?: import('../payouts/withdraw.js').WithdrawService
+  /** Yayincinin istege bagli cekimi — verilmezse `/v1/publisher/withdraw` kapali. */
+  readonly publisherWithdraw?: import('../payouts/withdraw.js').WithdrawService
+  /**
+   * Platformun kendi payinin cekimi (`kind: 'platform_revenue'`) —
+   * verilmezse `/v1/admin/*` uclari kapali.
+   *
+   * Denetimde bulundu: platform payi her gosterimde `PLATFORM_REVENUE`'ye
+   * yaziliyordu ama onu okuyan/ceken tek bir satir kod yoktu.
+   */
+  readonly platformWithdraw?: import('../payouts/withdraw.js').WithdrawService
+  /**
+   * `/v1/admin/*` icin paylasilan sir — cuzdan tabanli SEP-10 akisina
+   * girmiyor, cunku ortada "platform admin cuzdani" diye bir kimlik
+   * kavrami yok. Verilmezse `/v1/admin/*` uclari 404 doner.
+   */
+  readonly adminSecret?: string
   /** USDC kabulu icin imzasiz islem kurar. */
   readonly trustlineXdr?: (address: string) => Promise<
     | { ok: true; xdr: string; networkPassphrase: string }
@@ -279,6 +295,12 @@ export function createApp(deps: AppDeps) {
       payableStroops: payable.toString(),
       inFlightStroops: inFlight.toString(),
       lifetimeStroops: payable.toString(),
+      // Su an cekilebilecek tutar — istege bagli cekim. Esigin altindaysa
+      // sifir: kullaniciya cekemeyecegi bir rakam gostermek, dugmeye basip
+      // hata almasina yol acardi (bkz. reklamveren tarafindaki ayni desen).
+      withdrawableStroops: (deps.publisherWithdraw?.available(publisherId) ?? 0n).toString(),
+      // Gecmis alan — artik yayinci istedigi an cekebiliyor, otomatik
+      // job'in esigi degil. Geriye donuk uyumluluk icin (ADR-016) kaldirilmadi.
       payoutThresholdStroops: deps.payoutThreshold.toString(),
       // Odeme gecmisi kayittan. "Param nerede" sorusunun cevabi burada:
       // her kalem bir islem hash'i tasir, kullanici zincirde dogrulayabilir.
@@ -295,6 +317,31 @@ export function createApp(deps: AppDeps) {
         ? `esik ${deps.payoutThreshold} stroop, bakiye ${payable}`
         : null,
     })
+  })
+
+  /**
+   * Istege bagli cekim — yayinci artik otomatik job'i beklemek zorunda
+   * degil, `withdrawableStroops` kadar tutari istedigi an cekebilir.
+   *
+   * Reklamveren cekimiyle AYNI desen (`/v1/advertiser/withdraw`): hedef
+   * parametresi yok, para her zaman token sahibinin kendi adresine gider.
+   */
+  app.post('/v1/publisher/withdraw', requireScope('withdraw:balance'), async (c) => {
+    if (!deps.publisherWithdraw) return c.json(err('DWL_9001', 'cekim kapali'), 404)
+    const { publisherId } = c.get('auth')
+
+    const body = await c.req.json().catch(() => null)
+    const raw = typeof body?.amountStroops === 'string' ? body.amountStroops : null
+    if (raw === null || !/^\d+$/.test(raw)) {
+      return c.json(err('DWL_9001', '`amountStroops` tam sayi metni olmali'), 400)
+    }
+
+    const r = await deps.publisherWithdraw.withdraw(publisherId, stroops(BigInt(raw)))
+    if (!r.ok) {
+      // 409 = "su an olmaz, sonra olabilir". 400 = "boyle olmaz".
+      return c.json(err('DWL_9001', r.reason), r.retryable ? 409 : 400)
+    }
+    return c.json({ txHash: r.txHash, amountStroops: r.amount.toString() })
   })
 
   /* ─────────────────── reklamveren ─────────────────── */
@@ -408,6 +455,68 @@ export function createApp(deps: AppDeps) {
       const r = store.setStatus(c.req.param('id'), advertiserId, durum)
       if (!r.ok) return c.json(err('DWL_9001', r.reason), 404)
       return c.json(toCampaignJson(r.campaign))
+    })
+  }
+
+  /* ─────────────────── admin ─────────────────── */
+
+  /**
+   * Cuzdan tabanli SEP-10 akisina girmiyor — ortada "admin cuzdani" diye
+   * bir kimlik kavrami yok. Paylasilan bir sirla korunuyor, tipki
+   * `DWELL_HOT_SECRET` gibi. `adminSecret` verilmezse uc hic acilmaz.
+   */
+  if (deps.adminSecret) {
+    const requireAdmin = async (c: any, next: any) => {
+      const raw = bearerToken(c.req.header('authorization'))
+      // Sabit-zamanli olmayan karsilastirma burada kabul edilebilir: bu
+      // sir zaten yalnizca bir kisi (platform operatoru) tarafindan
+      // kullaniliyor, kamuya acik bir giris denemesi yuzeyi degil.
+      if (!raw || raw !== deps.adminSecret) {
+        return c.json(err('DWL_2002', 'gecersiz admin sirri'), 401)
+      }
+      await next()
+    }
+
+    /** Platformun goremedigi seyler burada: bkz. denetim notu. */
+    app.get('/v1/admin/overview', requireAdmin, (c) => {
+      const campaigns = deps.campaigns?.all() ?? []
+      const imps = deps.pipeline.impressions()
+      const verified = imps.filter((i) => i.state === 'verified')
+      const pending = imps.filter((i) => i.state === 'pending')
+      const rejected = imps.filter((i) => i.state === 'rejected')
+
+      return c.json({
+        platformRevenueStroops: deps.ledger.balance(PLATFORM_REVENUE).toString(),
+        withdrawableStroops: (deps.platformWithdraw?.available('platform') ?? 0n).toString(),
+        impressions: {
+          verified: verified.length,
+          pending: pending.length,
+          rejected: rejected.length,
+        },
+        campaigns: campaigns.map((c2) => ({
+          ...toCampaignJson(c2),
+          advertiserId: c2.advertiserId,
+          frequencyCap: c2.frequencyCap,
+          dailyBudgetStroops: c2.dailyBudgetStroops?.toString() ?? null,
+        })),
+      })
+    })
+
+    app.post('/v1/admin/withdraw', requireAdmin, async (c) => {
+      if (!deps.platformWithdraw) return c.json(err('DWL_9001', 'cekim kapali'), 404)
+      const body = await c.req.json().catch(() => null)
+      const raw = typeof body?.amountStroops === 'string' ? body.amountStroops : null
+      const to = typeof body?.destination === 'string' ? body.destination : null
+      if (raw === null || !/^\d+$/.test(raw)) {
+        return c.json(err('DWL_9001', '`amountStroops` tam sayi metni olmali'), 400)
+      }
+      if (!to) {
+        return c.json(err('DWL_9001', '`destination` (platformun kendi cuzdan adresi) sart'), 400)
+      }
+
+      const r = await deps.platformWithdraw.withdraw(to, stroops(BigInt(raw)))
+      if (!r.ok) return c.json(err('DWL_9001', r.reason), r.retryable ? 409 : 400)
+      return c.json({ txHash: r.txHash, amountStroops: r.amount.toString() })
     })
   }
 

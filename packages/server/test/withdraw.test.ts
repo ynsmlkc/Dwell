@@ -16,8 +16,8 @@ import type { PaymentRail, PayoutBatch, SubmissionReceipt, SettlementState } fro
 import { openDb, type Db } from '../src/store/db.js'
 import { SqliteLedgerStore, SqlitePayoutStore } from '../src/store/persistent.js'
 import { Ledger } from '../src/ledger/ledger.js'
-import { accountId } from '../src/ledger/accounts.js'
-import { WithdrawService, MIN_WITHDRAW } from '../src/advertisers/withdraw.js'
+import { accountId, PLATFORM_REVENUE } from '../src/ledger/accounts.js'
+import { WithdrawService, MIN_WITHDRAW } from '../src/payouts/withdraw.js'
 
 const ADV = 'GA' + 'A'.repeat(53) + 'WHF5'
 
@@ -68,6 +68,7 @@ function kur(spendable: bigint, bakiye = spendable) {
   const loglar: string[] = []
   const svc = new WithdrawService({
     clock, ledger, rail, store: new SqlitePayoutStore(db),
+    kind: 'advertiser',
     spendable: () => stroops(spendable),
     newBatchId: () => `w-${++n}`,
     log: (m) => loglar.push(m),
@@ -224,5 +225,136 @@ describe('para cekme', () => {
   it('cekilebilir tutar esigin altindaysa sifir gosterilir', () => {
     const t = kur(MIN_WITHDRAW - 1n)
     expect(t.svc.available(ADV)).toBe(0n)
+  })
+})
+
+/**
+ * Yayinci cekimi — ayni makine, farkli hesap turu.
+ *
+ * Reklamverenden fark: `spendable` burada dogrudan ledger bakiyesi.
+ * Rezerve edilecek bir sey yok, cunku yayinci bakiyesi zaten yalnizca
+ * `verified` gosterimlerden olusuyor (ADR-011).
+ */
+describe('yayinci cekimi — kind: publisher', () => {
+  const PUB = 'GB' + 'B'.repeat(53) + 'MQPX'
+
+  function kurYayinci(kazancStroops: bigint) {
+    const ids = () => `id-${++n}`
+    const ledger = new Ledger(new SqliteLedgerStore(db, clock, ids), clock, ids)
+    // Reklamvereni once fonla, sonra gosterimi PARA OLARAK yayinciya yaz —
+    // gercek akisin aynisi (Pipeline.runVerification → ledger.postImpression).
+    ledger.deposit({ advertiserId: ADV, amount: stroops(kazancStroops * 2n), topupId: `t-${++n}` })
+    ledger.postImpression({
+      impressionId: `i-${++n}`, advertiserId: ADV, publisherId: PUB, campaignId: 'c1',
+      rate: stroops(kazancStroops * 2n), revShareBps: 5000,     // %50 pay → yayinciya kazancStroops
+    })
+    const rail = new SahteRail(clock)
+    const loglar: string[] = []
+    const svc = new WithdrawService({
+      clock, ledger, rail, store: new SqlitePayoutStore(db),
+      kind: 'publisher',
+      spendable: (id) => ledger.balance(accountId('publisher', id)),
+      newBatchId: () => `w-${++n}`,
+      log: (m) => loglar.push(m),
+    })
+    return { svc, ledger, rail, loglar }
+  }
+
+  it('verified gosterimlerden birikmis kazanc istege bagli cekilir', async () => {
+    const t = kurYayinci(20_000_000n)
+    const r = await t.svc.withdraw(PUB, stroops(20_000_000n))
+
+    expect(r.ok).toBe(true)
+    expect(t.ledger.balance(accountId('publisher', PUB))).toBe(0n)
+    expect(t.ledger.audit()).toEqual([])
+  })
+
+  it('para KENDI cuzdanina gider, baska bir hedefe degil', async () => {
+    const t = kurYayinci(20_000_000n)
+    await t.svc.withdraw(PUB, stroops(20_000_000n))
+    expect(t.rail.gonderilen[0]!.items[0]!.address).toBe(PUB)
+  })
+
+  it('reklamverendeki gibi bir rezerve YOK — tum bakiye tek seferde cekilebilir', async () => {
+    const t = kurYayinci(20_000_000n)
+    expect(t.svc.available(PUB)).toBe(20_000_000n)
+    expect((await t.svc.withdraw(PUB, stroops(20_000_000n))).ok).toBe(true)
+  })
+
+  it('esigin altindaki toz cekilemez — reklamverenle ayni kural', async () => {
+    const t = kurYayinci(MIN_WITHDRAW - 1n)
+    const r = await t.svc.withdraw(PUB, stroops(MIN_WITHDRAW - 1n))
+    expect(r.ok).toBe(false)
+  })
+
+  it('bakiyenin ustunde cekim istenirse reddedilir, "raporlanmamis" gibi yanlis bir sebep verilmez', async () => {
+    const t = kurYayinci(20_000_000n)
+    const r = await t.svc.withdraw(PUB, stroops(30_000_000n))
+    expect(r.ok).toBe(false)
+    expect(r.ok === false && r.reason).not.toContain('raporlanmamis')
+  })
+
+  it('zincirde patlarsa yayincinin parasi GERI DONER', async () => {
+    const t = kurYayinci(20_000_000n)
+    t.rail.sonuc = 'failed'
+    await t.svc.withdraw(PUB, stroops(20_000_000n))
+    expect(t.ledger.balance(accountId('publisher', PUB))).toBe(20_000_000n)
+    expect(t.ledger.audit()).toEqual([])
+  })
+})
+
+/**
+ * Platform cekimi — denetimde bulundu: platform payi her gosterimde
+ * `PLATFORM_REVENUE`'ye yaziliyordu ama onu okuyan/ceken TEK BIR SATIR
+ * kod yoktu. `PLATFORM_REVENUE` sahipsiz, tekil bir hesap — `id` burada
+ * ledger hesabini degil, yalnizca paranin gidecegi HEDEF adresi belirler.
+ */
+describe('platform cekimi — kind: platform_revenue', () => {
+  const PLATFORM_ADDR = 'GC' + 'C'.repeat(53) + 'RVNU'
+
+  function kurPlatform(kazancStroops: bigint) {
+    const ids = () => `id-${++n}`
+    const ledger = new Ledger(new SqliteLedgerStore(db, clock, ids), clock, ids)
+    // Reklamvereni fonla, gosterimi yaz — platform payi otomatik olusuyor
+    // (splitRevenue, ADR-011). %50 pay ile PUB kazancStroops * 2'nin
+    // yarisini, platform da yarisini alir.
+    ledger.deposit({ advertiserId: ADV, amount: stroops(kazancStroops * 2n), topupId: `t-${++n}` })
+    ledger.postImpression({
+      impressionId: `i-${++n}`, advertiserId: ADV, publisherId: 'irrelevant-pub', campaignId: 'c1',
+      rate: stroops(kazancStroops * 2n), revShareBps: 5000,
+    })
+    const rail = new SahteRail(clock)
+    const loglar: string[] = []
+    const svc = new WithdrawService({
+      clock, ledger, rail, store: new SqlitePayoutStore(db),
+      kind: 'platform_revenue',
+      spendable: () => ledger.balance(PLATFORM_REVENUE),
+      newBatchId: () => `w-${++n}`,
+      log: (m) => loglar.push(m),
+    })
+    return { svc, ledger, rail, loglar }
+  }
+
+  it('biriken platform payi PLATFORM_ADDR\'a cekilir', async () => {
+    const t = kurPlatform(20_000_000n)
+    const r = await t.svc.withdraw(PLATFORM_ADDR, stroops(20_000_000n))
+
+    expect(r.ok).toBe(true)
+    expect(t.ledger.balance(PLATFORM_REVENUE)).toBe(0n)
+    expect(t.rail.gonderilen[0]!.items[0]!.address).toBe(PLATFORM_ADDR)
+    expect(t.ledger.audit()).toEqual([])
+  })
+
+  it('balance() teshis metodu dogru hesabi okur — accountId(kind, id) DEGIL', () => {
+    const t = kurPlatform(20_000_000n)
+    expect(t.svc.balance(PLATFORM_ADDR)).toBe(20_000_000n)
+  })
+
+  it('zincirde patlarsa platformun parasi GERI DONER', async () => {
+    const t = kurPlatform(20_000_000n)
+    t.rail.sonuc = 'failed'
+    await t.svc.withdraw(PLATFORM_ADDR, stroops(20_000_000n))
+    expect(t.ledger.balance(PLATFORM_REVENUE)).toBe(20_000_000n)
+    expect(t.ledger.audit()).toEqual([])
   })
 })

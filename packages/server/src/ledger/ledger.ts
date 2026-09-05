@@ -206,22 +206,27 @@ export class Ledger {
      * Paranin cikacagi hesap turu.
      *
      * Varsayilan `publisher` — yayinci kazancinin odenmesi. `advertiser`
-     * ise reklamverenin harcamadigi butceyi geri cekmesi. Ikisi AYNI
-     * makineyi kullaniyor: ayni `payouts_in_flight` kutusu, ayni ters
-     * kayit yolu, ayni mutabakat. Ayri bir akis yazmak, test edilmis
+     * ise reklamverenin harcamadigi butceyi geri cekmesi. `platform_revenue`
+     * ise platformun kendi payinin cekilmesi — tek fark, bu hesabin sahibi
+     * (owner) olmamasi, tekil bir havuz olmasi (bkz. `PlatformWithdrawService`).
+     * Ucu de AYNI makineyi kullaniyor: ayni `payouts_in_flight` kutusu, ayni
+     * ters kayit yolu, ayni mutabakat. Ayri bir akis yazmak, test edilmis
      * mantigin ikinci ve daha az bakimli bir kopyasini uretmek olurdu.
      */
-    kind?: 'publisher' | 'advertiser'
+    kind?: 'publisher' | 'advertiser' | 'platform_revenue'
   }): readonly Entry[] {
     if (input.amount <= 0n) throw new LedgerError('odeme tutari pozitif olmali', 'DWL_5006')
     const asset = input.asset ?? 'USDC'
     const key = `${input.batchId}:${input.publisherId}`
 
     const kind = input.kind ?? 'publisher'
+    // `platform_revenue` sahipsiz, tekil bir hesap — `accountId(kind, owner)`
+    // deseni burada uygulanmiyor.
+    const fromAccount = kind === 'platform_revenue' ? PLATFORM_REVENUE : accountId(kind, input.publisherId)
 
     return this.#post([
       this.#entry({
-        accountId: accountId(kind, input.publisherId), amount: neg(input.amount),
+        accountId: fromAccount, amount: neg(input.amount),
         asset, type: 'payout_submit', refType: 'payout_batch', refId: key,
         idempotencyKey: `payout_submit:${key}:publisher`,
         publisherId: input.publisherId,

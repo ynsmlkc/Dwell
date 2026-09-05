@@ -27,14 +27,14 @@ import { Pipeline } from './pipeline.js'
 import { Ledger } from './ledger/ledger.js'
 import { CampaignStore } from './ads/campaign-store.js'
 import { DepositWatcher, sqliteCursor } from './advertisers/deposits.js'
-import { WithdrawService } from './advertisers/withdraw.js'
-import { accountId } from './ledger/accounts.js'
+import { WithdrawService } from './payouts/withdraw.js'
+import { accountId, PLATFORM_REVENUE } from './ledger/accounts.js'
 import { openDb, MEMORY, vacuumExpired } from './store/db.js'
 import {
   SqliteLedgerStore, SqliteTokenStore, SqlitePayoutStore,
   SqliteImpressionMirror, walletPersistence,
 } from './store/persistent.js'
-import { PayoutRunner, schedulePayouts } from './payouts/runner.js'
+import { PayoutRunner } from './payouts/runner.js'
 import { StellarRail, HORIZON as HORIZON_URLS, TESTNET_USDC } from '@dwell/payments'
 import { WalletStore } from '@dwell/payments'
 
@@ -204,11 +204,10 @@ const wallets = new WalletStore({
 /**
  * Sicak cuzdan.
  *
- * Anahtar YOKSA odeme turu hic baslatilmaz — sahte bir rayla "odedik" demek,
- * odememekten kotudur: kullanici odendigini sanir ve beklemeyi birakir.
+ * Anahtar YOKSA hicbir cekim (otomatik ya da istege bagli) baslatilmaz —
+ * sahte bir rayla "odedik" demek, odememekten kotudur: kullanici odendigini
+ * sanir ve beklemeyi birakir.
  */
-let zamanlama: { stop: () => void } | null = null
-
 const HOT_SECRET = process.env['DWELL_HOT_SECRET']
 /** Reklamverenin para gonderecegi adres. */
 const hotAddress = HOT_SECRET ? Keypair.fromSecret(HOT_SECRET).publicKey() : null
@@ -235,6 +234,7 @@ const payoutRunner = HOT_SECRET
 const withdraw = HOT_SECRET
   ? new WithdrawService({
       clock, ledger, store: payouts,
+      kind: 'advertiser',
       rail: new StellarRail({
         horizonUrl: HORIZON,
         networkPassphrase: NETWORKS.testnet,
@@ -248,16 +248,73 @@ const withdraw = HOT_SECRET
     })
   : null
 
+/**
+ * Yayinci cekimi — istege bagli, PayoutRunner'in ustune eklendi (bkz. asagi).
+ *
+ * `spendable` burada dogrudan ledger bakiyesi: yayinci bakiyesi zaten
+ * yalnizca `verified` gosterimlerden olusuyor (ADR-011), reklamverendeki
+ * gibi "teslim edilmis ama raporlanmamis" rezervi yok.
+ */
+const publisherWithdraw = HOT_SECRET
+  ? new WithdrawService({
+      clock, ledger, store: payouts,
+      kind: 'publisher',
+      rail: new StellarRail({
+        horizonUrl: HORIZON,
+        networkPassphrase: NETWORKS.testnet,
+        sourceSecret: HOT_SECRET,
+        assetCode: process.env['DWELL_ASSET_CODE'] ?? TESTNET_USDC.code,
+        assetIssuer: process.env['DWELL_ASSET_ISSUER'] ?? TESTNET_USDC.issuer,
+      }),
+      spendable: (p) => ledger.balance(accountId('publisher', p)),
+      newBatchId: () => `w-${ids.impressionId()}`,
+      log,
+    })
+  : null
+
+/**
+ * Platformun kendi payinin cekimi — denetimde bulundu: platform payi her
+ * gosterimde `PLATFORM_REVENUE`'ye yaziliyordu ama onu okuyan/ceken TEK BIR
+ * SATIR kod yoktu. `platform_revenue` sahipsiz, tekil bir hesap — `spendable`
+ * burada `id`'yi (hedef adres) yok sayip dogrudan o havuzu okuyor.
+ */
+const platformWithdraw = HOT_SECRET
+  ? new WithdrawService({
+      clock, ledger, store: payouts,
+      kind: 'platform_revenue',
+      rail: new StellarRail({
+        horizonUrl: HORIZON,
+        networkPassphrase: NETWORKS.testnet,
+        sourceSecret: HOT_SECRET,
+        assetCode: process.env['DWELL_ASSET_CODE'] ?? TESTNET_USDC.code,
+        assetIssuer: process.env['DWELL_ASSET_ISSUER'] ?? TESTNET_USDC.issuer,
+      }),
+      spendable: () => ledger.balance(PLATFORM_REVENUE),
+      newBatchId: () => `w-${ids.impressionId()}`,
+      log,
+    })
+  : null
+
 if (payoutRunner) {
-  // Uretimde gunde bir. Gelistirmede kisa, yoksa hicbir seyi gozlemleyemezsin.
-  const her = Number(process.env['DWELL_PAYOUT_INTERVAL_MS'] ?? 60_000)
-  zamanlama = schedulePayouts(payoutRunner, her, log)
-  // Yeniden baslatmada asili kalanlari coz — para `payouts_in_flight`'ta
-  // sonsuza kadar beklemesin.
+  /**
+   * Otomatik esik-tetiklemeli odeme turu ARTIK ZAMANLANMIYOR.
+   *
+   * Yayinci artik `publisherWithdraw` ile istedigi an cekebiliyor — ADR-006
+   * zaten Stellar'da islem ucretinin `base_fee × operation_sayisi` oldugunu,
+   * yani toplu odemenin ucret KAZANDIRMADIGINI tespit etmisti. Otomatik
+   * job'un tek faydasi operasyonel rahatlikti, bedeli ise "param ne zaman
+   * gelecek" belirsizligiydi. Istege bagli cekim ayni raya dayanarak bu
+   * belirsizligi kaldiriyor.
+   *
+   * `PayoutRunner` SILINMEDI: `resumeUnresolved()` hala gerekli — sunucu
+   * `payouts_in_flight`ta asili kalmis bir batch birakip duserse (ister
+   * eski otomatik turdan, ister yeni istege bagli cekimden), yeniden
+   * baslatmada zincire sorup karari veren tek yer burasi.
+   */
   void payoutRunner.resumeUnresolved().then((n) => {
     if (n > 0) log(`${n} asili batch cozuldu`)
   })
-  log(`odeme turu her ${her / 1000}s · esik ${PAYOUT_THRESHOLD} stroop`)
+  log('istege bagli cekim acik · otomatik odeme turu kapali (bkz. main.ts)')
 } else {
   log('odeme KAPALI — DWELL_HOT_SECRET tanimli degil')
 }
@@ -351,6 +408,9 @@ const app = createApp({
   campaigns: campaignStore,
   trustlineXdr,
   ...(withdraw ? { withdraw } : {}),
+  ...(publisherWithdraw ? { publisherWithdraw } : {}),
+  ...(platformWithdraw ? { platformWithdraw } : {}),
+  ...(process.env['DWELL_ADMIN_SECRET'] ? { adminSecret: process.env['DWELL_ADMIN_SECRET'] } : {}),
   ...(hotAddress ? { depositAddress: hotAddress } : {}),
   assetCode: process.env['DWELL_ASSET_CODE'] ?? TESTNET_USDC.code,
   assetIssuer: process.env['DWELL_ASSET_ISSUER'] ?? TESTNET_USDC.issuer,
@@ -423,10 +483,11 @@ setInterval(() => {
  * Railway her deploy'da SIGTERM gonderir ve kisa bir sure sonra sureci
  * oldurur.
  *
- * Onemli olan: kapanirken YENI odeme turu BASLATMAMAK. Zincire gonderilmis
- * ama mutabakati yapilmamis bir batch, sunucu dustugunde `payouts_in_flight`
- * ta asili kalir. Kaybolmaz — `resumeUnresolved` acilista zincire sorup
- * cozuyor — ama hic olusturmamak daha iyi.
+ * Artik periyodik bir odeme turu yok, bu yuzden "yeni tur baslatma" diye
+ * bir sey durdurulmuyor. Tam o an suren bir istege bagli cekim varsa
+ * zincire gonderilmis ama mutabakati yapilmamis batch `payouts_in_flight`
+ * ta asili kalir. Kaybolmaz — `resumeUnresolved` bir sonraki aciliste
+ * zincire sorup cozuyor.
  */
 let kapaniyor = false
 for (const sig of ['SIGTERM', 'SIGINT'] as const) {
@@ -434,7 +495,6 @@ for (const sig of ['SIGTERM', 'SIGINT'] as const) {
     if (kapaniyor) return
     kapaniyor = true
     log(`${sig} — kapaniyor`)
-    zamanlama?.stop()
     server.close(() => { db.close(); process.exit(0) })
     // Acik baglantilar kapanmazsa da bekleme: platform zaten olduruyor.
     setTimeout(() => process.exit(0), 5_000).unref()

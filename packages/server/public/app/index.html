@@ -101,12 +101,29 @@
           <p class="figure" id="payable">$0</p>
           <p class="small" style="margin: 10px 0 0"><span id="payable-stroops"></span> stroops · verified and yours</p>
 
-          <div style="margin-top: 30px">
-            <div class="bar"><i id="bar" style="width: 0%"></i></div>
-            <p class="body" id="threshold-text" style="margin: 12px 0 0; font-size: 13.5px"></p>
+          <div style="margin-top: 22px">
+            <button class="btn btn-quiet hidden" id="withdraw">Withdraw</button>
+            <p class="small hidden" id="nothing-to-withdraw" style="margin: 8px 0 0">Nothing to withdraw yet — comes back the moment your balance clears the dust floor.</p>
           </div>
 
-          <div class="note hidden" id="blocked" style="margin-top: 20px"></div>
+          <!-- Cekme kutusu — yalnizca acikca istendiginde. Reklamveren
+               panelindeki AYNI desen: hedef parametresi yok, para her zaman
+               kendi cuzdanina gider. -->
+          <div class="card hidden" id="withdraw-box" style="margin-top: 18px">
+            <h3 style="margin-bottom: 6px">Withdraw</h3>
+            <p class="small" style="margin: 0 0 18px; max-width: 50ch">Goes straight to your own wallet — there is no other destination.</p>
+            <div style="display: flex; flex-wrap: wrap; align-items: end; gap: 14px">
+              <label class="field" style="max-width: 200px">Amount in USD<input type="text" id="w-amount" placeholder="0.00"></label>
+              <button class="btn btn-sm btn-quiet" id="w-max">Max</button>
+              <button class="btn btn-primary" id="w-send">
+                <span class="spinner hidden" id="w-spin"></span><span>Withdraw</span>
+              </button>
+              <button class="btn btn-sm btn-quiet" id="w-cancel">Cancel</button>
+            </div>
+            <p class="small" style="margin: 12px 0 0" id="w-avail"></p>
+            <p class="err hidden" id="w-error"></p>
+            <div class="note hidden" id="w-done" style="margin-top: 14px; border-left-color: var(--accent)"></div>
+          </div>
         </div>
 
         <div class="grid-1px" id="rows"></div>
@@ -154,7 +171,7 @@
 <script type="module">
 import {
   $, show, usd, short, api, ApiError, session, login, freighterReady,
-  walletState, enableUsdc, copyButton, explorer,
+  walletState, enableUsdc, copyButton, explorer, toStroops,
 } from '/app.js';
 
 const views = ['v-connect', 'v-loading', 'v-neterr', 'v-expired', 'v-dash'];
@@ -216,9 +233,10 @@ async function load() {
 }
 $('#retry-load').onclick = load;
 
+let me = { withdrawableStroops: '0' };
+
 function render(d) {
-  const payable = BigInt(d.payableStroops);
-  const threshold = BigInt(d.payoutThresholdStroops);
+  me = d;
   const lifetime = BigInt(d.lifetimeStroops);
 
   const empty = lifetime === 0n && BigInt(d.pendingStroops) === 0n;
@@ -229,22 +247,10 @@ function render(d) {
   $('#payable').textContent = usd(d.payableStroops);
   $('#payable-stroops').textContent = d.payableStroops.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
-  // Yuzde tam sayi aritmetigiyle — para hesabinda float yok.
-  const pct = threshold === 0n ? 100 : Number((payable * 100n) / threshold);
-  $('#bar').style.width = Math.max(0, Math.min(100, pct)) + '%';
-
-  const reached = payable >= threshold;
-  const t = $('#threshold-text');
-  t.textContent = reached
-    ? 'Threshold passed — this goes out in the next payout round.'
-    : `${usd((threshold - payable).toString())} to go before the first payout of ${usd(d.payoutThresholdStroops)}.`;
-  t.style.color = reached ? 'var(--accent)' : 'var(--muted)';
-
-  // `blockedReason` yalnizca ESIK DISI bir sebep varsa. Esigi zaten cubuk
-  // anlatiyor; ayni seyi iki kez soylemek gurultu.
-  const other = d.blockedReason && !/esik/i.test(d.blockedReason) ? d.blockedReason : null;
-  show($('#blocked'), !!other);
-  if (other) $('#blocked').textContent = other;
+  const canWithdraw = BigInt(d.withdrawableStroops || '0') > 0n;
+  show($('#withdraw'), canWithdraw);
+  show($('#nothing-to-withdraw'), !canWithdraw);
+  if (!canWithdraw) show($('#withdraw-box'), false);
 
   const rows = [
     ['Pending', usd(d.pendingStroops), 'counted, not verified yet — may not survive'],
@@ -268,7 +274,7 @@ function render(d) {
   show($('#no-payouts'), ps.length === 0);
   show($('#payouts-wrap'), ps.length > 0);
   if (ps.length === 0) {
-    $('#no-payouts').textContent = `Nothing sent yet. The first payout goes out once you pass ${usd(d.payoutThresholdStroops)}.`;
+    $('#no-payouts').textContent = 'Nothing sent yet. Withdraw whenever you have a balance above the network\'s dust floor.';
   } else {
     $('#payouts').innerHTML = ps.map((p) => `
       <tr>
@@ -311,6 +317,54 @@ $('#enable-usdc').onclick = async () => {
   } finally {
     show($('#trust-spin'), false);
     $('#trust-label').textContent = 'Accept USDC';
+  }
+};
+
+/* ─────────── para cekme ─────────── */
+
+const wBox = $('#withdraw-box');
+$('#withdraw').onclick = () => {
+  show(wBox, true);
+  $('#w-avail').textContent = `${usd(me.withdrawableStroops)} available to withdraw.`;
+  show($('#w-error'), false); show($('#w-done'), false);
+  wBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
+$('#w-cancel').onclick = () => show(wBox, false);
+$('#w-max').onclick = () => {
+  $('#w-amount').value = usd(me.withdrawableStroops).replace('$', '');
+};
+
+$('#w-send').onclick = async () => {
+  show($('#w-error'), false);
+  const amount = toStroops($('#w-amount').value);
+  if (amount === null || amount <= 0n) {
+    $('#w-error').textContent = 'Enter an amount, e.g. 12.50';
+    show($('#w-error'), true); return;
+  }
+  if (amount > BigInt(me.withdrawableStroops)) {
+    $('#w-error').textContent = `Only ${usd(me.withdrawableStroops)} can be withdrawn right now.`;
+    show($('#w-error'), true); return;
+  }
+
+  show($('#w-spin'), true);
+  $('#w-send').disabled = true;
+  try {
+    const r = await api('/v1/publisher/withdraw', {
+      method: 'POST', body: { amountStroops: amount.toString() },
+    });
+    $('#w-done').innerHTML =
+      `Sent ${usd(r.amountStroops)}. `
+      + `<a href="${explorer.tx(r.txHash)}" target="_blank" rel="noopener" style="color: var(--accent)">View on the chain ↗</a>`;
+    show($('#w-done'), true);
+    $('#w-amount').value = '';
+    await load();
+    show(wBox, true);
+  } catch (e) {
+    $('#w-error').textContent = e.message;
+    show($('#w-error'), true);
+  } finally {
+    show($('#w-spin'), false);
+    $('#w-send').disabled = false;
   }
 };
 

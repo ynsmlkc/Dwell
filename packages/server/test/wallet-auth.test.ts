@@ -82,7 +82,7 @@ describe('WalletAuth', () => {
   })
 
   it('token yalnizca daemon kapsamlarini tasir — cuzdan degistiremez', async () => {
-    expect(LOGIN_SCOPES).toEqual(['report:impressions', 'read:balance'])
+    expect(LOGIN_SCOPES).toEqual(['report:impressions', 'read:balance', 'withdraw:balance'])
     expect(LOGIN_SCOPES).not.toContain('manage:wallet')
   })
 
