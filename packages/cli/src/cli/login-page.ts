@@ -19,10 +19,10 @@ export interface LoginPageOpts {
 
 export function loginPage(opts: LoginPageOpts): string {
   return `<!doctype html>
-<html lang="tr"><head>
+<html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Dwell — cüzdanı bağla</title>
+<title>Dwell — connect your wallet</title>
 <style>
   *, *::before, *::after { box-sizing: border-box }
   :root {
@@ -131,59 +131,59 @@ export function loginPage(opts: LoginPageOpts): string {
 
 <header>
   <span class="brand"><i>✶</i>dwell</span>
-  <span class="chip"><i></i>127.0.0.1:${opts.port} — yerel</span>
+  <span class="chip"><i></i>127.0.0.1:${opts.port} — local</span>
 </header>
 
 <main>
   <div class="card">
     <div style="display:grid; gap:14px">
-      <p class="eyebrow">Adım 2 / 3 — kimlik</p>
-      <h1>Cüzdanını bağla</h1>
-      <p class="lede">Kazancın bu adrese gider. İmza yalnızca kimlik kanıtıdır — <b>ağa hiçbir işlem gönderilmez</b>, sıra numarası 0'dır. Özel anahtarın tarayıcıdan çıkmaz.</p>
+      <p class="eyebrow">Step 2 / 3 — identity</p>
+      <h1>Connect your wallet</h1>
+      <p class="lede">Your earnings go to this address. The signature is only proof of identity — <b>nothing is submitted to the network</b>, the sequence number is 0. Your private key never leaves the browser.</p>
     </div>
 
     <div class="term">
-      <div class="term-bar"><span>dwell login</span><span id="status">hazır</span></div>
+      <div class="term-bar"><span>dwell login</span><span id="status">ready</span></div>
       <div class="log" id="log"></div>
 
       <div class="addr hide" id="addrbox">
-        <span class="k">Bağlı adres</span>
+        <span class="k">Connected address</span>
         <span class="v" id="addr"></span>
         <div class="facts">
-          <span>ağ <em>testnet</em></span>
-          <span>varlık <em>USDC</em></span>
+          <span>network <em>testnet</em></span>
+          <span>asset <em>USDC</em></span>
           <span>trustline <em id="trust">—</em></span>
         </div>
       </div>
     </div>
 
     <div class="manual hide" id="manualbox">
-      <p>Freighter yoksa: adresini gir, çıkan XDR'ı cüzdanında ya da Stellar Laboratory'de imzala, sonucu buraya yapıştır.</p>
-      <input id="m-addr" placeholder="G… ile başlayan adresin" autocomplete="off" spellcheck="false">
-      <button id="m-get" class="linkish" style="justify-self:start; border-bottom-color:rgba(236,231,225,0.35)">XDR oluştur</button>
+      <p>No Freighter? Enter your address, sign the resulting XDR in your wallet or Stellar Laboratory, and paste the result back here.</p>
+      <input id="m-addr" placeholder="your address, starting with G…" autocomplete="off" spellcheck="false">
+      <button id="m-get" class="linkish" style="justify-self:start; border-bottom-color:rgba(236,231,225,0.35)">Generate XDR</button>
       <code id="m-xdr" class="hide"></code>
-      <textarea id="m-signed" rows="3" placeholder="imzalanmış XDR" class="hide" spellcheck="false"></textarea>
-      <button id="m-send" class="hide" style="justify-self:start; padding:11px 18px; font-size:13.5px">İmzayı doğrula</button>
+      <textarea id="m-signed" rows="3" placeholder="signed XDR" class="hide" spellcheck="false"></textarea>
+      <button id="m-send" class="hide" style="justify-self:start; padding:11px 18px; font-size:13.5px">Verify signature</button>
     </div>
 
     <div style="display:grid; gap:10px">
-      <button id="primary" class="primary">Freighter ile bağlan</button>
+      <button id="primary" class="primary">Connect with Freighter</button>
       <div style="display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; justify-content:space-between">
-        <button id="toggle-manual" class="linkish">Freighter yok mu? XDR'ı elle imzala</button>
+        <button id="toggle-manual" class="linkish">No Freighter? Sign the XDR manually</button>
       </div>
     </div>
 
     <ul class="notes">
-      <li><i>·</i><span>Bu sayfa yalnızca kendi bilgisayarında çalışır; adres CLI'a lokalden geçer.</span></li>
-      <li><i>·</i><span>İmzalanan işlem ağa gönderilemez — sıra numarası 0'dır, yalnızca kimlik kanıtıdır.</span></li>
-      <li><i>·</i><span>Özel anahtar hiçbir zaman bu sayfaya veya CLI'a girmez.</span></li>
+      <li><i>·</i><span>This page only runs on your own computer; the address reaches the CLI locally.</span></li>
+      <li><i>·</i><span>The signed transaction can never be submitted to the network — sequence number 0, proof of identity only.</span></li>
+      <li><i>·</i><span>Your private key never enters this page or the CLI.</span></li>
     </ul>
   </div>
 </main>
 
 <footer>
   <span>✶ dwell — testnet</span>
-  <span>kapatmak için terminalde Ctrl-C</span>
+  <span>Ctrl-C in the terminal to close</span>
 </footer>
 
 <script>
@@ -209,7 +209,7 @@ function status(text, color) {
 }
 
 log('❯ dwell login', DIM)
-log('  cüzdan bağlı değil', DIM)
+log('  wallet not connected', DIM)
 
 /* ─────────────────────────── sunucu ─────────────────────────── */
 
@@ -287,25 +287,25 @@ function setPrimary(label, o) {
 async function connect() {
   if (busy || done) return
   busy = true
-  setPrimary('challenge oluşturuluyor…', { busy: true })
+  setPrimary('generating challenge…', { busy: true })
   status('challenge', INK)
 
   try {
     if (!(await freighterReady())) {
-      throw new Error('Freighter bulunamadı — kur ve sayfayı yenile, ya da aşağıdan elle imzala')
+      throw new Error('Freighter not found — install it and reload the page, or sign manually below')
     }
 
     const acc = await fSend({ type: 'REQUEST_ACCESS' })
-    if (acc && acc.apiError) throw new Error(acc.apiError.message || 'erişim reddedildi')
+    if (acc && acc.apiError) throw new Error(acc.apiError.message || 'access denied')
     const address = acc && acc.publicKey
-    if (!address) throw new Error('Freighter adres vermedi')
+    if (!address) throw new Error('Freighter did not return an address')
 
     const ch = await post('/challenge', { address })
-    log('→ challenge oluşturuldu (seq 0, ağa gönderilmeyecek)', SOFT)
+    log('→ challenge generated (seq 0, will not be submitted)', SOFT)
 
-    status('imza bekleniyor', INK)
-    setPrimary('Freighter\\u2019da onayla…', { busy: true })
-    log('⋯ Freighter penceresinde imza bekleniyor', INK)
+    status('awaiting signature', INK)
+    setPrimary('confirm in Freighter…', { busy: true })
+    log('⋯ waiting for a signature in the Freighter window', INK)
 
     const signed = await fSend({
       type: 'SUBMIT_TRANSACTION',
@@ -313,8 +313,8 @@ async function connect() {
       networkPassphrase: ch.network_passphrase,
       accountToSign: address,
     })
-    if (signed && signed.apiError) throw new Error(signed.apiError.message || 'imza reddedildi')
-    if (!signed || !signed.signedTransaction) throw new Error('imza alınamadı')
+    if (signed && signed.apiError) throw new Error(signed.apiError.message || 'signature rejected')
+    if (!signed || !signed.signedTransaction) throw new Error('did not receive a signature')
 
     await finish(address, signed.signedTransaction)
   } catch (e) {
@@ -325,23 +325,23 @@ async function connect() {
 }
 
 async function finish(address, signedXdr) {
-  log('✓ imza alındı', ACC)
-  status('doğrulanıyor', INK)
-  setPrimary('doğrulanıyor…', { busy: true })
-  log('⋯ imza doğrulanıyor', INK)
+  log('✓ signature received', ACC)
+  status('verifying', INK)
+  setPrimary('verifying…', { busy: true })
+  log('⋯ verifying signature', INK)
 
   const res = await post('/verify', { address, transaction: signedXdr })
 
   done = true
-  log('✓ doğrulandı — kazanç bu adrese gidecek', ACC)
-  log('✓ oturum kaydedildi ~/.dwell/credentials.json', DIM)
-  status('bağlı', ACC)
+  log('✓ verified — earnings will go to this address', ACC)
+  log('✓ session saved to ~/.dwell/credentials.json', DIM)
+  status('connected', ACC)
 
   $('addr').textContent = res.publisherId
   $('addrbox').classList.remove('hide')
   $('manualbox').classList.add('hide')
   $('toggle-manual').classList.add('hide')
-  setPrimary('Bağlandı — terminale dönebilirsin', { quiet: true, frozen: true })
+  setPrimary('Connected — you can return to the terminal', { quiet: true, frozen: true })
 
   // Trustline'i GERCEKTEN sor. Odemeyi engelleyen sey bu ve kullanicinin
   // baska turlu ogrenmesinin yolu yok — tasarimda sabit "var" yaziyordu,
@@ -353,24 +353,24 @@ async function checkTrust(address) {
   try {
     const r = await post('/trustline', { address })
     if (r.usdc) {
-      $('trust').textContent = 'var'
+      $('trust').textContent = 'yes'
       $('trust').style.color = OK
     } else {
-      $('trust').textContent = 'YOK'
+      $('trust').textContent = 'no'
       $('trust').style.color = ACC
-      log('⚠ cüzdanın USDC kabul etmiyor — bu haliyle ödeme yapılamaz', ACC)
-      log('  kazanmaya devam edersin, para hesabında bekler', DIM)
+      log('⚠ your wallet does not accept USDC — payouts can\\u2019t go through like this', ACC)
+      log('  you\\u2019ll keep earning, the money just waits on your balance', DIM)
     }
   } catch {
-    $('trust').textContent = 'bakılamadı'
+    $('trust').textContent = 'could not check'
   }
 }
 
 function fail(e) {
   const msg = (e && e.message) ? e.message : String(e)
   log('✗ ' + msg, ERR)
-  status('hata', ERR)
-  setPrimary('Tekrar dene', {})
+  status('error', ERR)
+  setPrimary('Try again', {})
 }
 
 $('primary').onclick = connect
@@ -380,8 +380,8 @@ $('primary').onclick = connect
 $('toggle-manual').onclick = () => {
   const gizli = $('manualbox').classList.toggle('hide')
   $('toggle-manual').textContent = gizli
-    ? 'Freighter yok mu? XDR\\u2019ı elle imzala'
-    : 'XDR\\u2019ı elle imzalamayı kapat'
+    ? 'No Freighter? Sign the XDR manually'
+    : 'Hide manual XDR signing'
 }
 
 $('m-get').onclick = async () => {
@@ -393,7 +393,7 @@ $('m-get').onclick = async () => {
     $('m-xdr').classList.remove('hide')
     $('m-signed').classList.remove('hide')
     $('m-send').classList.remove('hide')
-    log('→ challenge oluşturuldu (elle imza)', SOFT)
+    log('→ challenge generated (manual signing)', SOFT)
   } catch (e) { fail(e) }
 }
 
@@ -408,7 +408,7 @@ $('m-send').onclick = async () => {
 freighterReady().then((ok) => {
   if (ok) return
   setTimeout(() => freighterReady().then((ok2) => {
-    if (!ok2) log('  Freighter görünmüyor — kuruluysa sayfayı yenile', DIM)
+    if (!ok2) log('  Freighter not detected — if it\\u2019s installed, reload the page', DIM)
   }), 900)
 })
 </script>
