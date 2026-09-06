@@ -56,7 +56,7 @@ export function readSettings(path = SETTINGS_PATH): ClaudeSettings {
   } catch (e) {
     // Bozuk bir settings.json'u ezmek felakettir — kullanici tum ayarlarini
     // kaybeder. Okuyamiyorsak DOKUNMUYORUZ.
-    throw new Error(`settings.json okunamadi (bozuk JSON olabilir): ${path}`)
+    throw new Error(`could not read settings.json (it may contain broken JSON): ${path}`)
   }
 }
 
@@ -217,7 +217,7 @@ export interface Diagnosis {
 
 export function diagnose(expectedCommand: string, path = SETTINGS_PATH): Diagnosis {
   const none = { spinnerOwner: 'yok' as const, spinnerDetail: null }
-  if (!existsSync(path)) return { installed: false, hijacked: false, detail: 'settings.json yok', ...none }
+  if (!existsSync(path)) return { installed: false, hijacked: false, detail: 'settings.json does not exist', ...none }
 
   let settings: ClaudeSettings
   try { settings = readSettings(path) } catch (e) {
@@ -227,23 +227,23 @@ export function diagnose(expectedCommand: string, path = SETTINGS_PATH): Diagnos
   const sv = settings.spinnerVerbs
   const spinner = sv
     ? sv[MARKER] === true
-      ? { spinnerOwner: 'bizim' as const, spinnerDetail: (sv.verbs ?? []).join(', ') || 'liste bos' }
+      ? { spinnerOwner: 'bizim' as const, spinnerDetail: (sv.verbs ?? []).join(', ') || 'list is empty' }
       : { spinnerOwner: 'baskasinin' as const,
-          spinnerDetail: `baska araca ait, senkron kapali: ${(sv.verbs ?? []).join(', ').slice(0, 40)}` }
+          spinnerDetail: `belongs to another tool, sync is off: ${(sv.verbs ?? []).join(', ').slice(0, 40)}` }
     : none
 
   const sl = settings.statusLine
-  if (!sl) return { installed: false, hijacked: false, detail: 'statusLine tanimli degil', ...spinner }
+  if (!sl) return { installed: false, hijacked: false, detail: 'statusLine is not configured', ...spinner }
 
   if (sl[MARKER] && sl.command === expectedCommand) {
-    return { installed: true, hijacked: false, detail: 'kurulum saglam', ...spinner }
+    return { installed: true, hijacked: false, detail: 'setup is sound', ...spinner }
   }
   if (sl[MARKER] && sl.command !== expectedCommand) {
-    return { installed: false, hijacked: false, detail: 'eski surumden kalma kurulum — `dwell init` tekrar calistir', ...spinner }
+    return { installed: false, hijacked: false, detail: 'leftover install from an old version — run `dwell init` again', ...spinner }
   }
   return {
     installed: false, hijacked: true,
-    detail: `statusLine baska bir araca ait: ${sl.command.slice(0, 60)}`,
+    detail: `statusLine belongs to another tool: ${sl.command.slice(0, 60)}`,
     ...spinner,
   }
 }

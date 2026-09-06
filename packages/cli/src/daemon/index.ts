@@ -207,7 +207,7 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
         } catch (e) {
           opts.onError?.(e)
         }
-        opts.onLog?.(req.on ? 'duraklatildi' : 'devam ediliyor')
+        opts.onLog?.(req.on ? 'paused' : 'resumed')
         return { t: 'ok' }
       }
 

@@ -68,9 +68,9 @@ describe('dwell balance', () => {
     await cmdBalance([], cevap({ pendingStroops: '32000000', payableStroops: '15000000' }))
 
     const s = ekran()
-    expect(s).toContain('odenebilir')
+    expect(s).toContain('payable')
     expect(s).toContain('$1.5')
-    expect(s).toContain('bekleyen')
+    expect(s).toContain('pending')
     expect(s).toContain('$3.2')
     // Toplam ($4.7) HICBIR yerde tek sayi olarak gecmemeli.
     expect(s).not.toContain('$4.7')
@@ -79,14 +79,14 @@ describe('dwell balance', () => {
   it('bekleyenin henuz para OLMADIGI yaziyor', async () => {
     girisYap()
     await cmdBalance([], cevap({ pendingStroops: '32000000' }))
-    expect(ekran()).toContain('dogrulanmayi bekliyor')
+    expect(ekran()).toContain('awaiting verification')
   })
 
   it('esigin altindayken NE KADAR kaldigi soylenir', async () => {
     girisYap()
     await cmdBalance([], cevap({
       payableStroops: '4000000', payoutThresholdStroops: '10000000',
-      blockedReason: 'esik 10000000 stroop, bakiye 4000000',
+      blockedReason: 'threshold 10000000 stroop, balance 4000000',
     }))
     const s = ekran()
     expect(s).toContain('$0.6')          // 1.00 − 0.40
@@ -96,7 +96,7 @@ describe('dwell balance', () => {
   it('esik asildiysa odemenin gelecegi soylenir', async () => {
     girisYap()
     await cmdBalance([], cevap({ payableStroops: '25000000' }))
-    expect(ekran()).toMatch(/esik asildi/)
+    expect(ekran()).toMatch(/threshold cleared/)
   })
 
   /**
@@ -108,22 +108,22 @@ describe('dwell balance', () => {
     girisYap()
     await cmdBalance([], cevap({
       payableStroops: '4000000',
-      blockedReason: 'cuzdan degisikligi sonrasi 72 saat bekleme',
+      blockedReason: 'wallet-change hold, 72 hours remaining',
     }))
-    expect(ekran()).toContain('72 saat')
+    expect(ekran()).toContain('72 hours')
   })
 
   it('yolda para YOKSA o satir hic cikmaz', async () => {
     girisYap()
     await cmdBalance([], cevap({ inFlightStroops: '0' }))
-    expect(ekran()).not.toContain('yolda')
+    expect(ekran()).not.toContain('in flight')
   })
 
   it('yolda para VARSA gosterilir', async () => {
     girisYap()
     await cmdBalance([], cevap({ inFlightStroops: '7000000' }))
     const s = ekran()
-    expect(s).toContain('yolda')
+    expect(s).toContain('in flight')
     expect(s).toContain('$0.7')
   })
 
@@ -140,7 +140,10 @@ describe('dwell balance', () => {
     await cmdBalance(['--json'], cevap({ payableStroops: '15000000' }))
     const s = ekran().trim()
     expect(JSON.parse(s).payableStroops).toBe('15000000')
-    expect(s).not.toContain('odenebilir')
+    // Ham JSON'un alan adlari zaten Ingilizce (`payableStroops`) — "hicbir
+    // suslemesi yok" testi bunu degil, insan-okur GORUNUMUN (dolar isareti,
+    // satir basliklari) sizmadigini kontrol ediyor.
+    expect(s).not.toContain('$')
   })
 
   it('401 alinca yeniden giris soylenir', async () => {
@@ -154,7 +157,7 @@ describe('dwell balance', () => {
     girisYap()
     const f = (async () => { throw new Error('ECONNREFUSED') }) as unknown as typeof fetch
     await expect(cmdBalance([], f)).rejects.toThrow()
-    expect(ekran()).toContain('ulasilamadi')
+    expect(ekran()).toContain('reach the server')
   })
 
   it('son odemeler tarih ve islem linkiyle listelenir', async () => {
@@ -165,7 +168,7 @@ describe('dwell balance', () => {
       ],
     }))
     const s = ekran()
-    expect(s).toContain('son odemeler')
+    expect(s).toContain('recent payouts')
     expect(s).toContain('$2.5')
     expect(s).toContain('abc123')
   })

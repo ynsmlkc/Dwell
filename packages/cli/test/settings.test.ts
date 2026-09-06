@@ -191,7 +191,7 @@ describe('kaldirma', () => {
 describe('bozuk dosya', () => {
   it('okunamazsa DOKUNMAZ — tum ayarlari kaybetmektense hata ver', () => {
     writeFileSync(path, '{ bu bozuk json')
-    expect(() => install(OPTS, path)).toThrow(/okunamadi/)
+    expect(() => install(OPTS, path)).toThrow(/could not read/)
     expect(readFileSync(path, 'utf8')).toBe('{ bu bozuk json')
   })
 })
@@ -220,11 +220,11 @@ describe('doctor — kurulum saglam mi', () => {
     install({ ...OPTS, statusLineCommand: '/eski/yol' }, path)
     const d = diagnose(OPTS.statusLineCommand, path)
     expect(d.hijacked, 'bu ele gecirme degil').toBe(false)
-    expect(d.detail).toMatch(/eski surumden/)
+    expect(d.detail).toMatch(/old version/)
   })
 
   it('hic kurulmamissa dogru soyler', () => {
-    expect(diagnose(OPTS.statusLineCommand, path).detail).toMatch(/settings.json yok/)
+    expect(diagnose(OPTS.statusLineCommand, path).detail).toMatch(/does not exist/)
   })
 })
 

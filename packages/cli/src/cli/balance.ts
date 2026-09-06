@@ -42,7 +42,7 @@ export async function cmdBalance(
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
   const creds = loadCredentials()
-  if (!creds) fail('DWL-2001', 'Giris yapilmamis', '`dwell login` ile cuzdanini bagla')
+  if (!creds) fail('DWL-2001', 'Not logged in', '`dwell login` to connect your wallet')
 
   let res: Response
   try {
@@ -52,13 +52,13 @@ export async function cmdBalance(
     })
   } catch (e) {
     // Ag hatasi bir SORU degil, bir DURUM. Kullaniciya ne yapacagini soyle.
-    fail('DWL-3001', 'Sunucuya ulasilamadi', e instanceof Error ? e.message : String(e))
+    fail('DWL-3001', 'Could not reach the server', e instanceof Error ? e.message : String(e))
   }
 
   if (res.status === 401) {
-    fail('DWL-2002', 'Token gecersiz', '`dwell login --force` ile tekrar bagla')
+    fail('DWL-2002', 'Token is invalid', '`dwell login --force` to reconnect')
   }
-  if (!res.ok) fail('DWL-3001', `Sunucu hatasi (HTTP ${res.status})`)
+  if (!res.ok) fail('DWL-3001', `Server error (HTTP ${res.status})`)
 
   const b = (await res.json()) as BalanceResponse
   render(b, creds.publisherId, argv.includes('--json') ? JSON.stringify(b) : null)
@@ -74,37 +74,37 @@ function render(b: BalanceResponse, address: string, jsonOut: string | null): vo
 
   banner()
   rows([
-    ['odenebilir', `${bold(green(usdc(payable)))}`],
-    ['bekleyen', `${usdc(pending)} ${dim('· dogrulanmayi bekliyor')}`],
+    ['payable', `${bold(green(usdc(payable)))}`],
+    ['pending', `${usdc(pending)} ${dim('· awaiting verification')}`],
     ...(inFlight > 0n
-      ? [['yolda', `${usdc(inFlight)} ${dim('· zincirde onay bekleniyor')}`] as const]
+      ? [['in flight', `${usdc(inFlight)} ${dim('· awaiting on-chain confirmation')}`] as const]
       : []),
-    ['toplam kazanc', dim(usdc(b.lifetimeStroops))],
+    ['lifetime earnings', dim(usdc(b.lifetimeStroops))],
   ])
 
   out()
-  out(`  ${dim('cuzdan')}  ${address}`)
+  out(`  ${dim('wallet')}  ${address}`)
   out()
 
   /* ── odeme ne zaman ── */
 
   if (payable >= threshold) {
-    ok(`esik asildi — bir sonraki odeme turunda gonderilecek`)
+    ok(`threshold cleared — going out in the next payout round`)
   } else if (b.blockedReason) {
     const kalan = threshold - payable
-    warn(`${usdc(kalan)} daha gerekiyor ${dim(`(esik ${usdc(threshold)})`)}`)
+    warn(`${usdc(kalan)} more needed ${dim(`(threshold ${usdc(threshold)})`)}`)
     // Sunucunun kendi gerekcesi farkliysa onu da goster — esik disinda bir
     // sebep olabilir (cuzdan bekleme suresi, trustline eksigi).
-    if (!/esik/i.test(b.blockedReason)) info(dim(b.blockedReason))
+    if (!/threshold/i.test(b.blockedReason)) info(dim(b.blockedReason))
   } else {
-    info(dim('odeme bekleniyor'))
+    info(dim('payout pending'))
   }
 
   /* ── gecmis ── */
 
   if (b.recentPayouts.length > 0) {
     out()
-    out(`  ${dim('son odemeler')}`)
+    out(`  ${dim('recent payouts')}`)
     for (const p of b.recentPayouts.slice(0, 5)) {
       const isaret = p.state === 'settled' ? green('✓') : yellow('·')
       const tarih = new Date(p.at).toLocaleDateString()

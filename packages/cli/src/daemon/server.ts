@@ -46,7 +46,7 @@ export async function startSocketServer(
   // Once gercekten olu mu diye bakilir, canliysa DOKUNULMAZ.
   if (existsSync(socketPath)) {
     if (await isSocketAlive(socketPath)) {
-      throw new Error(`dwelld zaten calisiyor: ${socketPath}`)
+      throw new Error(`dwelld is already running: ${socketPath}`)
     }
     try { unlinkSync(socketPath) } catch { /* yaris — bind zaten patlar */ }
   }

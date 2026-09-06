@@ -129,7 +129,7 @@ export class ServerSync {
       // ADR-016 — sunucu bizi eski buluyorsa render'i durdur. Kullaniciya
       // sessizce yanlis calisan bir istemci birakmaktansa susmak dogru.
       if (res.status === 426) {
-        this.#lastError = 'istemci surumu cok eski — `npm i -g dwell` ile guncelle'
+        this.#lastError = 'client version is too old — update with `npm i -g dwell`'
         this.opts.setConfig({ ...this.opts.config(), renderEnabled: false })
         this.opts.onLog(this.#lastError)
         return null

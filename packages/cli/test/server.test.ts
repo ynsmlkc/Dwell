@@ -81,7 +81,7 @@ describe('unix socket sunucusu', () => {
   it('canli daemon varken ikinci ornek REDDEDILIR', async () => {
     const p = join(newDir(), 'd.sock')
     server = await startSocketServer(p, () => ({ t: 'ok' }))
-    await expect(startSocketServer(p, () => ({ t: 'ok' }))).rejects.toThrow(/zaten calisiyor/)
+    await expect(startSocketServer(p, () => ({ t: 'ok' }))).rejects.toThrow(/already running/)
   })
 
   it('asiri buyuk istek baglantiyi keser — bellek doldurulamaz', async () => {

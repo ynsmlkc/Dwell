@@ -82,7 +82,7 @@ export interface StartOptions {
 
 /** Daemon'i arka planda baslatir ve ayaga kalkmasini bekler. */
 export async function start(opts: StartOptions): Promise<{ pid: number } | { error: string }> {
-  if (await isAlive()) return { error: 'daemon zaten calisiyor' }
+  if (await isAlive()) return { error: 'daemon already running' }
 
   mkdirSync(home(), { recursive: true, mode: 0o700 })
   // Log dosyasina yaz: detached surecin ciktisi kaybolmasin, `dwell doctor`
@@ -95,7 +95,7 @@ export async function start(opts: StartOptions): Promise<{ pid: number } | { err
     env: { ...process.env, ...opts.env },
   })
   child.unref()
-  if (child.pid === undefined) return { error: 'surec baslatilamadi' }
+  if (child.pid === undefined) return { error: 'could not spawn the process' }
 
   // Ayaga kalkmasini bekle — hemen doner ve "kuruldu" dersek, kullanici
   // calismayan bir daemon'la kalir.
@@ -114,7 +114,7 @@ export async function start(opts: StartOptions): Promise<{ pid: number } | { err
   }
   // Basarisiz baslatmadan geriye pidfile BIRAKMIYORUZ.
   try { unlinkSync(pidPath()) } catch { /* zaten yok */ }
-  return { error: `daemon ${opts.waitMs ?? 5000}ms icinde yanit vermedi — ${logPath()}` }
+  return { error: `daemon did not respond within ${opts.waitMs ?? 5000}ms — ${logPath()}` }
 }
 
 /**

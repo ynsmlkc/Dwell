@@ -364,13 +364,13 @@ describe('giristen sonra daemon kimligi', () => {
     const cikti = c.satirlar.join('')
     expect(cikti).toContain('port mesgul')
     expect(cikti).toContain('dwell restart')
-    expect(cikti).toContain('ESKI')          // sonucunu acikca yazar
+    expect(cikti).toContain('OLD')          // sonucunu acikca yazar
   })
 
   it('basarisizlikta sessizce basarili gibi davranmaz', async () => {
     const c = yakala()
     await kimligiTazele(async () => ({ error: 'x' }))
     c.bitir()
-    expect(c.satirlar.join('')).not.toContain('yeni kimlikle calisiyor')
+    expect(c.satirlar.join('')).not.toContain('running with the new identity')
   })
 })

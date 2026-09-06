@@ -68,9 +68,9 @@ const statusLineCommand = (): string => `${process.execPath} ${shimPath()}`
  */
 function geciciKonum(): string | null {
   const p = PKG_ROOT
-  if (p.includes('/_npx/') || p.includes('\\_npx\\')) return 'npx onbellegi'
+  if (p.includes('/_npx/') || p.includes('\\_npx\\')) return 'npx cache'
   if (p.includes('/.npm/_cacache') || p.includes('/tmp/') || p.startsWith('/private/tmp/')) {
-    return 'gecici klasor'
+    return 'temporary folder'
   }
   return null
 }
@@ -84,27 +84,27 @@ async function cmdInit(argv: string[]): Promise<void> {
   if (gecici && !argv.includes('--allow-temp')) {
     fail(
       'DWL-1004',
-      `Dwell ${gecici} icinden calisiyor — buradan kurulmaz`,
-      'Kalici olarak kur:  npm i -g dwellsh && dwell init',
+      `Dwell is running from a ${gecici} — cannot install from here`,
+      'Install it permanently:  npm i -g dwellsh && dwell init',
     )
   }
 
   // 1. Cakisma var mi? ONCE sor, sonra yaz.
   let settings
   try { settings = readSettings() } catch (e) {
-    fail('DWL-1003', 'Claude Code ayar dosyasi okunamadi',
-      `${SETTINGS_PATH} bozuk JSON olabilir. Duzeltince tekrar dene — dosyaya dokunmadik.`)
+    fail('DWL-1003', 'Could not read the Claude Code settings file',
+      `${SETTINGS_PATH} may contain broken JSON. Fix it and try again — we didn't touch the file.`)
   }
   const conflicts = detectConflicts(settings).filter((c) => !c.ours)
 
   if (conflicts.length > 0 && !force) {
-    warn('Mevcut ayarlarin var, uzerine YAZMADIK:')
+    warn('You already have settings — we did NOT overwrite them:')
     out()
     for (const c of conflicts) info(`${bold(c.field)}  ${dim(c.current)}`)
     out()
-    info(`Yine de kurmak icin: ${bold('dwell init --force')}`)
-    info(dim('(mevcut ayarin yedeklenir, `dwell uninstall` geri getirmez —'))
-    info(dim(' yedek ~/.claude/dwell-backups/ altinda durur)'))
+    info(`To install anyway: ${bold('dwell init --force')}`)
+    info(dim('(your current setting is backed up, `dwell uninstall` won\'t restore it —'))
+    info(dim(' the backup lives under ~/.claude/dwell-backups/)'))
     out()
   }
 
@@ -117,17 +117,17 @@ async function cmdInit(argv: string[]): Promise<void> {
     force,
   })
 
-  for (const f of result.changed) ok(`${f} kuruldu`)
-  if (result.backupPath) info(dim(`yedek: ${result.backupPath}`))
+  for (const f of result.changed) ok(`${f} installed`)
+  if (result.backupPath) info(dim(`backup: ${result.backupPath}`))
 
   // 3. Daemon
   out()
   const started = await daemon.start({ entry: daemonEntry() })
   if ('error' in started) {
-    if (started.error.includes('zaten')) ok('daemon zaten calisiyor')
-    else fail('DWL-1001', 'Daemon baslatilamadi', started.error)
+    if (started.error.includes('already')) ok('daemon already running')
+    else fail('DWL-1001', 'Could not start the daemon', started.error)
   } else {
-    ok(`daemon calisiyor (pid ${started.pid})`)
+    ok(`daemon running (pid ${started.pid})`)
   }
 
   // 4. Giris yapilmadiysa BUNU SOYLE.
@@ -138,20 +138,20 @@ async function cmdInit(argv: string[]): Promise<void> {
   // beklemeye birakmak olurdu.
   if (!loadCredentials()) {
     out()
-    warn(`${bold('demo modu')} — cuzdan bagli degil, ${bold('kazanc yok')}`)
-    info(dim('gosterdigin reklamlar ornek; hicbir yere kaydedilmiyor'))
-    info(`gercekten kazanmak icin: ${bold('dwell login')}`)
+    warn(`${bold('demo mode')} — no wallet connected, ${bold('no earnings')}`)
+    info(dim('the ads you see are samples; nothing is being recorded'))
+    info(`to actually earn: ${bold('dwell login')}`)
   }
 
   // 5. Ne degistigini SOYLE — kullanicidan bir sey aldik.
   out()
-  out(`  ${bold('Bilmen gerekenler')}`)
-  info('• Claude Code, alt satirdaki bazi klavye ipuclarini artik gostermiyor')
-  info(`  (${dim('esc to interrupt')} gibi) — custom statusLine tanimliyken oluyor`)
-  if (withSpinner) info('• Spinner kelimeleri degisti')
-  info(`• Geri almak: ${bold('dwell uninstall')} — kendi izimizi sileriz, senin ayarlarina dokunmayiz`)
+  out(`  ${bold('Good to know')}`)
+  info('• Claude Code no longer shows some keyboard hints on the bottom line')
+  info(`  (like ${dim('esc to interrupt')}) — happens whenever a custom statusLine is set`)
+  if (withSpinner) info('• Spinner words changed')
+  info(`• To undo: ${bold('dwell uninstall')} — we remove our own footprint, we don't touch your settings`)
   out()
-  info(`Yeni bir Claude Code oturumu ac. ${dim('Beklerken alt satirda gorunecek.')}`)
+  info(`Open a new Claude Code session. ${dim('It will show up on the bottom line while you wait.')}`)
   out()
 }
 
@@ -164,11 +164,11 @@ async function cmdDoctor(): Promise<void> {
 
   const checks: [string, boolean, string][] = [
     ['settings.json', d.installed, d.detail],
-    ['daemon', alive, alive ? `pid ${daemon.readPid() ?? '?'}` : 'calismiyor — `dwell init`'],
+    ['daemon', alive, alive ? `pid ${daemon.readPid() ?? '?'}` : 'not running — `dwell init`'],
     ['socket', existsSync(SOCKET_PATH), SOCKET_PATH],
     ['shim', existsSync(shimPath()), shimPath().endsWith('.ts')
-      ? 'TypeScript kaynagi — derlenmis surum daha hizli' : 'derlenmis'],
-    ['spinner', d.spinnerOwner !== 'baskasinin', d.spinnerDetail ?? 'kurulu degil'],
+      ? 'TypeScript source — the compiled version is faster' : 'compiled'],
+    ['spinner', d.spinnerOwner !== 'baskasinin', d.spinnerDetail ?? 'not installed'],
   ]
 
   for (const [name, good, detail] of checks) {
@@ -177,31 +177,31 @@ async function cmdDoctor(): Promise<void> {
 
   if (d.spinnerOwner === 'baskasinin') {
     out()
-    warn('spinnerVerbs BASKA BIR ARACA ait — spinner senkronu sessizce kapali.')
-    info('Kullanicinin ayarini ezmeme kurali geregi dokunmuyoruz. Ayni yuzeyi')
-    info('kullanan baska bir eklenti kurulu olabilir; bazilari saniyeler icinde')
-    info('kendi degerini geri yaziyor, yani `--force` de kalici olmaz.')
-    info('Once o araci kaldir, sonra `dwell init --spinner`.')
+    warn('spinnerVerbs belongs to ANOTHER TOOL — spinner sync is silently off.')
+    info('We don\'t touch it, per the rule of never overwriting a user\'s own')
+    info('setting. Another plugin using the same surface may be installed;')
+    info('some of these write their value back within seconds, so even')
+    info('`--force` wouldn\'t stick. Remove that tool first, then run `dwell init --spinner`.')
   }
 
   if (d.hijacked) {
     out()
-    warn('statusLine ayarin BASKA BIR ARAC tarafindan degistirilmis.')
-    info('Ayni satiri kullanan baska bir eklenti kurulu olabilir; bazilari')
-    info('periyodik olarak kendi ayarini geri koyuyor.')
-    info(`Tekrar kurmak icin: ${bold('dwell init --force')}`)
+    warn('Your statusLine setting has been changed by ANOTHER TOOL.')
+    info('Another plugin using the same line may be installed; some of these')
+    info('periodically restore their own setting.')
+    info(`To reinstall: ${bold('dwell init --force')}`)
   }
 
   if (health?.t === 'health') {
     out()
     const i = health.info
     rows([
-      ['durum', i.phase],
-      ['kuyrukta', `${i.queuedImpressions} gosterim`],
-      ['reklam', `${i.adsCached} adet onbellekte`],
-      ['render', i.renderEnabled ? 'acik' : 'kapali'],
-      ...(i.paused ? [['duraklatildi', 'evet — `dwell resume`'] as const] : []),
-      ...(i.lastError ? [['son hata', i.lastError] as const] : []),
+      ['status', i.phase],
+      ['queued', `${i.queuedImpressions} impression(s)`],
+      ['ads', `${i.adsCached} cached`],
+      ['render', i.renderEnabled ? 'on' : 'off'],
+      ...(i.paused ? [['paused', 'yes — `dwell resume`'] as const] : []),
+      ...(i.lastError ? [['last error', i.lastError] as const] : []),
     ])
   }
   out()
@@ -210,12 +210,12 @@ async function cmdDoctor(): Promise<void> {
 async function cmdUninstall(): Promise<void> {
   banner()
   await daemon.stop()
-  ok('daemon durduruldu')
+  ok('daemon stopped')
 
   const r = uninstall()
-  if (r.removed.length === 0) warn('settings.json\'da bize ait bir ayar bulunamadi')
-  for (const f of r.removed) ok(`${f} kaldirildi`)
-  if (r.backupPath) info(dim(`yedek: ${r.backupPath}`))
+  if (r.removed.length === 0) warn('couldn\'t find any of our own settings in settings.json')
+  for (const f of r.removed) ok(`${f} removed`)
+  if (r.backupPath) info(dim(`backup: ${r.backupPath}`))
 
   /**
    * Spinner ACIK OTURUMDA hemen kaybolmaz — bunu SOYLEMEK zorundayiz.
@@ -231,13 +231,13 @@ async function cmdUninstall(): Promise<void> {
    */
   if (r.removed.includes('spinnerVerbs')) {
     out()
-    info(`Spinner kelimeleri ${bold('acik oturumda')} degismez —`)
-    info(dim('Claude Code onlari yeniden okumuyor. Yeni oturumda kendi kelimeleri doner.'))
+    info(`Spinner words won't change ${bold('in an open session')} —`)
+    info(dim('Claude Code doesn\'t re-read them. Its own words return in a new session.'))
   }
 
   out()
-  info('Senin diger ayarlarina dokunulmadi.')
-  info(`Kazancin duruyor — ${bold('dwell init')} ile geri donebilirsin.`)
+  info('Your other settings were untouched.')
+  info(`Your earnings are still there — ${bold('dwell init')} brings you back.`)
   out()
 }
 
@@ -245,22 +245,22 @@ async function cmdStatus(): Promise<void> {
   banner()
   const health = await daemon.ask({ t: 'health' })
   if (health === null || health.t !== 'health') {
-    fail('DWL-1001', 'Daemon calismiyor', '`dwell init` ile baslat')
+    fail('DWL-1001', 'Daemon is not running', '`dwell init` to start it')
   }
   const i = health.info
   rows([
-    ['surum', i.version],
-    ['durum', i.phase === 'idle' ? dim('bekliyor') : green(i.phase)],
-    ['calisma suresi', `${Math.round(i.uptimeMs / 60_000)} dakika`],
-    ['kuyrukta', `${i.queuedImpressions} gosterim`],
-    ['aktif oturum', i.activeSession ?? dim('yok')],
+    ['version', i.version],
+    ['status', i.phase === 'idle' ? dim('waiting') : green(i.phase)],
+    ['uptime', `${Math.round(i.uptimeMs / 60_000)} min`],
+    ['queued', `${i.queuedImpressions} impression(s)`],
+    ['active session', i.activeSession ?? dim('none')],
   ])
   out()
 }
 
 async function cmdPause(paused: boolean): Promise<void> {
   const alive = await daemon.isAlive()
-  if (!alive) fail('DWL-1001', 'Daemon calismiyor', '`dwell init` ile baslat')
+  if (!alive) fail('DWL-1001', 'Daemon is not running', '`dwell init` to start it')
 
   // Once GERCEKTEN durdur, sonra soyle.
   //
@@ -269,11 +269,11 @@ async function cmdPause(paused: boolean): Promise<void> {
   // kotu sey, olmayan bir seyi olmus gibi gostermek.
   const res = await daemon.ask({ t: 'pause', on: paused })
   if (!res || res.t !== 'ok') {
-    fail('DWL-1001', paused ? 'Duraklatilamadi' : 'Devam ettirilemedi', 'daemon cevap vermedi')
+    fail('DWL-1001', paused ? 'Could not pause' : 'Could not resume', 'daemon did not respond')
   }
 
-  out(paused ? `${yellow('⏸')} duraklatildi — reklam gosterilmeyecek` : `${green('▶')} devam ediyor`)
-  if (paused) info(dim('kalici: yeniden baslatsan da duraklatilmis kalir · `dwell resume`'))
+  out(paused ? `${yellow('⏸')} paused — ads won't be shown` : `${green('▶')} resumed`)
+  if (paused) info(dim('persists: stays paused even if you restart · `dwell resume`'))
 }
 
 /**
@@ -287,40 +287,40 @@ async function cmdPause(paused: boolean): Promise<void> {
 async function cmdRestart(): Promise<void> {
   banner()
   const durdu = await daemon.stop()
-  if (durdu) ok('daemon durduruldu')
+  if (durdu) ok('daemon stopped')
 
   const started = await daemon.start({ entry: daemonEntry() })
-  if ('error' in started) fail('DWL-1001', 'Daemon baslatilamadi', started.error)
-  ok(`daemon calisiyor (pid ${started.pid})`)
+  if ('error' in started) fail('DWL-1001', 'Could not start the daemon', started.error)
+  ok(`daemon running (pid ${started.pid})`)
 
   const creds = loadCredentials()
-  if (creds) info(dim(`cuzdan ${shortAddress(creds.publisherId)}`))
-  else info(dim('cuzdan bagli degil — `dwell login`'))
+  if (creds) info(dim(`wallet ${shortAddress(creds.publisherId)}`))
+  else info(dim('no wallet connected — `dwell login`'))
   out()
 }
 
 function cmdHelp(): void {
   banner()
-  out(`  ${dim('AI kodlama araclarinin bekleme anlarini kazanca cevirir.')}`)
+  out(`  ${dim('Turns your AI coding tool\'s wait time into earnings.')}`)
   out()
   rows([
-    ['dwell init', 'kur ve baslat'],
-    ['dwell login', 'cuzdanini bagla — kazanc buraya gider'],
-    ['dwell balance', 'kazancini goster'],
-    ['dwell whoami', 'bagli cuzdani goster'],
-    ['dwell logout', 'cuzdan baglantisini kaldir'],
-    ['dwell doctor', 'kurulumu tesh­is et'],
-    ['dwell status', 'daemon durumu'],
-    ['dwell restart', 'daemon\'i yeniden baslat'],
-    ['dwell pause', 'reklami gecici durdur'],
-    ['dwell resume', 'devam et'],
-    ['dwell uninstall', 'kaldir — kendi izimizi sileriz'],
-    ['dwell version', 'surumu yaz'],
+    ['dwell init', 'install and start'],
+    ['dwell login', 'connect your wallet — earnings go here'],
+    ['dwell balance', 'show your earnings'],
+    ['dwell whoami', 'show the connected wallet'],
+    ['dwell logout', 'disconnect the wallet'],
+    ['dwell doctor', 'diagnose the setup'],
+    ['dwell status', 'daemon status'],
+    ['dwell restart', 'restart the daemon'],
+    ['dwell pause', 'pause ads temporarily'],
+    ['dwell resume', 'resume'],
+    ['dwell uninstall', 'remove — we clean up our own footprint'],
+    ['dwell version', 'print the version'],
   ])
   out()
   rows([
-    ['--force', 'mevcut ayarin uzerine yaz'],
-    ['--spinner', 'spinner katmanini da kur'],
+    ['--force', 'overwrite the existing setting'],
+    ['--spinner', 'also install the spinner layer'],
   ])
   out()
 }
@@ -362,7 +362,7 @@ export async function main(argv: readonly string[]): Promise<void> {
       out(VERSION)
       return
     default:
-      fail('DWL-9001', `bilinmeyen komut: ${cmd}`, '`dwell help` ile komutlari gor')
+      fail('DWL-9001', `unknown command: ${cmd}`, '`dwell help` to see the commands')
   }
 }
 
@@ -401,6 +401,6 @@ function dogrudanCalistirildi(): boolean {
 if (dogrudanCalistirildi()) {
   main(process.argv.slice(2)).catch((e: unknown) => {
     // Stack trace ASLA kullaniciya gitmez.
-    fail('DWL-9001', 'Beklenmeyen hata', e instanceof Error ? e.message : String(e))
+    fail('DWL-9001', 'Unexpected error', e instanceof Error ? e.message : String(e))
   })
 }

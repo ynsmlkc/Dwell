@@ -80,8 +80,8 @@ export async function cmdLogin(
   const opts = parseLoginArgs(argv)
   const existing = loadCredentials()
   if (existing && !argv.includes('--force')) {
-    warn(`zaten giris yapilmis: ${bold(shortAddress(existing.publisherId))}`)
-    info(`baska bir cuzdana gecmek icin ${dim('dwell login --force')}`)
+    warn(`already logged in: ${bold(shortAddress(existing.publisherId))}`)
+    info(`to switch to a different wallet: ${dim('dwell login --force')}`)
     return
   }
 
@@ -95,10 +95,10 @@ export async function cmdLogin(
   })
 
   out()
-  ok(`giris yapildi — ${bold(result.publisherId)}`)
-  info(dim(`token ${credentialsPath()} icinde (yalnizca sen okuyabilirsin)`))
+  ok(`logged in — ${bold(result.publisherId)}`)
+  info(dim(`token stored in ${credentialsPath()} (only you can read it)`))
   out()
-  info(`kazanc bu adrese gidecek. ${dim('dwell balance')} ile takip et.`)
+  info(`earnings will go to this address. Track them with ${dim('dwell balance')}.`)
 
   /**
    * Daemon'i BIZ yeniden baslatiyoruz.
@@ -129,12 +129,12 @@ export async function kimligiTazele(daemonYeniden: DaemonYeniden): Promise<void>
     // Basarisizlik SESSIZ GECILMEZ: kullanici ne yapacagini bilmeli, cunku
     // bu haliyle kazanci eski cuzdana yazilmaya devam eder.
     out()
-    warn('daemon yeni kimlikle yeniden baslatilamadi')
+    warn('could not restart the daemon with the new identity')
     info(dim(r.error))
-    info(`elle: ${bold('dwell restart')} — bunu yapmadan kazanc ESKI cuzdana yazilir`)
+    info(`manually: ${bold('dwell restart')} — until you do, earnings go to the OLD wallet`)
     return
   }
-  ok(`daemon yeni kimlikle calisiyor (pid ${r.pid})`)
+  ok(`daemon running with the new identity (pid ${r.pid})`)
 }
 
 interface LoginResult {
@@ -171,7 +171,7 @@ export function runLoginServer(opts: LoginOptions): Promise<LoginResult> {
     }
 
     const timer = setTimeout(() => {
-      finish(() => reject(new Error('sure doldu — tarayicida islem tamamlanmadi')))
+      finish(() => reject(new Error('timed out — the browser flow was not completed')))
     }, LOGIN_TIMEOUT_MS)
     timer.unref()
 
@@ -204,8 +204,8 @@ export function runLoginServer(opts: LoginOptions): Promise<LoginResult> {
         return
       }
 
-      if (req.method !== 'POST') { json(res, 404, { message: 'yok' }); return }
-      if (req.headers['x-dwell-nonce'] !== nonce) { json(res, 403, { message: 'gecersiz oturum' }); return }
+      if (req.method !== 'POST') { json(res, 404, { message: 'not found' }); return }
+      if (req.headers['x-dwell-nonce'] !== nonce) { json(res, 403, { message: 'invalid session' }); return }
 
       const body = await readJson(req)
 
@@ -215,7 +215,7 @@ export function runLoginServer(opts: LoginOptions): Promise<LoginResult> {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ address: body?.['address'] }),
         })
-        json(res, r.status, await r.json().catch(() => ({ message: 'sunucu cevabi okunamadi' })))
+        json(res, r.status, await r.json().catch(() => ({ message: 'could not read the server response' })))
         return
       }
 
@@ -252,7 +252,7 @@ export function runLoginServer(opts: LoginOptions): Promise<LoginResult> {
         })
         const payload = (await r.json().catch(() => null)) as LoginResult | null
         if (!r.ok || !payload?.token) {
-          json(res, r.status === 200 ? 502 : r.status, payload ?? { message: 'dogrulama basarisiz' })
+          json(res, r.status === 200 ? 502 : r.status, payload ?? { message: 'verification failed' })
           return
         }
         // Token'i tarayiciya GERI GONDERME — sayfaya yalnizca adres doner.
@@ -261,7 +261,7 @@ export function runLoginServer(opts: LoginOptions): Promise<LoginResult> {
         return
       }
 
-      json(res, 404, { message: 'yok' })
+      json(res, 404, { message: 'not found' })
     }
 
     server.on('error', (e) => finish(() => reject(e)))
@@ -271,17 +271,17 @@ export function runLoginServer(opts: LoginOptions): Promise<LoginResult> {
     server.listen(0, '127.0.0.1', () => {
       const addr = server.address()
       if (typeof addr === 'string' || addr === null) {
-        finish(() => reject(new Error('yerel sunucu baslatilamadi')))
+        finish(() => reject(new Error('could not start the local server')))
         return
       }
       port = addr.port
       const url = `http://127.0.0.1:${port}/`
 
       out()
-      out(`  ${orange('◆')} ${bold('Cuzdanini bagla')}`)
+      out(`  ${orange('◆')} ${bold('Connect your wallet')}`)
       out()
-      info(`tarayicida ac: ${green(url)}`)
-      info(dim('5 dakika icinde tamamla · iptal icin Ctrl-C'))
+      info(`open in your browser: ${green(url)}`)
+      info(dim('complete it within 5 minutes · Ctrl-C to cancel'))
       out()
 
       if (!opts.noBrowser) (opts.openImpl ?? openBrowser)(url)
@@ -296,7 +296,7 @@ async function readJson(req: IncomingMessage): Promise<Record<string, unknown> |
     size += (c as Buffer).length
     // XDR buyuk olabilir ama sinirsiz degil. Sinir olmadan bir istek belligi
     // doldurabilir.
-    if (size > 256 * 1024) throw new Error('govde cok buyuk')
+    if (size > 256 * 1024) throw new Error('body too large')
     chunks.push(c as Buffer)
   }
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown> }
@@ -318,20 +318,20 @@ function openBrowser(url: string): void {
 export function cmdLogout(): void {
   const c = loadCredentials()
   const removed = clearCredentials()
-  if (!removed) { warn('zaten giris yapilmamis'); return }
-  ok(`cikis yapildi${c ? ` — ${shortAddress(c.publisherId)}` : ''}`)
+  if (!removed) { warn('not logged in'); return }
+  ok(`logged out${c ? ` — ${shortAddress(c.publisherId)}` : ''}`)
   // Token sunucuda HALA GECERLI. Iptal ucu yazilinca burada cagrilacak;
   // simdilik durumu gizlemek yerine soyluyoruz.
-  info(dim('not: cihaz token\'i sunucuda hala gecerli — iptal ucu henuz yok'))
-  info(dim('daemon calisiyorsa `dwell restart` ile durdur'))
+  info(dim('note: the device token is still valid on the server — revocation isn\'t built yet'))
+  info(dim('if the daemon is running, stop it with `dwell restart`'))
 }
 
 export function cmdWhoami(): void {
   const c = loadCredentials()
-  if (!c) fail('DWL-2001', 'Giris yapilmamis', '`dwell login` ile cuzdanini bagla')
+  if (!c) fail('DWL-2001', 'Not logged in', '`dwell login` to connect your wallet')
   out()
   out(`  ${bold(c.publisherId)}`)
-  info(dim(`sunucu ${c.serverUrl}`))
-  info(dim(`giris ${new Date(c.loggedInAt).toLocaleString()}`))
+  info(dim(`server ${c.serverUrl}`))
+  info(dim(`logged in ${new Date(c.loggedInAt).toLocaleString()}`))
   out()
 }
