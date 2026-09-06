@@ -314,7 +314,7 @@ export function createApp(deps: AppDeps) {
       })),
       // Odeme neden bloke — kullaniciya sebep gosterilmek zorunda (§6.5).
       blockedReason: payable < deps.payoutThreshold
-        ? `esik ${deps.payoutThreshold} stroop, bakiye ${payable}`
+        ? `threshold ${deps.payoutThreshold} stroop, balance ${payable}`
         : null,
     })
   })

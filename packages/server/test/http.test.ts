@@ -258,7 +258,7 @@ describe('GET /v1/me/balance', () => {
 
   it('odeme bloke ise SEBEBI gosterilir', async () => {
     const b = await asJson(await app.request('/v1/me/balance', { headers: auth() }))
-    expect(b.blockedReason).toMatch(/esik/)
+    expect(b.blockedReason).toMatch(/threshold/)
   })
 
   it('esik gecilince sebep null olur', async () => {
