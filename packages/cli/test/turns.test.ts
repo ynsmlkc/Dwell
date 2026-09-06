@@ -297,6 +297,37 @@ describe('ADR-012 — makine basina tek gosterim', () => {
     expect(m.activeSession, 's2 devralmali').toBe('s2')
     expect(m.onTick('s2', clock.now()).reason).toBeNull()
   })
+
+  /**
+   * Gercek olayda yakalandi (2026-09-06): Claude Code `SessionEnd`
+   * gondermeden kapanirsa (coktu, zorla kapatildi) `onSessionEnd` HIC
+   * cagrilmaz — yukaridaki temiz kapanis testindeki gibi degil. Tur
+   * `showing` fazinda sonsuza dek kalir, `#expireCooldowns` bunu hic
+   * yakalamaz (yalnizca cooldown->idle geçisini izliyor) ve mutex olu
+   * oturumda kilitli kalirdi — bir kullanicida 10 gun surdu.
+   */
+  it('olu oturum (SessionEnd hic gelmedi) 60sn tick atmayinca mutex devredilir', () => {
+    const { m, clock, run } = setup()
+    m.onTurnStart('olu', clock.now())
+    expect(m.onTick('olu', clock.now()).reason).toBeNull()   // mutex 'olu'da, sayiliyor
+
+    // 's2' yeni bir tur baslatiyor ama mutex hala 'olu'da — SessionEnd/
+    // onTurnEnd HIC gelmedi, sadece zaman geciyor (coken bir surecin
+    // birebir benzetimi).
+    m.onTurnStart('s2', clock.now())
+    clock.advance(30_000)
+    expect(m.onTick('s2', clock.now()).reason, '30sn: hala eski sahipte').toBe('baska oturum sayiyor')
+
+    clock.advance(31_000)   // toplam 61sn — STALE_MUTEX_MS asildi
+    expect(m.onTick('s2', clock.now()).reason, '61sn: mutex devredildi').toBeNull()
+    expect(m.activeSession).toBe('s2')
+
+    run('s2', 5_000)
+    m.onTurnEnd('s2', clock.now())
+    run('s2', 5_000)
+    const counted = m.drainImpressions().filter((i) => i.rejectedReason === null)
+    expect(counted.every((i) => i.sessionId === 's2'), 's2 gercekten sayabiliyor olmali').toBe(true)
+  })
 })
 
 describe('sayilan sure dogru', () => {

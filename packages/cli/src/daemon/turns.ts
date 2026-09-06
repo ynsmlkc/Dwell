@@ -57,7 +57,29 @@ const HIDDEN = (phase: TurnPhase, reason: string): RenderDecision =>
 interface SessionState {
   phase: TurnPhase
   cooldownUntil: number
+  /** Bu oturumdan gelen en son `onTick` an — mutex'in olu tutulup
+   * tutulmadigini anlamak icin (bkz. `STALE_MUTEX_MS`). */
+  lastTickAt: number
 }
+
+/**
+ * Mutex sahibi bu kadar suredir tick atmiyorsa OLU sayilir ve mutex baska
+ * bir oturuma devredilir.
+ *
+ * Gercek olayda yakalandi (2026-09-06): Claude Code `SessionEnd` hic
+ * gondermeden kapanirsa (coktu, zorla kapatildi, makine uyudu) `onTurnEnd`
+ * hic cagrilmaz, tur `showing` fazinda SONSUZA DEK kalir ve
+ * `#expireCooldowns` bunu hic yakalamaz — o yalnizca cooldown->idle
+ * gecisini izliyor. Sonuc: mutex olu bir oturumda kilitli kalir, o andaki
+ * DONDURULMUS reklam butun sonraki gercek oturumlara sonsuza dek gosterilir
+ * ve hicbir yeni secim/rotasyon calismaz (mutex sahibi olmayan oturumlar
+ * icin rotasyon kodu hic calismiyor). Bir kullanicida 10 gun surdu.
+ *
+ * refreshInterval varsayilani 1 saniye oldugu icin (ADR-001) gercekten
+ * acik bir Claude Code oturumu bu esigin cok altinda kalir; bu deger
+ * yalnizca GERCEKTEN olu bir oturumu yakalayacak kadar buyuk.
+ */
+const STALE_MUTEX_MS = 60_000
 
 interface ActiveShow {
   readonly ad: AdPayload
@@ -117,7 +139,7 @@ export class TurnMachine {
 
   /** `UserPromptSubmit` — tur acilir. */
   onTurnStart(sessionId: string, ts: number = this.deps.clock.now()): void {
-    this.#sessions.set(sessionId, { phase: 'showing', cooldownUntil: 0 })
+    this.#sessions.set(sessionId, { phase: 'showing', cooldownUntil: 0, lastTickAt: ts })
 
     // ADR-012: mutex bostaysa veya bu oturum zaten tutuyorsa devral.
     // Doluysa devralma — digeri sayiyor, bu oturum SILENT.
@@ -167,6 +189,18 @@ export class TurnMachine {
     // Kullanicinin bakis acisindan reklam "hic kapanmiyor" gorunuyordu.
     const st = this.#sessions.get(sessionId)
     if (!st || st.phase === 'idle') return HIDDEN('idle', 'bu oturumda aktif tur yok')
+    st.lastTickAt = ts
+
+    // Mutex sahibi olu mu? Bkz. `STALE_MUTEX_MS` dokumani — sahip
+    // `SessionEnd` hic gondermeden kaybolduysa mutex'i ebediyen tutar.
+    if (this.#activeSession !== null && this.#activeSession !== sessionId) {
+      const sahip = this.#sessions.get(this.#activeSession)
+      if (!sahip || ts - sahip.lastTickAt > STALE_MUTEX_MS) {
+        this.#closeShow(ts)
+        this.#sessions.delete(this.#activeSession)
+        this.#activeSession = sessionId
+      }
+    }
 
     // ADR-012: mutex baskasindaysa satir yine GOSTERILIR (kullanici deneyimi
     // tutarli kalsin) ama SAYILMAZ. Bu oturumun da tur icinde olmasi sart —
