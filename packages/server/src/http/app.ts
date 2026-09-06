@@ -498,6 +498,10 @@ export function createApp(deps: AppDeps) {
           advertiserId: c2.advertiserId,
           frequencyCap: c2.frequencyCap,
           dailyBudgetStroops: c2.dailyBudgetStroops?.toString() ?? null,
+          // "Neden bu kampanya hic servis edilmiyor" sorusunun cevabi cogu
+          // zaman burada: ADR-021 bakiyesi sifir/eksi olan kampanyayi
+          // AdSelector'da sessizce eliyor, durumu "active" gorunse bile.
+          spendableStroops: deps.pipeline.spendable(c2.advertiserId).toString(),
         })),
       })
     })

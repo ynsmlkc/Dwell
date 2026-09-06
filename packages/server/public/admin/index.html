@@ -97,7 +97,7 @@
         <table>
           <thead><tr>
             <th>Advertiser</th><th>Line</th><th style="text-align:right">Bid CPM</th>
-            <th>Status</th><th>Freq. cap</th><th>Daily budget</th>
+            <th>Status</th><th style="text-align:right">Spendable</th><th>Freq. cap</th><th>Daily budget</th>
           </tr></thead>
           <tbody id="campaigns"></tbody>
         </table>
@@ -199,15 +199,19 @@ function render(d) {
   show($('#no-campaigns'), cs.length === 0);
   show($('#campaigns-wrap'), cs.length > 0);
   if (cs.length > 0) {
-    $('#campaigns').innerHTML = cs.map((c) => `
+    $('#campaigns').innerHTML = cs.map((c) => {
+      const broke = c.status === 'active' && BigInt(c.spendableStroops || '0') <= 0n;
+      return `
       <tr>
         <td class="mono">${short(c.advertiserId)}</td>
         <td>${c.preview}</td>
         <td class="num">${usd((BigInt(c.bidCpmStroops) / 1000n).toString())}</td>
         <td>${c.status}</td>
+        <td class="num" style="${broke ? 'color: var(--accent)' : ''}">${usd(c.spendableStroops)}${broke ? ' ⚠' : ''}</td>
         <td>${c.frequencyCap === 0 ? 'none' : c.frequencyCap}</td>
         <td>${c.dailyBudgetStroops ? usd(c.dailyBudgetStroops) : '—'}</td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
   }
 }
 
