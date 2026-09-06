@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { fixedClock, fakeIdGenerator, stroops, type Stroops } from '@dwell/protocol'
+import { fixedClock, fakeIdGenerator, cryptoIdGenerator, stroops, type Stroops } from '@dwell/protocol'
 import { AdSelector, type Campaign } from '../src/ads/selector.js'
 
 const camp = (id: string, cpmUsdc: number, over: Partial<Campaign> = {}): Campaign => ({
@@ -168,6 +168,36 @@ describe('ADR-009 (revize) — SWRR ile teklife orantili pay', () => {
     expect(share['b']!).toBeLessThan(0.31)
     expect(share['c']!).toBeGreaterThan(0.19)
     expect(share['c']!).toBeLessThan(0.31)
+  })
+
+  /**
+   * Gercek olayda yakalandi (2026-09-06): esit teklifli iki kampanyada,
+   * `AdSelector` (dolayisiyla birikimi) her SUNUCU YENIDEN BASLADIGINDA
+   * sifirlaniyor. Eskiden esitlik ID string'ine gore sabit kazaniyordu —
+   * yani "yeniden baslat, esitlik olustur, hep ayni ID kazansin" dongusu
+   * ayni reklamin surekli kazanmasina yol aciyordu, cunku canli sistemde
+   * deploy'lar arka arkaya geldiginde birikim hic olgunlasmiyordu.
+   */
+  it('esit teklifte tekrarlanan "yeniden baslama" ayni kazanani kilitlemez', () => {
+    const campaigns = [camp('a', 40), camp('b', 40)]
+    const kazananlar = new Set<string>()
+    // Her biri TAZE bir AdSelector — sunucunun her deploy'da birikimi
+    // sifirlayip yeniden baslamasinin birebir benzetimi. `cryptoIdGenerator`
+    // BILEREK kullaniliyor: `fakeIdGenerator` deterministik oldugu icin
+    // rastgele-dusme dalini test edemez, ilk secimde hep ayni yani secerdi.
+    for (let i = 0; i < 30; i++) {
+      const clock = fixedClock(1_700_000_000_000)
+      const sel = new AdSelector({
+        clock, ids: cryptoIdGenerator(clock),
+        campaigns: () => campaigns,
+        spendableBalance: () => stroops(1_000_000_000n),
+        spentToday: () => stroops(0n),
+      })
+      kazananlar.add(sel.select('p1')!.campaign.id)
+    }
+    // Ikisi de en az bir kez kazanmis olmali — tek bir ID'ye kilitlenmemeli.
+    // (Adil yazi-tura ile 30 denemede ikisinin de cikmama ihtimali ~2e-9.)
+    expect(kazananlar.size).toBe(2)
   })
 
   it('frequencyCap > 0 hala payi 1/(N+1) ile kilitler — bilinen gerilim (PROBLEMS.md #8a)', () => {

@@ -155,6 +155,7 @@ export class AdSelector {
    */
   #swrrPick(publisherId: string, eligible: readonly Campaign[]): Campaign {
     const weights = this.#weightState(publisherId, eligible)
+    const recent = this.#recentByPublisher.get(publisherId) ?? []
 
     let total = 0n
     for (const c of eligible) {
@@ -163,16 +164,39 @@ export class AdSelector {
       total += c.bidCpm
     }
 
+    /**
+     * Esit agirlikta (ayni teklif, aynı birikim) eskiden ID string'ine gore
+     * sabit bir kazanan seciliyordu — bu, sunucu her yeniden basladiginda
+     * (deploy, restart) birikim sifirlanip esitlikler yeniden olustugunda,
+     * AYNI reklamin her seferinde kazanmasina yol aciyordu (gercek olayda
+     * yakalandi: sik deploy'lar birikimi hic olgunlasmadan sifirlayip
+     * hep ayni ID'yi kazandırdi — bkz. denetim notu, 2026-09-06).
+     *
+     * Simdi esitlikte "en once secilmis (ya da hic secilmemis) olan"
+     * kazaniyor — kendiliginden duzelen, deterministik bir kural: bir
+     * reklam kazandiktan sonra `recent`e girer ve bir sonraki esitlikte
+     * ARTIK dezavantajli olur, sirayla herkese firsat dogar. Hicbiri daha
+     * once secilmemisse (ilk tik, sunucu yeni acilmis) rastgele secilir —
+     * ama bu yalnizca BIR kez olur, sonrasi "en once secilmis" kuralina gecer.
+     */
+    const lastPickIndex = (id: string): number => {
+      const idx = recent.lastIndexOf(id)
+      return idx === -1 ? -Infinity : idx
+    }
+
     const byWeightDesc = (a: Campaign, b: Campaign): number => {
       const wa = weights.get(a.id)!
       const wb = weights.get(b.id)!
       if (wa !== wb) return wa > wb ? -1 : 1
-      // Esitlikte: yuksek teklif, sonra id — deterministik.
       if (a.bidCpm !== b.bidCpm) return a.bidCpm > b.bidCpm ? -1 : 1
-      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+      const la = lastPickIndex(a.id)
+      const lb = lastPickIndex(b.id)
+      if (la !== lb) return la < lb ? -1 : 1
+      // Ikisi de daha once hic secilmemis: gercekten kararsiz durum,
+      // sabit bir ID sirasina dusmemek icin rastgele.
+      return this.deps.ids.randomHex(1) < '8' ? -1 : 1
     }
 
-    const recent = this.#recentByPublisher.get(publisherId) ?? []
     // frequencyCap 0 → kisitlama yok (bkz. Campaign.frequencyCap dokumani).
     // `slice(-0)` JS'te `slice(0)` ile ayni seydir (tum diziyi doner!) —
     // bu yuzden 0 durumu ayrica ele alinir, yoksa "kisitlama yok" niyeti
