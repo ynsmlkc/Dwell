@@ -56,12 +56,18 @@ export function termShape(env: NodeJS.ProcessEnv = process.env): TermShape {
   switch (env['TERM_PROGRAM']) {
     case 'vscode':
     case 'iTerm.app':
-    // Warp `plain` olarak isaretliydi ve bu YANLISTI: OSC 8 destekliyor,
-    // gozlemle dogrulandi (2026-08-19). Yanlis siniflandirmanin belirtisi
-    // sessiz — link basmayiz, kimse bir hata gormez, reklamveren tiklama
-    // alamaz.
-    case 'WarpTerminal':
     case 'WezTerm': return 'osc8'
+    /**
+     * Warp iki kez yanlis siniflandirildi: once `plain`, sonra 2026-08-19'da
+     * "destekliyor" diye `osc8`. OLCULDU (2026-09-13): OSC 8'in hicbir
+     * bicimi — BEL, ST, soluk, alti cizili — tiklanabilir olmuyor.
+     * Tiklanan tek sey semali duz URL.
+     *
+     * Agustos'taki "calisiyor" gozlemi muhtemelen bir rakibin semali URL
+     * basmasiydi; OSC 8 sanildi. Yetenek tespitinde gozlem ile olcumu
+     * ayirmak gerekiyor: ikisi de "link calisiyor" der, sebep farklidir.
+     */
+    case 'WarpTerminal': return 'plain'
     // Apple Terminal OSC 8 bilmiyor; basarsak ekranda ham metin kalir.
     case 'Apple_Terminal': return 'plain'
     case 'ghostty': return 'hybrid'

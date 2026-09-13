@@ -17,8 +17,6 @@ describe('OSC 8 destegi olan terminaller', () => {
     ['iTerm2', { ITERM_SESSION_ID: 'w0t0p0' }],
     ['VS Code', { TERM_PROGRAM: 'vscode' }],
     ['Windows Terminal', { WT_SESSION: 'abc' }],
-    // Onceden `plain` sayiliyordu; gozlemle duzeltildi (2026-08-19).
-    ['Warp', { TERM_PROGRAM: 'WarpTerminal' }],
     ['VTE 0.50+', { VTE_VERSION: '6003' }],
   ]
   for (const [name, env] of cases) {
@@ -31,6 +29,12 @@ describe('OSC 8 desteklemeyen terminaller — ciplak URL', () => {
     ['Alacritty', { ALACRITTY_WINDOW_ID: '1' }],
     ['Konsole', { KONSOLE_VERSION: '220800' }],
     ['Apple Terminal', { TERM_PROGRAM: 'Apple_Terminal' }],
+    /**
+     * Warp iki kez yer degistirdi: plain → osc8 (2026-08-19 gozlem) →
+     * plain (2026-09-13 OLCUM). Olcumde OSC 8'in hicbir bicimi
+     * tiklanabilir olmadi; tiklanan tek sey semali duz URL.
+     */
+    ['Warp', { TERM_PROGRAM: 'WarpTerminal' }],
     ['JetBrains', { TERMINAL_EMULATOR: 'JetBrains-JediTerm' }],
     ['eski VTE', { VTE_VERSION: '4600' }],
   ]

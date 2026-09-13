@@ -199,8 +199,31 @@ function hyperlink(domain: string, label: string): string {
   if (!SAFE_DOMAIN.test(domain)) return label
   // ST olarak BEL () kullaniliyor: ESC-backslash bicimini bazi eski
   // terminaller yutmuyor ve ekranda ham metin birakiyor.
-  return `]8;;https://${domain}${label}]8;;`
+  return `]8;;${SCHEME}${domain}${label}]8;;`
 }
+
+/**
+ * Alan adinin ONUNE sema konur — `yunus.com` DEGIL `https://yunus.com`.
+ *
+ * OLCULDU (2026-09-13, Warp + Claude Code): OSC 8'in hicbir bicimi —
+ * BEL, ST, soluk, alti cizili — tiklanabilir olmuyor. Tiklanabilen tek
+ * sey SEMALI DUZ URL: terminal `https://` gordugu icin kendi algiliyor,
+ * hover'daki cerceveyi de o ciziyor.
+ *
+ * `TermShape` dokumaninda `plain` zaten "ciplak URL; terminal kendi
+ * algilar" diye tanimliydi — ama kod semayi hic eklemiyordu, yani o mod
+ * tiklanamaz bir metin basiyordu. Niyet yaziliydi, uygulanmamisti.
+ *
+ * Sema ARTIK HER SEKILDE goruluyor. Yetenek tespiti bizi iki kez yanietti
+ * (Warp once `plain`, sonra `osc8`, simdi yine `plain`) ve hatanin
+ * belirtisi her seferinde SESSIZ oldu: link olmuyor, kimse hata gormuyor,
+ * reklamveren tiklama alamiyor. Olcumle calistigi bilinen yol artik
+ * herkesin varsayilani; OSC 8 yalnizca destekleyen terminalde ustune
+ * eklenen bir ikram.
+ *
+ * Bedeli sekiz karakter. Dar terminalde alan adi zaten ilk dusen parca.
+ */
+const SCHEME = 'https://'
 
 /**
  * Kreatifi terminale basilabilir satira cevirir.
@@ -237,7 +260,7 @@ export function renderAdLine(
   let outCta = cta
 
   // 1) Sigmiyorsa once cta atilir — en az bilgi tasiyan parca o.
-  if (fixed + displayWidth(text) + (cta ? displayWidth(CTA_SEP + cta) : 0) > budget) {
+  if (fixed + displayWidth(text) + (cta ? displayWidth(CTA_SEP + SCHEME + cta) : 0) > budget) {
     outCta = ''
   }
   // 2) Hala sigmiyorsa metin kisaltilir. Marka ve glif asla kirpilmaz.
@@ -245,7 +268,8 @@ export function renderAdLine(
     outText = truncate(text, Math.max(3, budget - fixed))
   }
 
-  const tail = outCta ? `${CTA_SEP}${outCta}` : ''
+  const gorunenCta = outCta ? `${SCHEME}${outCta}` : ''
+  const tail = gorunenCta ? `${CTA_SEP}${gorunenCta}` : ''
   const plain = `${DISCLOSURE_GLYPH} ${brand}${SEP}${outText}${tail}`
 
   /**
@@ -255,7 +279,7 @@ export function renderAdLine(
    * gorunenden onlarca karakter genis sayilir ve kirpma yanlis yerden
    * keserdi. Ayni sebeple kirpma yukarida duz metin uzerinde yapildi.
    */
-  const ctaText = outCta && shape !== 'plain' ? hyperlink(outCta, outCta) : outCta
+  const ctaText = outCta && shape !== 'plain' ? hyperlink(outCta, gorunenCta) : gorunenCta
 
   const ansi =
     `${STYLE.glyph}${DISCLOSURE_GLYPH}${STYLE.reset} ` +
