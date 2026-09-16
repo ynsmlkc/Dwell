@@ -24,7 +24,7 @@
 <main class="wrap">
 
   <section style="padding-top: clamp(56px, 9vw, 104px)">
-    <p class="eyebrow">Terminal-native ad marketplace</p>
+    <p class="eyebrow" id="eyebrow">Terminal-native ad marketplace</p>
     <h1 class="h-hero">One sponsored line while your <em class="hl">agent</em> thinks. You get paid in USDC.</h1>
     <p class="lead" style="margin: 26px 0 40px">Install a small CLI. While Claude Code is working, a single line of text sits in your status line. When the answer lands, it is gone.</p>
 
@@ -191,9 +191,20 @@
   ];
   const DONE = '✓ src/auth/middleware.ts  +34 −6\n✓ tests pass — 18 files, 0 failing';
 
+  /* Ust satir (eyebrow) reklamla birlikte doner — sabit durup sikici
+     kalmasin diye. Ayni durust ton: sitenin baska yerinde zaten yazan
+     gercek iddialar, yeni pazarlama laf kalabaligi degil. */
+  const EYEBROWS = [
+    'Terminal-native ad marketplace',
+    'Paid in USDC — no minimum',
+    'Disclosed — every line starts with ✶',
+    'Shown only while you wait',
+  ];
+
   const el = {
     ad: $('#ad'), brand: $('#ad-brand'), text: $('#ad-text'), cta: $('#ad-cta'),
     right: $('#ad-right'), activity: $('#activity'), output: $('#output'), phase: $('#phase'),
+    eyebrow: $('#eyebrow'),
   };
 
   let i = 0, waiting = true, secs = 2.8;
@@ -203,10 +214,11 @@
     el.brand.textContent = ad.brand;
     el.text.textContent = ad.text;
     el.cta.textContent = ad.cta;
+    el.eyebrow.textContent = EYEBROWS[i % EYEBROWS.length];
     el.ad.style.opacity = waiting ? '1' : '0';
     el.activity.textContent = waiting ? act.verb : 'Done — 3 files changed';
     el.output.textContent = waiting ? '' : DONE;
-    el.right.textContent = waiting ? `${act.label} · ${secs.toFixed(1)}s` : 'idle';
+    el.right.textContent = waiting ? `${act.label} · ${secs.toFixed(1)}s` : 'Done';
     el.phase.textContent = waiting ? 'waiting — the line is shown' : 'answer arrived — the line is gone';
   }
 
@@ -215,7 +227,9 @@
     setInterval(() => { if (waiting) { secs += 0.4; paint(); } }, 400);
     setInterval(() => {
       waiting = false; paint();
-      setTimeout(() => { waiting = true; i = (i + 1) % ADS.length; secs = 0.4; paint(); }, 2600);
+      // Satirin gercekten kayboldugunu gostermeye yetecek kadar kisa bir
+      // an — ama "idle" diye asilip kalmasin, hemen sonraki reklama gecsin.
+      setTimeout(() => { waiting = true; i = (i + 1) % ADS.length; secs = 0.4; paint(); }, 450);
     }, 9000);
   }
   paint();
