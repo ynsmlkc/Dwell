@@ -172,8 +172,9 @@
   copyButton($('#copy-install'), () => 'npm i -g dwellsh && dwell init --spinner');
   copyButton($('#copy-uninstall'), () => 'dwell uninstall');
 
-  /* Hero animasyonu — urunun gercek davranisi.
-     Bekleme basliyor → satir beliriyor → cevap geliyor → satir gidiyor. */
+  /* Hero animasyonu — terminal SABIT durur, hicbir satir eklenip
+     cikarilmiyor (yukseklik degismiyor). Degisen tek sey status line'daki
+     reklam — capraz gecisle bir sonrakine geciyor. */
   /* Ornek satirlar — GERCEK marka DEGIL.
      Onceden burada Firecrawl, Resend, Neon yaziyordu. Hicbiri musterimiz
      degil ve izin vermediler; siteye koymak "bunlar bize para veriyor"
@@ -189,7 +190,6 @@
     { label: 'Search', verb: 'Searching for rate limit helpers' },
     { label: 'Thinking', verb: 'Thinking about token bucket vs. sliding window' },
   ];
-  const DONE = '✓ src/auth/middleware.ts  +34 −6\n✓ tests pass — 18 files, 0 failing';
 
   /* Ust satir (eyebrow) reklamla birlikte doner — sabit durup sikici
      kalmasin diye. Ayni durust ton: sitenin baska yerinde zaten yazan
@@ -203,11 +203,10 @@
 
   const el = {
     ad: $('#ad'), brand: $('#ad-brand'), text: $('#ad-text'), cta: $('#ad-cta'),
-    right: $('#ad-right'), activity: $('#activity'), output: $('#output'), phase: $('#phase'),
-    eyebrow: $('#eyebrow'),
+    right: $('#ad-right'), activity: $('#activity'), eyebrow: $('#eyebrow'),
   };
 
-  let i = 0, waiting = true, secs = 2.8;
+  let i = 0, secs = 2.8;
 
   function paint() {
     const ad = ADS[i], act = ACTS[i % ACTS.length];
@@ -215,24 +214,21 @@
     el.text.textContent = ad.text;
     el.cta.textContent = ad.cta;
     el.eyebrow.textContent = EYEBROWS[i % EYEBROWS.length];
-    el.ad.style.opacity = waiting ? '1' : '0';
-    el.activity.textContent = waiting ? act.verb : 'Done — 3 files changed';
-    el.output.textContent = waiting ? '' : DONE;
-    el.right.textContent = waiting ? `${act.label} · ${secs.toFixed(1)}s` : 'Done';
-    el.phase.textContent = waiting ? 'waiting — the line is shown' : 'answer arrived — the line is gone';
+    el.activity.textContent = act.verb;
+    el.right.textContent = `${act.label} · ${secs.toFixed(1)}s`;
   }
+  paint();
 
   // Hareket istemeyene tek kare: yine de urunu gosterir.
   if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    setInterval(() => { if (waiting) { secs += 0.4; paint(); } }, 400);
+    setInterval(() => { secs += 0.4; paint(); }, 400);
     setInterval(() => {
-      waiting = false; paint();
-      // Satirin gercekten kayboldugunu gostermeye yetecek kadar kisa bir
-      // an — ama "idle" diye asilip kalmasin, hemen sonraki reklama gecsin.
-      setTimeout(() => { waiting = true; i = (i + 1) % ADS.length; secs = 0.4; paint(); }, 450);
-    }, 9000);
+      // Yalnizca reklam satiri soluyor — govde (satir sayisi, terminalin
+      // boyu) hic kimildamiyor, cunku output/activity buraya hic dokunmuyor.
+      el.ad.style.opacity = '0';
+      setTimeout(() => { i = (i + 1) % ADS.length; secs = 0.4; paint(); el.ad.style.opacity = '1'; }, 260);
+    }, 4000);
   }
-  paint();
 </script>
 </body>
 </html>
