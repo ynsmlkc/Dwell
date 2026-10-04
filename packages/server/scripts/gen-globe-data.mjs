@@ -48,7 +48,7 @@ writeFileSync(join(out, 'public/globe-data.js'),
 const codes = Object.keys(countries).sort()
 const lines = []
 for (let i = 0; i < codes.length; i += 16) lines.push('  ' + codes.slice(i, i + 16).map((c) => `'${c}'`).join(', ') + ',')
-const ts = join(out, 'src/leaderboard/countries.ts')
+const ts = join(out, '../protocol/src/countries.ts')
 writeFileSync(ts, readFileSync(ts, 'utf8').replace(/new Set\(\[[\s\S]*\]\)/, `new Set([\n${lines.join('\n')}\n])`))
 
 console.log(`${dots.length / 2} kara noktasi, ${codes.length} ulke`)

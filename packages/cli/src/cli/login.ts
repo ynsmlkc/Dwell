@@ -27,6 +27,13 @@ import { loginPage } from './login-page.js'
 const LOGIN_TIMEOUT_MS = 5 * 60_000
 
 /**
+ * Giristen sonra sayfanin istege bagli siralama adimi icin acik kaldigi sure.
+ * Kullanici kaydeder ya da atlarsa sunucu hemen kapanir; sayfayi kapatip
+ * giderse terminal en fazla bu kadar bekler.
+ */
+export const PROFILE_WINDOW_MS = 3 * 60_000
+
+/**
  * Sunucu adresi.
  *
  * Kendi alan adimiz yok; barindiran platformun verdigi adres bu. Yayina
@@ -99,6 +106,8 @@ export async function cmdLogin(
   info(dim(`token stored in ${credentialsPath()} (only you can read it)`))
   out()
   info(`earnings will go to this address. Track them with ${dim('dwell balance')}.`)
+  info(`optional: join the public leaderboard in the browser — or later with ${dim('dwell profile')}.`)
+  info(dim('the page stays open for a few minutes; Ctrl-C to finish now'))
 
   /**
    * Daemon'i BIZ yeniden baslatiyoruz.
@@ -160,15 +169,29 @@ export function runLoginServer(opts: LoginOptions): Promise<LoginResult> {
 
   return new Promise<LoginResult>((resolve, reject) => {
     let settled = false
-    const finish = (fn: () => void): void => {
+    /**
+     * Giristen sonra elde tutulan token — yalnizca siralama adimindaki
+     * istekleri Dwell sunucusuna iletmek icin. Tarayiciya ASLA gitmez.
+     */
+    let token: string | null = null
+    let closing = false
+
+    // Sunucuyu kapatmadan once cevabin gitmesini bekle; hemen kapatirsak
+    // tarayici son ekrani goremeden baglanti duser.
+    const closeSoon = (): void => {
+      if (closing) return
+      closing = true
+      setTimeout(() => server.close(), 150).unref()
+    }
+
+    /** Giris sonucunu bir kez bildirir. Sunucuyu KAPATMAZ (bkz. `/verify`). */
+    const settle = (fn: () => void): void => {
       if (settled) return
       settled = true
       clearTimeout(timer)
-      // Sunucuyu kapatmadan once cevabin gitmesini bekle; hemen kapatirsak
-      // tarayici "basarili" ekranini goremeden baglanti duser.
-      setTimeout(() => server.close(), 150).unref()
       fn()
     }
+    const finish = (fn: () => void): void => { settle(fn); closeSoon() }
 
     const timer = setTimeout(() => {
       finish(() => reject(new Error('timed out — the browser flow was not completed')))
@@ -191,7 +214,7 @@ export function runLoginServer(opts: LoginOptions): Promise<LoginResult> {
       const url = req.url ?? '/'
 
       if (req.method === 'GET' && (url === '/' || url.startsWith('/?'))) {
-        const html = loginPage({ nonce, port })
+        const html = loginPage({ nonce, port, serverUrl: opts.serverUrl })
         res.writeHead(200, {
           'content-type': 'text/html; charset=utf-8',
           'content-length': Buffer.byteLength(html),
@@ -257,7 +280,41 @@ export function runLoginServer(opts: LoginOptions): Promise<LoginResult> {
         }
         // Token'i tarayiciya GERI GONDERME — sayfaya yalnizca adres doner.
         json(res, 200, { publisherId: payload.publisherId })
-        finish(() => resolve(payload))
+        // Giris bitti: kimlik hemen kaydedilsin, daemon yeni kimlikle
+        // baslasin. Sunucu ise siralama adimi icin bir sure daha acik kalir.
+        token = payload.token
+        settle(() => resolve(payload))
+        setTimeout(closeSoon, PROFILE_WINDOW_MS).unref()
+        return
+      }
+
+      /**
+       * Istege bagli siralama adimi — giristen SONRA, ayni sayfada.
+       *
+       * Sayfa Dwell sunucusuna dogrudan gitmiyor (CSP `connect-src 'self'`);
+       * istekler buradan, elde tutulan token'la iletiliyor. Ulke tahmini de
+       * bu yuzden dogru calisiyor: istek kullanicinin kendi makinesinden
+       * cikiyor.
+       */
+      if (url === '/profile/get' || url === '/profile/save') {
+        if (!token) { json(res, 409, { message: 'log in first' }); return }
+        const save = url === '/profile/save'
+        const r = await f(`${opts.serverUrl}/v1/me/profile`, {
+          method: save ? 'PUT' : 'GET',
+          headers: { authorization: `Bearer ${token}`, ...(save ? { 'content-type': 'application/json' } : {}) },
+          ...(save ? { body: JSON.stringify({
+            nickname: body?.['nickname'], country: body?.['country'] ?? null, listed: body?.['listed'],
+          }) } : {}),
+          signal: AbortSignal.timeout(15_000),
+        })
+        json(res, r.status, await r.json().catch(() => ({ message: 'could not read the server response' })))
+        if (save && r.ok) closeSoon()
+        return
+      }
+
+      if (url === '/profile/skip') {
+        json(res, 200, { ok: true })
+        closeSoon()
         return
       }
 

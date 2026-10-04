@@ -15,6 +15,7 @@ import * as daemon from './daemon-control.js'
 import { out, ok, warn, info, fail, rows, dim, bold, green, yellow, red, orange, banner, usdc } from './output.js'
 import { cmdLogin, cmdLogout, cmdWhoami } from './login.js'
 import { cmdBalance } from './balance.js'
+import { cmdProfile } from './profile.js'
 import { loadCredentials, shortAddress } from '../credentials.js'
 import { VERSION } from '../version.js'
 
@@ -307,6 +308,7 @@ function cmdHelp(): void {
     ['dwell init', 'install and start'],
     ['dwell login', 'connect your wallet — earnings go here'],
     ['dwell balance', 'show your earnings'],
+    ['dwell profile', 'leaderboard nickname, country, listed or not'],
     ['dwell whoami', 'show the connected wallet'],
     ['dwell logout', 'disconnect the wallet'],
     ['dwell doctor', 'diagnose the setup'],
@@ -349,6 +351,7 @@ export async function main(argv: readonly string[]): Promise<void> {
     case 'logout': return cmdLogout()
     case 'whoami': return cmdWhoami()
     case 'balance': return cmdBalance(rest)
+    case 'profile': return cmdProfile(rest)
     case 'help': case '--help': case '-h': return cmdHelp()
     /**
      * Surum. Daemon'a SORMAZ — herkesin ilk denedigi komut bu ve daemon

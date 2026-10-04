@@ -12,10 +12,17 @@
  * hicbir yere baglanamiyor.
  */
 
+import { COUNTRY_CODES } from '@dwell/protocol'
+
 export interface LoginPageOpts {
   readonly nonce: string
   readonly port: number
+  /** Siralama adimindaki "sitede gor" baglantisi icin. */
+  readonly serverUrl?: string
 }
+
+/** Sayfaya gomulen ulke kodlari; adlari tarayici `Intl.DisplayNames` ile uretir. */
+const CODES = JSON.stringify([...COUNTRY_CODES].sort())
 
 export function loginPage(opts: LoginPageOpts): string {
   return `<!doctype html>
@@ -124,6 +131,15 @@ export function loginPage(opts: LoginPageOpts): string {
   ul.notes li i { color:var(--accent); font-style:normal }
   ul.notes li span { line-height:1.6; text-wrap:pretty }
 
+  .manual select {
+    width:100%; padding:11px 12px; border:1px solid rgba(236,231,225,0.18); border-radius:4px;
+    background:var(--deep); color:var(--ink); font-family:var(--mono); font-size:13px;
+  }
+  .manual label.check { display:flex; align-items:center; gap:10px; font-family:var(--mono); font-size:13px; color:var(--soft); cursor:pointer }
+  .manual label.check input { width:auto; accent-color:var(--accent) }
+  .pbtns { display:flex; flex-wrap:wrap; gap:12px 18px; align-items:center }
+  .pbtns .primary { width:auto; padding:11px 18px; font-size:13.5px }
+
   .hide { display:none !important }
   @media (prefers-reduced-motion: reduce) { .caret { animation:none } }
 </style></head>
@@ -171,6 +187,24 @@ export function loginPage(opts: LoginPageOpts): string {
       <div style="display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; justify-content:space-between">
         <button id="toggle-manual" class="linkish">No Freighter? Sign the XDR manually</button>
       </div>
+    </div>
+
+    <!-- Istege bagli siralama adimi: yalnizca giristen SONRA gorunur.
+         Kutu varsayilan ISARETSIZ — kazanci herkese acmak kullanicinin
+         bilerek verdigi bir karar olmali. -->
+    <div class="manual hide" id="profilebox">
+      <p class="eyebrow" style="font-size:11.5px">Step 3 / 3 — optional</p>
+      <p style="color:var(--ink)">Join the public leaderboard and the world map?</p>
+      <p>Only a nickname and a country are shown, never your wallet address. Earnings from your own campaigns don't count. You can change or leave it any time with <b>dwell profile</b>.</p>
+      <input id="p-nick" maxlength="20" placeholder="nickname — 3–20 letters, digits, _ . -" autocomplete="off" spellcheck="false">
+      <select id="p-country"><option value="">Don't show a country</option></select>
+      <p id="p-guess" class="hide" style="font-size:12px"></p>
+      <label class="check"><input type="checkbox" id="p-listed"> Show me on the leaderboard</label>
+      <div class="pbtns">
+        <button id="p-save" class="primary">Save</button>
+        <button id="p-skip" class="linkish">Skip for now</button>
+      </div>
+      <p id="p-msg" class="hide"></p>
     </div>
 
     <ul class="notes">
@@ -341,7 +375,9 @@ async function finish(address, signedXdr) {
   $('addrbox').classList.remove('hide')
   $('manualbox').classList.add('hide')
   $('toggle-manual').classList.add('hide')
-  setPrimary('Connected — you can return to the terminal', { quiet: true, frozen: true })
+  setPrimary('Connected ✓ — one optional step below', { quiet: true, frozen: true })
+
+  openProfile()
 
   // Trustline'i GERCEKTEN sor. Odemeyi engelleyen sey bu ve kullanicinin
   // baska turlu ogrenmesinin yolu yok — tasarimda sabit "var" yaziyordu,
@@ -374,6 +410,87 @@ function fail(e) {
 }
 
 $('primary').onclick = connect
+
+/* ─────────────────────────── siralama (istege bagli) ─────────────────────────── */
+
+const SERVER = ${JSON.stringify((opts.serverUrl ?? '').replace(/\/+$/, ''))}
+const CODES = ${CODES}
+const NICK = /^[A-Za-z0-9_.-]{3,20}$/
+let regionName = (c) => c
+try { const dn = new Intl.DisplayNames(['en'], { type: 'region' }); regionName = (c) => dn.of(c) || c } catch {}
+const flag = (c) => String.fromCodePoint(...[...c].map((ch) => 127397 + ch.charCodeAt(0)))
+
+function fillCountries() {
+  const sel = $('p-country')
+  CODES.map((c) => [c, regionName(c)])
+    .sort((a, b) => a[1].localeCompare(b[1]))
+    .forEach(([c, name]) => {
+      const o = document.createElement('option')
+      o.value = c; o.textContent = flag(c) + '  ' + name
+      sel.appendChild(o)
+    })
+}
+
+function profileMsg(text, color) {
+  $('p-msg').textContent = text
+  $('p-msg').style.color = color || SOFT
+  $('p-msg').classList.remove('hide')
+}
+
+async function openProfile() {
+  fillCountries()
+  $('profilebox').classList.remove('hide')
+  try {
+    const r = await post('/profile/get', {})
+    const p = r.profile
+    if (p) {
+      $('p-nick').value = p.nickname
+      $('p-country').value = p.country || ''
+      $('p-listed').checked = !!p.listed
+    }
+    // CCgather yaklasimi: ulke secilmemisse baglantidan tahmin; kaydedilene
+    // kadar hicbir yere yazilmaz.
+    if ((!p || !p.country) && r.suggestedCountry) {
+      $('p-country').value = r.suggestedCountry
+      $('p-guess').textContent = regionName(r.suggestedCountry) + ' was picked from your connection — change it if that is wrong.'
+      $('p-guess').classList.remove('hide')
+    }
+  } catch { /* okunamadiysa form bos kalir; kaydetmek yine calisir */ }
+}
+
+$('p-save').onclick = async () => {
+  const nickname = $('p-nick').value.trim()
+  if (!NICK.test(nickname)) { profileMsg('Nickname: 3–20 letters, digits, _ . -', ERR); return }
+  $('p-save').disabled = true
+  try {
+    const r = await post('/profile/save', { nickname, country: $('p-country').value || null, listed: $('p-listed').checked })
+    const listed = r.profile && r.profile.listed
+    log(listed ? '✓ leaderboard: listed as ' + r.profile.nickname : '✓ leaderboard profile saved (not listed)', ACC)
+    profileMsg(listed
+      ? 'Saved. You will appear within a minute once you have earnings from other advertisers.'
+      : 'Saved. You are not listed.', OK)
+    if (SERVER && listed) {
+      const a = document.createElement('a')
+      a.href = SERVER + '/#board'; a.target = '_blank'; a.rel = 'noopener'
+      a.textContent = 'See the leaderboard →'
+      a.className = 'linkish'
+      a.style.justifySelf = 'start'
+      $('p-msg').after(a)
+    }
+    $('p-skip').classList.add('hide')
+    status('done — you can close this page', ACC)
+  } catch (e) {
+    profileMsg(e && e.message ? e.message : String(e), ERR)
+    $('p-save').disabled = false
+  }
+}
+
+$('p-skip').onclick = async () => {
+  try { await post('/profile/skip', {}) } catch {}
+  $('profilebox').classList.add('hide')
+  log('  leaderboard skipped — join later with: dwell profile', DIM)
+  status('done — you can close this page', ACC)
+}
 
 /* ─────────────────────────── elle imza ─────────────────────────── */
 

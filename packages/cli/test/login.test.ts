@@ -374,3 +374,89 @@ describe('giristen sonra daemon kimligi', () => {
     expect(c.satirlar.join('')).not.toContain('running with the new identity')
   })
 })
+
+/**
+ * Istege bagli siralama adimi — giristen SONRA ayni sayfada.
+ *
+ * Korunan: token tarayiciya gitmez (istekler yerel surecten iletilir),
+ * giristen once profil uclari kapali, kaydetme/atlama sunucuyu kapatir,
+ * giris sonucu siralama adimini BEKLEMEZ (kimlik hemen kaydedilir).
+ */
+describe('siralama adimi', () => {
+  function profileServer(profile: unknown = null) {
+    const calls: { path: string; method: string; auth: string | null; body: any }[] = []
+    const impl = (async (url: any, init: any = {}) => {
+      const path = String(url)
+      const method = init.method ?? 'GET'
+      const body = init.body ? JSON.parse(String(init.body)) : null
+      calls.push({ path, method, auth: (init.headers ?? {})['authorization'] ?? null, body })
+      const reply = (o: unknown, status = 200) =>
+        new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } })
+      if (path.endsWith('/v1/auth/challenge')) return reply({ transaction: 'AAAAfake', network_passphrase: 'Test SDF Network ; September 2015', expiresAt: 9e12 })
+      if (path.endsWith('/v1/auth/verify')) return reply({ token: 'dwl_gizli_token', tokenId: 't1', publisherId: GOOD })
+      if (path.endsWith('/v1/me/profile') && method === 'GET') return reply({ profile, suggestedCountry: 'TR' })
+      if (path.endsWith('/v1/me/profile') && method === 'PUT') return reply({ profile: body })
+      return reply({ message: 'not found' }, 404)
+    }) as unknown as typeof fetch
+    return { impl, calls }
+  }
+
+  async function loggedIn(srv: ReturnType<typeof profileServer>) {
+    const { url, done } = start(srv.impl)
+    const b = await browse(await url)
+    await b.post('/challenge', { address: GOOD })
+    await b.post('/verify', { address: GOOD, transaction: 'AAAAsigned' })
+    return { b, done }
+  }
+
+  it('giristen once profil uclari kapali', async () => {
+    const { url } = start(profileServer().impl)
+    const b = await browse(await url)
+    expect((await b.post('/profile/get', {})).status).toBe(409)
+    expect((await b.post('/profile/save', { nickname: 'ada', listed: true })).status).toBe(409)
+  })
+
+  it('giris sonucu siralama adimini beklemez', async () => {
+    const { done } = await loggedIn(profileServer())
+    await expect(done).resolves.toMatchObject({ publisherId: GOOD })
+  })
+
+  it('profil yerel surecten token ile okunur; token sayfaya donmez', async () => {
+    const srv = profileServer({ nickname: 'ada', country: null, listed: false })
+    const { b } = await loggedIn(srv)
+    const r = await b.post('/profile/get', {})
+    const text = await r.text()
+    expect(JSON.parse(text)).toEqual({ profile: { nickname: 'ada', country: null, listed: false }, suggestedCountry: 'TR' })
+    expect(text).not.toContain('dwl_gizli_token')
+    const call = srv.calls.find((c) => c.path.endsWith('/v1/me/profile'))!
+    expect(call).toMatchObject({ method: 'GET', auth: 'Bearer dwl_gizli_token' })
+  })
+
+  it('kaydetme PUT gonderir ve sunucuyu kapatir', async () => {
+    const srv = profileServer()
+    const { b } = await loggedIn(srv)
+    const r = await b.post('/profile/save', { nickname: 'ada', country: 'TR', listed: true, extra: 'drop me' })
+    expect(r.status).toBe(200)
+    expect(srv.calls.at(-1)).toMatchObject({ method: 'PUT', body: { nickname: 'ada', country: 'TR', listed: true } })
+    await new Promise((res) => setTimeout(res, 300))
+    await expect(b.post('/profile/get', {})).rejects.toThrow()
+  })
+
+  it('atlamak sunucuyu kapatir ve Dwell sunucusuna profil yazmaz', async () => {
+    const srv = profileServer()
+    const { b } = await loggedIn(srv)
+    expect((await b.post('/profile/skip', {})).status).toBe(200)
+    expect(srv.calls.some((c) => c.method === 'PUT')).toBe(false)
+    await new Promise((res) => setTimeout(res, 300))
+    await expect(b.post('/profile/get', {})).rejects.toThrow()
+  })
+
+  it('sayfa ulke kodlarini ve gizli siralama kutusunu tasir; kutu isaretsiz', async () => {
+    const { url } = start(profileServer().impl)
+    const b = await browse(await url)
+    expect(b.html).toContain('id="profilebox"')
+    expect(b.html).toMatch(/class="manual hide" id="profilebox"/)
+    expect(b.html).toContain('"TR"')
+    expect(b.html).not.toMatch(/id="p-listed"[^>]*checked/)
+  })
+})
