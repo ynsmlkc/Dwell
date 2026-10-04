@@ -6,13 +6,17 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs'
+import {
+  mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, readdirSync,
+  mkdirSync, symlinkSync, lstatSync, statSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   install, uninstall, readSettings, detectConflicts, diagnose,
   MARKER, TURN_HOOKS, type ClaudeSettings,
 } from '../src/settings.js'
+import { SpinnerSync } from '../src/daemon/spinner-sync.js'
 
 let dir = ''
 let path = ''
@@ -234,5 +238,59 @@ describe('yedek birikimi', () => {
     for (let i = 0; i < 15; i++) install(OPTS, path)
     const backups = readdirSync(join(dir, 'dwell-backups'))
     expect(backups.length).toBeLessThanOrEqual(10)
+  })
+})
+
+/**
+ * Dosya guvenligi — kullanicinin kendi ayar dosyasi.
+ *
+ * Bircok gelistirici settings.json'u dotfiles deposuna baglar. Baglantinin
+ * ustune `rename` etmek onu duz dosyaya cevirir ve depo sessizce ayrisir.
+ */
+describe('dosya guvenligi — sembolik baglanti, izin, atomiklik', () => {
+  const bagla = () => {
+    const depo = join(dir, 'dotfiles')
+    mkdirSync(depo)
+    const gercek = join(depo, 'settings.json')
+    writeFileSync(gercek, JSON.stringify({ theme: 'dark' }), { mode: 0o644 })
+    symlinkSync(gercek, path)
+    return gercek
+  }
+
+  it('kurulum sembolik baglantiyi KORUR ve gercek dosyaya yazar', () => {
+    const gercek = bagla()
+    install(OPTS, path)
+    expect(lstatSync(path).isSymbolicLink()).toBe(true)
+    expect(JSON.parse(readFileSync(gercek, 'utf8')).statusLine[MARKER]).toBe(true)
+    expect(JSON.parse(readFileSync(gercek, 'utf8')).theme).toBe('dark')
+  })
+
+  it('kaldirma da baglantiyi korur', () => {
+    const gercek = bagla()
+    install(OPTS, path)
+    uninstall(path, now)
+    expect(lstatSync(path).isSymbolicLink()).toBe(true)
+    expect(JSON.parse(readFileSync(gercek, 'utf8'))).toEqual({ theme: 'dark' })
+  })
+
+  it('dosyanin mevcut izinleri korunur', () => {
+    const gercek = bagla()
+    install(OPTS, path)
+    expect(statSync(gercek).mode & 0o777).toBe(0o644)
+  })
+
+  it('yazmadan geriye gecici dosya kalmaz', () => {
+    bagla()
+    install(OPTS, path)
+    const artik = readdirSync(join(dir, 'dotfiles')).filter((f) => f.includes('dwell-tmp'))
+    expect(artik).toEqual([])
+  })
+
+  it('spinner senkronu da baglantiyi korur', () => {
+    const gercek = bagla()
+    install({ ...OPTS, spinnerVerbs: ['✶ Ilk'] }, path)
+    new SpinnerSync({ path }).sync('Marka')
+    expect(lstatSync(path).isSymbolicLink()).toBe(true)
+    expect(JSON.parse(readFileSync(gercek, 'utf8')).spinnerVerbs.verbs).toEqual(['✶ Marka'])
   })
 })

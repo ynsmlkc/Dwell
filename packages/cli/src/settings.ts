@@ -12,7 +12,10 @@
  *   • Her yazmadan once zaman damgali yedek alinir
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, readdirSync, unlinkSync } from 'node:fs'
+import {
+  readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, readdirSync, unlinkSync,
+  realpathSync, renameSync, statSync,
+} from 'node:fs'
 import { homedir } from 'node:os'
 import { join, dirname } from 'node:path'
 
@@ -252,7 +255,37 @@ export function diagnose(expectedCommand: string, path = SETTINGS_PATH): Diagnos
 
 function writeSettings(s: ClaudeSettings, path: string): void {
   mkdirSync(dirname(path), { recursive: true })
-  writeFileSync(path, JSON.stringify(s, null, 2) + '\n', { mode: 0o600 })
+  writeSettingsFile(path, s)
+}
+
+/**
+ * Kullanicinin `settings.json`'unu GUVENLE yazar — iki kural:
+ *
+ * 1. **Atomik.** Yerinde yazmak (`writeFileSync(path)`) yarida kesilirse ya
+ *    da Claude Code ayni anda yazarsa yarim bir JSON birakir; `readSettings`
+ *    bozuk dosyaya dokunmayi reddettigi icin `dwell uninstall` bile calismaz
+ *    hale gelir. Gecici dosyaya yazip `rename` etmek ya eski ya yeni dosyayi
+ *    birakir, arasini asla.
+ *
+ * 2. **Sembolik baglantiyi korur.** Bircok gelistirici `~/.claude/settings.json`'u
+ *    dotfiles deposuna (stow, chezmoi) baglar. Baglantinin USTUNE `rename`
+ *    etmek baglantiyi duz bir dosyayla degistirir — depo ile gercek ayar
+ *    sessizce ayrisir. Bu yuzden gercek hedef cozulur ve gecici dosya ONUN
+ *    yanina yazilir (rename ancak ayni dizinde atomik).
+ *
+ * Dosyanin mevcut izinleri korunur; yeni dosya 0600.
+ */
+export function writeSettingsFile(path: string, s: ClaudeSettings): void {
+  const target = existsSync(path) ? realpathSync(path) : path
+  const mode = existsSync(target) ? statSync(target).mode & 0o777 : 0o600
+  const tmp = `${target}.dwell-tmp-${process.pid}`
+  try {
+    writeFileSync(tmp, JSON.stringify(s, null, 2) + '\n', { mode })
+    renameSync(tmp, target)
+  } catch (e) {
+    try { unlinkSync(tmp) } catch { /* zaten yok */ }
+    throw e
+  }
 }
 
 function backup(path: string, now: NowFn): string {

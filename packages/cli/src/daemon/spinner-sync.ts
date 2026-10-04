@@ -33,8 +33,8 @@
  *   • Hata YUTULUR: spinner guncellenememesi urunu durdurmaz
  */
 
-import { readFileSync, writeFileSync, renameSync, existsSync, unlinkSync } from 'node:fs'
-import { SETTINGS_PATH, MARKER, type ClaudeSettings } from '../settings.js'
+import { readFileSync, existsSync } from 'node:fs'
+import { SETTINGS_PATH, MARKER, type ClaudeSettings, writeSettingsFile } from '../settings.js'
 import { DISCLOSURE_GLYPH } from '@dwell/protocol'
 
 export interface SpinnerSyncOptions {
@@ -81,14 +81,14 @@ export class SpinnerSync {
 
       settings.spinnerVerbs = { mode: 'replace', verbs, [MARKER]: true }
 
-      const tmp = `${this.#path}.dwell-tmp`
-      writeFileSync(tmp, JSON.stringify(settings, null, 2) + '\n', { mode: 0o600 })
-      renameSync(tmp, this.#path)                  // atomik yer degistirme
+      // Atomik ve sembolik baglantiyi koruyarak — bkz. `writeSettingsFile`.
+      // Eskiden dogrudan `rename` ediliyordu: dotfiles deposuna bagli bir
+      // settings.json her reklam degisiminde duz bir dosyaya donusuyordu.
+      writeSettingsFile(this.#path, settings)
     } catch (e) {
       // Spinner guncellenememesi urunu durdurmaz. statusLine calismaya
       // devam eder ve sayim ondan gelir.
       this.#onError(e)
-      try { unlinkSync(`${this.#path}.dwell-tmp`) } catch { /* onemsiz */ }
     }
   }
 
