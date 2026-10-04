@@ -246,6 +246,118 @@ parasını geri alır, yayıncı karşılığını alamazdı.
 
 ---
 
+## 8 — Sıralama ve dünya küresi ☐ yapılacak (planlandı 2026-10-02)
+
+Ana sayfada iki yapı: kimlerin kazandığını gösteren bir sıralama tablosu ve
+kullanıcıların hangi ülkelerde olduğunu gösteren, sürüklenerek döndürülen
+noktalı bir dünya küresi (ccgather.com'daki gibi). Amaç README'deki iddiayı
+kanıtlamak: "Türkiye, Latin Amerika, Afrika'daki geliştiriciler de para alıyor."
+
+**Durum:** ilk taslak kodu yazıldı (çalışma ağacında, commit edilmedi,
+yayınlanmadı). Yalnızca **sahte örnek veriyle** yerelde görüldü. Gerçek veriyle
+doğrulanmadan yayına çıkmayacak.
+
+### Taslakta olanlar
+
+- [x] `profiles` tablosu — takma ad, ülke, `listed` (varsayılan kapalı)
+- [x] `PUT/GET /v1/me/profile`, genel `GET /v1/leaderboard`, `/v1/leaderboard/countries`, `/v1/leaderboard/profile/:nick`
+- [x] Kazanç **defterden** hesaplanıyor (gösterim tablosu 90 günde temizleniyor, defter kalıcı)
+- [x] Kendi reklamından gelen gösterim sayılmıyor (PROBLEMS.md #7)
+- [x] Ana sayfa: küre (`public/globe.js`, kütüphanesiz canvas) + tablo + profil kartı
+- [x] Panel (`/app`): "Show me on the leaderboard" formu
+- [x] Gizlilik sayfasına "The leaderboard" bölümü
+- [x] 27 test (`test/leaderboard.test.ts`)
+- [x] Ülke tahmini — CCgather yaklaşımı (2026-10-04): profil ilk açıldığında ülke bağlantıdan önceden seçili gelir, kullanıcı onaylar ya da değiştirir; seçilmiş ülkenin üstüne asla yazılmaz. Kaynak: önce platform başlığı (`cf-ipcountry`, `x-vercel-ip-country`), yoksa sunucudaki DB-IP Lite veritabanı (Docker derlemesinde indiriliyor, CC BY 4.0). IP saklanmıyor, dışarı gitmiyor. **Doğrulama değil** — ödül eklenirse ayrıca doğrulama gerekir
+
+### Yapılacaklar
+
+- [ ] **Gerçek veriyle doğrulama — sahte veri yok.** Örnek veri yalnızca yerel önizlemeydi; sitede hiçbir zaman kullanılmayacak
+  - [ ] Canlı SQLite'ın bir kopyasını (`DWELL_DB`) yerelde aç, sunucuyu ona karşı çalıştır
+  - [ ] Kendi profilini aç; tablodaki kazanç ve gösterim sayısını `/v1/admin/overview` ve `/v1/me/balance` ile karşılaştır, kuruşu kuruşuna tutmalı
+  - [ ] Kendi reklamı ayıklandıktan sonra kalan rakam mantıklı mı (`GOOX` gösterimlerinin çoğu kendi kampanyalarından)
+  - [ ] Reddedilmiş (8.415) ve ters çevrilmiş gösterimlerin sayılmadığını gerçek kayıtlarla kontrol et
+  - [ ] Küre ve tablo gerçek yanıtla doğru çiziliyor mu
+- [ ] Boş durum: ilk günlerde liste boş görünecek — "Nobody is listed yet" yeterli mi, yoksa bölüm ilk N kişi listelenene kadar gizli mi kalsın? **Karar ver**
+- [ ] İlk kullanıcıları listelenmeye davet et (mevcut yayıncılara duyuru)
+- [ ] `dwell profile` CLI komutu — şu an yalnızca web panelinden ayarlanıyor
+- [ ] Seviye / rozet sistemi (ccgather'daki Lv.7 gibi) — istenirse, ayrı karar
+- [ ] Commit → deploy → canlıda tekrar doğrula
+
+### Riskler
+
+- Kazancı herkese açık sıralamak sahte gösterime teşvik eder; PROBLEMS.md #1 (sahte gösterim savunması yetersiz) çözülmeden yayına çıkmak riskli
+- Profil yazma `read:balance` kapsamıyla yapılıyor (yeniden giriş gerekmesin diye); çalınan daemon token'ı takma adı değiştirebilir, paraya dokunamaz
+
+---
+
+## 9 — IDE ve Codex ☐ yapılacak (Instawards 2. ay, planlandı 2026-10-02)
+
+Taslak SOW: `instawards/month-2-sow.md`. Kural değişmiyor: **başka bir
+eklentiyi ya da binary'yi yamalamak yok.** Kickbacks IDE'ye Claude Code
+eklentisini diskte yamalayarak giriyor (webview'e JS, CSP gevşetme); biz
+yalnızca resmi ayarları kullanıyoruz.
+
+- [ ] VS Code / Cursor'daki Claude Code paneli: eklenti `spinnerVerbs`'ü doğal okuyor (2.1.232, `webview/index.js`'te görüldü) — panelde canlı güncelleniyor mu, hook'lar tetikleniyor mu, görünürlük ölçülebiliyor mu? **Test et**
+- [ ] `dwell init` IDE kurulumunu algılasın
+- [ ] Gösterimlere yüzey etiketi: `terminal` / `ide` — reklamveren ayrı görsün
+- [ ] Codex CLI: `tui.status_line` yalnızca yerleşik öğeleri kabul ediyor, dışarıdan metin yok → fizibilite raporu + `openai/codex` #17827'ye öneri
+- [ ] Codex IDE eklentisi: resmi bir yüzey var mı? Test et
+- [ ] "Uygun kampanya yok" uyarısı (2026-09-29'da ağ 10 gün sessizce durdu)
+
+---
+
+## 10 — Sponsor havuzları (hackathon ve ekosistem) ◐ ilk sürüm yazıldı (2026-10-03, commit edilmedi)
+
+Bir sponsor (hackathon düzenleyicisi, Stellar Foundation, büyük bir şirket)
+tek seferde para yatırıp **kapalı bir havuz** açar. Havuza katılanlar
+yalnızca o havuzun projelerini görür, gösterim ücreti sponsorun bütçesinden
+ödenir. Örnek: hackathon'da her takım kendi projesini tek satır olarak girer,
+katılımcılar beklerken birbirlerinin projelerini görür ve para kazanır.
+Aynı yapı "büyük şirket küçük ekosistem şirketlerinin reklamını öder"
+senaryosuna da uyuyor.
+
+**Neden:** talep tarafının en zayıf yeri bütçenin bitmesi (2026-09-29'da ağ
+10 gün durdu). Sponsor havuzu talebi topluca getiriyor. Stellar
+hackathon'ları ve Stellar Türkiye etkinlikleri doğal pilot alanı.
+
+### Tasarım
+
+- **Para sponsorun reklamveren hesabında durur.** Havuz projeleri sponsorun
+  `advertiserId`'siyle faturalanır; defter, ödeme ve `spendableBalance`
+  değişmez. Havuz bitince kalan para mevcut reklamveren çekimiyle geri alınır
+- **Kampanyaya iki alan eklenir:** `poolId` (hangi havuz) ve `submittedBy`
+  (projeyi giren katılımcının publisherId'si)
+- **Kapalı döngü (`selector.ts`):** havuza üye bir yayıncıya yalnızca o
+  havuzun kampanyaları sunulur; havuz kampanyaları genel ağa çıkmaz
+- **Kendi projesini görerek kazanmak yok:** `submittedBy === publisherId`
+  olan kampanya o kişiye sunulmaz
+- **Katılım kodu:** sponsor havuzu açınca `HACK-XXXX` gibi bir kod alır;
+  katılımcı web panelinden (`/app`) kodu girer. Daemon token'ı publisherId
+  ile çalıştığı için **CLI güncellemesi gerekmez**
+- **Proje girişi:** katılımcı panelden marka + tek satır + alan adı girer;
+  teklif (CPM) havuzun sabit teklifinden gelir, takım para ödemez
+- **Sponsor paneli** (`/advertisers/app`): havuz oluştur, kodu gör, üye ve
+  proje sayısı, kalan bütçe, havuzu kapat
+
+### Yapılacaklar
+
+- [x] `pools` + `pool_members` tabloları, `campaigns`'e `pool_id` / `submitted_by` sütunları
+- [x] Seçici: havuz süzgeci + kendi projesini dışlama (`test/pools.test.ts`, 13 test)
+- [x] Uçlar: havuz oluştur/listele/kapat (sponsor), katıl/ayrıl/proje gir (katılımcı), genel havuz özeti
+- [x] Sponsor ve katılımcı panelleri — yerelde test token'larıyla uçtan uca denendi (havuz aç → kodla katıl → proje gir → `/v1/ads/next` başka üyeye projeyi veriyor, sahibine vermiyor)
+- [x] Havuz başına üye günlük üst sınırı — sponsor belirliyor (varsayılan 200 gösterim/gün, en fazla 2.000); sınıra gelen üyeye havuz susuyor
+- [x] Havuz bütçesi: sponsor havuza bütçe koyuyor, havuz bunu aşamıyor (teslimat anında sayılıyor) ve sponsorun normal kampanyaları açık havuzlara ayrılan parayı harcayamıyor. Bütçe panelden artırılıp azaltılabiliyor
+- [x] Çekimde de ayırma: açık havuzlara ayrılan para reklamveren çekiminden düşülüyor; sponsor önce havuzu kapatır ya da bütçesini düşürür. Panel nedenini gösteriyor. Hesap tek yerde (`src/pools/reserve.ts`): seçim, çekim ve panel aynı rakamı kullanıyor
+- [ ] Gerçek bir pilot: Stellar Türkiye etkinliği (İrem ile konuş) — Instawards 6.2 için kanıt olur
+
+### Açık kararlar
+
+- **Platform payı:** normalde gösterim ücretinin %50'si platformda kalıyor. Havuzlarda düşürülsün mü / sıfırlansın mı? Sponsor için cazibe ↔ platform geliri
+- Havuzun bitiş tarihi zorunlu mu, yoksa bütçe bitene kadar mı?
+- Hackathon jürisi için "en çok gösterilen proje" istatistiği verilsin mi?
+
+---
+
 ## Küçük ama biriken işler
 
 | # | İş | Nereden |
