@@ -301,8 +301,10 @@ function applyHook(m: TurnMachine, event: HookEvent, session: string, ts: number
     case 'UserPromptSubmit': m.onTurnStart(session, ts); break
     case 'Stop': m.onTurnEnd(session, ts); break
     case 'SessionEnd': m.onSessionEnd(session, ts); break
-    case 'SessionStart':
+    // Arac kullanimi turun surdugunun kaniti — sessiz tur sayacini yeniler
+    // (bkz. `MAX_QUIET_TURN_MS`). Gosterim suresine DOKUNMAZ; o yalnizca tick.
     case 'PreToolUse':
-    case 'PostToolUse': break
+    case 'PostToolUse': m.onActivity(session, ts); break
+    case 'SessionStart': break
   }
 }

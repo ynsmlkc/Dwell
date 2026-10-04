@@ -60,6 +60,8 @@ interface SessionState {
   /** Bu oturumdan gelen en son `onTick` an — mutex'in olu tutulup
    * tutulmadigini anlamak icin (bkz. `STALE_MUTEX_MS`). */
   lastTickAt: number
+  /** Bu turdaki son hook olayi — bkz. `MAX_QUIET_TURN_MS`. */
+  activeAt: number
 }
 
 /**
@@ -81,6 +83,22 @@ interface SessionState {
  */
 const STALE_MUTEX_MS = 60_000
 
+/**
+ * Hicbir hook gelmeden bir tur en fazla bu kadar `showing` kalabilir.
+ *
+ * Claude Code kullanici turu Esc ile KESTIGINDE `Stop` gondermiyor —
+ * belgelere gore `Stop` yalnizca "Claude yanitini bitirdiginde" atesleniyor
+ * ve kesinti icin bir hook yok. Bu sinir olmadan kesilen tur bir sonraki
+ * istem gelene kadar `showing` kaliyordu: oturum BOSTA, statusLine her
+ * saniye tikliyor, reklam ekranda duruyor ve SAYILIYORDU. "Yalnizca olculen
+ * faturalanir" kuralinin dogrudan ihlali — reklamveren bos ekrana para oduyor.
+ *
+ * Bedeli: hook gelmeden 10 dakikayi asan gercek bir turun kuyrugu
+ * gosterilmez (olculen turlerin p90'i 322s). Fail-closed: emin olmadigimiz
+ * sureyi satmiyoruz. `onActivity` (Pre/PostToolUse) bu sayaci yeniler.
+ */
+export const MAX_QUIET_TURN_MS = 10 * 60_000
+
 interface ActiveShow {
   readonly ad: AdPayload
   readonly startedAt: number
@@ -99,6 +117,8 @@ export interface TurnMachineDeps {
   readonly isPaused: () => boolean
   /** Giris yapilmis ve token gecerli mi? */
   readonly isAuthenticated: () => boolean
+  /** Varsayilan `MAX_QUIET_TURN_MS`. */
+  readonly maxQuietTurnMs?: number
 }
 
 /* ─────────────────────────── makine ─────────────────────────── */
@@ -139,7 +159,7 @@ export class TurnMachine {
 
   /** `UserPromptSubmit` — tur acilir. */
   onTurnStart(sessionId: string, ts: number = this.deps.clock.now()): void {
-    this.#sessions.set(sessionId, { phase: 'showing', cooldownUntil: 0, lastTickAt: ts })
+    this.#sessions.set(sessionId, { phase: 'showing', cooldownUntil: 0, lastTickAt: ts, activeAt: ts })
 
     // ADR-012: mutex bostaysa veya bu oturum zaten tutuyorsa devral.
     // Doluysa devralma — digeri sayiyor, bu oturum SILENT.
@@ -152,6 +172,15 @@ export class TurnMachine {
       // oldugunun kaniti degildir — yalnizca `onTick` oyle. Bkz. #closeShow.
       if (this.#show === null) this.#startShow(ts)
     }
+  }
+
+  /**
+   * Tur icinde hayat belirtisi (araç kullanimi) — sessiz tur sayacini yeniler.
+   * Yalnizca `showing`'deki oturumu etkiler; bos oturumu tura SOKMAZ.
+   */
+  onActivity(sessionId: string, ts: number = this.deps.clock.now()): void {
+    const st = this.#sessions.get(sessionId)
+    if (st && st.phase === 'showing') st.activeAt = ts
   }
 
   /** `Stop` — tur kapanir, tolerans baslar. */
@@ -283,10 +312,16 @@ export class TurnMachine {
     })
   }
 
-  /** Toleransi dolan her oturum bosa duser. */
+  /**
+   * Toleransi dolan her oturum bosa duser. Hook gelmeden `MAX_QUIET_TURN_MS`
+   * gecmis tur da — buyuk ihtimalle kullanici kesti ve `Stop` hic gelmeyecek.
+   */
   #expireCooldowns(ts: number): void {
+    const maxQuiet = this.deps.maxQuietTurnMs ?? MAX_QUIET_TURN_MS
     for (const [sid, st] of this.#sessions) {
-      if (st.phase !== 'cooldown' || ts < st.cooldownUntil) continue
+      const cooled = st.phase === 'cooldown' && ts >= st.cooldownUntil
+      const abandoned = st.phase === 'showing' && ts - st.activeAt >= maxQuiet
+      if (!cooled && !abandoned) continue
       st.phase = 'idle'
       if (this.#activeSession === sid) {
         this.#closeShow(ts)

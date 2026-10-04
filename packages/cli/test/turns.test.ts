@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { fixedClock, fakeIdGenerator, FALLBACK_CONFIG } from '@dwell/protocol'
 import type { AdPayload, RemoteConfig } from '@dwell/protocol'
-import { TurnMachine } from '../src/daemon/turns.js'
+import { TurnMachine, MAX_QUIET_TURN_MS } from '../src/daemon/turns.js'
 
 const CONFIG: RemoteConfig = {
   ...FALLBACK_CONFIG,
@@ -365,5 +365,63 @@ describe('sayilan sure dogru', () => {
 
     expect(m.drainImpressions().length).toBeGreaterThan(0)
     expect(m.drainImpressions().length).toBe(0)
+  })
+})
+
+/**
+ * Kesilen tur. Claude Code Esc ile kesilen turda `Stop` GONDERMIYOR; bu
+ * sinir olmadan oturum bir sonraki isteme kadar `showing` kalip bos ekrani
+ * faturaliyordu.
+ */
+describe('sessiz tur siniri — kesilen tur bos ekrani faturalamaz', () => {
+  it('hook gelmeden MAX_QUIET_TURN_MS dolunca reklam kalkar ve sayim durur', () => {
+    const { m, clock, run } = setup()
+    m.onTurnStart('s1', clock.now())
+    run('s1', 30_000)                               // gercek tur: sayiliyor
+    // Kullanici Esc'ye basti — Stop yok. statusLine tiklamaya devam ediyor.
+    run('s1', MAX_QUIET_TURN_MS)
+    const d = m.onTick('s1', clock.now())
+    expect(d.ad).toBeNull()
+    expect(d.phase).toBe('idle')
+
+    // Sinirdan sonra yeni gosterim ACILMAZ.
+    m.drainImpressions()
+    run('s1', 60 * 60_000)
+    expect(m.drainImpressions()).toEqual([])
+  })
+
+  it('bostaki toplam faturalanan sure siniri ASAMAZ', () => {
+    const { m, clock, run } = setup()
+    m.onTurnStart('s1', clock.now())
+    run('s1', 3 * 60 * 60_000)                      // 3 saat bosta, Stop hic gelmedi
+    const toplam = m.drainImpressions()
+      .filter((i) => i.rejectedReason === null)
+      .reduce((t, i) => t + i.durationMs, 0)
+    expect(toplam).toBeLessThanOrEqual(MAX_QUIET_TURN_MS)
+  })
+
+  it('arac kullanimi sayaci yeniler — uzun calisan tur kesilmez', () => {
+    const { m, clock, run } = setup()
+    m.onTurnStart('s1', clock.now())
+    for (let i = 0; i < 4; i++) {                   // 4 × 5dk = 20dk, araçlarla
+      run('s1', 5 * 60_000)
+      m.onActivity('s1', clock.now())
+    }
+    expect(m.onTick('s1', clock.now()).ad).not.toBeNull()
+  })
+
+  it('arac olayi bos oturumu tura SOKMAZ', () => {
+    const { m, clock } = setup()
+    m.onActivity('s1', clock.now())
+    expect(m.onTick('s1', clock.now()).ad).toBeNull()
+  })
+
+  it('normal Stop akisi degismedi', () => {
+    const { m, clock, run } = setup()
+    m.onTurnStart('s1', clock.now())
+    run('s1', 15_000)
+    m.onTurnEnd('s1', clock.now())
+    run('s1', 5_000)
+    expect(m.onTick('s1', clock.now()).ad).toBeNull()
   })
 })
