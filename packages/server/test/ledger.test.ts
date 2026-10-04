@@ -212,9 +212,20 @@ describe('audit — invariant denetimi', () => {
   it('publisher bakiyesi kapasitesinin ustunde odenemez', () => {
     ledger.deposit({ advertiserId: ADV, amount: stroops(10_000_000n), topupId: 't0' })
     impression('i1', 1_000_000n)                  // publisher +500_000
-    ledger.payoutSubmit({ batchId: 'b1', publisherId: PUB, amount: stroops(900_000n) })
-    // Defter yazmayi engellemiyor ama audit YAKALIYOR — bu bir bug isareti.
-    expect(ledger.audit()).toContainEqual(expect.stringMatching(/negatif bakiye.*publisher/))
+    // Defter YAZMAYI reddediyor. Eskiden yaziyor ve yalnizca `audit()`
+    // sonradan yakaliyordu — ama o anda para zincire cikmis olabiliyordu.
+    expect(() => ledger.payoutSubmit({ batchId: 'b1', publisherId: PUB, amount: stroops(900_000n) }))
+      .toThrow(/eksiye/)
+    expect(ledger.balance(accountId('publisher', PUB))).toBe(500_000n)
+    expect(ledger.audit()).toEqual([])
+  })
+
+  it('ayni odemenin idempotent tekrari bakiye kontrolune TAKILMAZ', () => {
+    ledger.deposit({ advertiserId: ADV, amount: stroops(10_000_000n), topupId: 't0' })
+    impression('i1', 1_000_000n)                  // publisher +500_000
+    const ilk = ledger.payoutSubmit({ batchId: 'b1', publisherId: PUB, amount: stroops(500_000n) })
+    // Bakiye artik sifir; tekrar orijinali donmeli, hata degil.
+    expect(ledger.payoutSubmit({ batchId: 'b1', publisherId: PUB, amount: stroops(500_000n) })).toEqual(ilk)
   })
 })
 
@@ -244,5 +255,57 @@ describe('odeme gucu — solvency', () => {
 
     expect(ledger.solvency(ZERO).owed).toBe(0n)
     expect(ledger.solvency(ZERO).solvent).toBe(true)
+  })
+})
+
+describe('hesaba ozel raporlar — /v1/me/balance', () => {
+  const PUB2 = 'pub-2'
+  const pub2Acc = accountId('publisher', PUB2)
+  const kazan = (pub: string, id: string, rate: bigint) => ledger.postImpression({
+    impressionId: id, advertiserId: ADV, publisherId: pub, campaignId: CAMP,
+    rate: stroops(rate), revShareBps: 5000,
+  })
+
+  beforeEach(() => {
+    ledger.deposit({ advertiserId: ADV, amount: stroops(100_000_000n), topupId: 't0' })
+    kazan(PUB, 'i1', 4_000_000n)                   // PUB  +2_000_000
+    kazan(PUB2, 'i2', 6_000_000n)                  // PUB2 +3_000_000
+  })
+
+  it('yoldaki para YALNIZCA o hesabin cekimleri — paylasilan kutunun toplami DEGIL', () => {
+    ledger.payoutSubmit({ batchId: 'b1', publisherId: PUB, amount: stroops(1_000_000n) })
+    ledger.payoutSubmit({ batchId: 'b2', publisherId: PUB2, amount: stroops(3_000_000n) })
+
+    expect(ledger.balance(inFlight)).toBe(4_000_000n)          // herkesin toplami
+    expect(ledger.inFlightFrom(pubAcc)).toBe(1_000_000n)
+    expect(ledger.inFlightFrom(pub2Acc)).toBe(3_000_000n)
+  })
+
+  it('onaylanan ve iade edilen cekim yoldan duser', () => {
+    ledger.payoutSubmit({ batchId: 'b1', publisherId: PUB, amount: stroops(1_000_000n) })
+    ledger.payoutSubmit({ batchId: 'b2', publisherId: PUB, amount: stroops(500_000n) })
+    ledger.payoutSettled({ batchId: 'b1', publisherId: PUB, amount: stroops(1_000_000n), txHash: 'h' })
+    expect(ledger.inFlightFrom(pubAcc)).toBe(500_000n)
+
+    ledger.reverse('payout_batch', `b2:${PUB}`, 'basarisiz')
+    expect(ledger.inFlightFrom(pubAcc)).toBe(0n)
+  })
+
+  it('ayni cuzdanin reklamveren cekimi yayinci "yolda"sina KARISMAZ', () => {
+    ledger.deposit({ advertiserId: PUB, amount: stroops(9_000_000n), topupId: 't-pub-adv' })
+    ledger.payoutSubmit({ batchId: 'w1', publisherId: PUB, amount: stroops(9_000_000n), kind: 'advertiser' })
+    expect(ledger.inFlightFrom(pubAcc)).toBe(0n)
+    expect(ledger.inFlightFrom(accountId('advertiser', PUB))).toBe(9_000_000n)
+  })
+
+  it('kazanc cekimden sonra DUSMEZ, gosterim iadesinde duser', () => {
+    ledger.payoutSubmit({ batchId: 'b1', publisherId: PUB, amount: stroops(2_000_000n) })
+    ledger.payoutSettled({ batchId: 'b1', publisherId: PUB, amount: stroops(2_000_000n), txHash: 'h' })
+    expect(ledger.balance(pubAcc)).toBe(0n)
+    expect(ledger.earned(pubAcc)).toBe(2_000_000n)
+
+    kazan(PUB, 'i3', 2_000_000n)                   // +1_000_000
+    ledger.reverse('impression', 'i3', 'fraud')
+    expect(ledger.earned(pubAcc)).toBe(2_000_000n)
   })
 })

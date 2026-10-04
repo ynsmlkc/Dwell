@@ -132,6 +132,62 @@
     </div>
   </section>
 
+  <section id="board">
+    <p class="eyebrow" style="margin-bottom: 12px">Leaderboard</p>
+    <h2 style="margin-bottom: 8px">Who gets paid, and where</h2>
+    <p class="body" style="margin: 0 0 8px; max-width: 62ch">Developers who chose to be listed. A nickname and a country — never a wallet address. Their own ads don't count.</p>
+
+    <div class="globe-wrap">
+      <canvas id="globe" aria-label="Globe of countries with listed developers. Drag or use the arrow keys to rotate."></canvas>
+      <div class="globe-tip mono hidden" id="globe-tip"></div>
+      <p class="globe-stats mono" id="globe-stats"></p>
+    </div>
+
+    <div class="board">
+      <div class="board-main">
+        <div class="board-bar">
+          <div class="seg" role="group" aria-label="Region">
+            <button class="seg-btn on" id="scope-global" aria-pressed="true">Global</button>
+            <select class="seg-select mono" id="scope-country" aria-label="Country"><option value="">Country…</option></select>
+          </div>
+          <div class="seg" role="group" aria-label="Period" id="period">
+            <button class="seg-btn on" data-period="all" aria-pressed="true">All</button>
+            <button class="seg-btn" data-period="30d" aria-pressed="false">30D</button>
+            <button class="seg-btn" data-period="7d" aria-pressed="false">7D</button>
+          </div>
+        </div>
+        <table class="board-table mono">
+          <thead><tr><th class="rank">#</th><th>Developer</th><th class="num col-imp">Impressions</th><th class="num">Earned</th></tr></thead>
+          <tbody id="board-rows"></tbody>
+        </table>
+        <div class="board-empty hidden" id="board-empty">
+          <p class="body" style="margin: 0 0 6px; color: var(--ink-soft)" id="board-empty-title">Nobody is listed yet.</p>
+          <p class="small" style="margin: 0">Open the <a class="link-under" href="/app">panel</a>, pick a nickname and turn on “Show me on the leaderboard”.</p>
+        </div>
+      </div>
+
+      <aside class="board-card hidden" id="board-card" aria-live="polite">
+        <div class="pc-head">
+          <span class="pc-avatar mono" id="pc-avatar"></span>
+          <div style="min-width: 0">
+            <h3 class="pc-name" id="pc-name"></h3>
+            <p class="small" style="margin: 2px 0 0" id="pc-country"></p>
+          </div>
+        </div>
+        <div class="pc-grid">
+          <div><span class="pc-k">Global</span><span class="pc-v" id="pc-global"></span></div>
+          <div><span class="pc-k">Country</span><span class="pc-v" id="pc-crank"></span></div>
+          <div><span class="pc-k">Impressions</span><span class="pc-v" id="pc-imp"></span></div>
+          <div class="wide"><span class="pc-k">Earned</span><span class="pc-v accent" id="pc-earned"></span></div>
+        </div>
+        <div class="pc-history">
+          <div class="pc-k" style="display: flex; justify-content: space-between"><span>Last 30 days</span><span id="pc-avg"></span></div>
+          <svg id="pc-spark" viewBox="0 0 300 64" preserveAspectRatio="none" aria-hidden="true"></svg>
+        </div>
+      </aside>
+    </div>
+  </section>
+
   <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: clamp(20px, 4vw, 56px); align-items: start">
     <div>
       <h2 style="font-size: clamp(24px, 2.8vw, 32px); margin-bottom: 14px">Leaving takes one command</h2>
@@ -164,6 +220,70 @@
   }
   .step .no { font-family: var(--mono); font-size: 12px; color: var(--accent); padding-top: 6px; }
   @media (max-width: 720px) { .step { grid-template-columns: 40px 1fr; } .step > div { grid-column: 2; } }
+
+  /* ── siralama ── */
+  .globe-wrap { position: relative; max-width: 620px; margin: 0 auto; }
+  #globe { display: block; width: 100%; aspect-ratio: 1; cursor: grab; touch-action: pan-y; outline: none; }
+  #globe:focus-visible { outline: 1px dashed var(--line-3); outline-offset: -1px; }
+  .globe-tip {
+    position: absolute; pointer-events: none; transform: translate(-50%, calc(-100% - 14px));
+    background: var(--bg-deep); border: 1px solid var(--line-3); border-radius: 4px;
+    padding: 6px 10px; font-size: 12px; color: var(--ink); white-space: nowrap;
+  }
+  .globe-stats { position: absolute; left: 0; right: 0; bottom: 4%; margin: 0; text-align: center; font-size: 12.5px; color: var(--faint); pointer-events: none; }
+  .globe-stats b { color: var(--accent); font-weight: 400; }
+
+  .board { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; margin-top: 8px; }
+  @media (max-width: 900px) { .board { grid-template-columns: minmax(0, 1fr); } }
+  .board-main { border: 1px solid var(--line-2); border-radius: 6px; background: rgba(236, 231, 225, 0.02); overflow: hidden; }
+  .board-bar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; padding: 12px; border-bottom: 1px solid var(--line); }
+  .seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 4px; overflow: hidden; }
+  .seg-btn, .seg-select {
+    font-family: var(--mono); font-size: 12.5px; color: var(--muted); background: transparent;
+    border: 0; padding: 7px 12px; cursor: pointer;
+  }
+  .seg-btn + .seg-btn, .seg-btn + .seg-select { border-left: 1px solid var(--line-2); }
+  .seg-btn:hover, .seg-select:hover { color: var(--ink); }
+  .seg-btn.on { background: var(--accent-bg); color: var(--accent); }
+  .seg-select.on { color: var(--accent); background: var(--accent-bg); }
+  .seg-select option { background: var(--bg); color: var(--ink); }
+
+  /* style.css tablolara min-width: 520px veriyor (panelin odeme tablosu, yatay kaydirmali); bu tablo kaydirilmiyor, daraliyor. */
+  .board-table { width: 100%; min-width: 0; border-collapse: collapse; font-size: 13.5px; table-layout: fixed; }
+  .board-table th.num { width: 120px; }
+  .board-table th { text-align: left; font-weight: 400; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .board-table td { padding: 12px 14px; border-bottom: 1px solid var(--line); color: var(--ink-soft); }
+  .board-table tbody tr { cursor: pointer; }
+  .board-table tbody tr:hover td { background: rgba(236, 231, 225, 0.025); }
+  .board-table tbody tr.sel td { background: var(--accent-bg); }
+  .board-table tbody tr.sel td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+  .board-table .num { text-align: right; }
+  .board-table .rank { width: 44px; color: var(--faint); }
+  .board-table tr:nth-child(-n+3) .rank { color: var(--accent); }
+  .board-table .who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .board-table .who .nick { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .board-table .earned { color: var(--good); }
+  .flag { font-size: 16px; line-height: 1; width: 22px; text-align: center; flex: none; }
+  @media (max-width: 560px) {
+    .board-table .col-imp { display: none; }
+    .board-table th, .board-table td { padding-left: 10px; padding-right: 10px; }
+    .board-table .rank { width: 34px; }
+    .board-table th.num { width: 84px; }
+  }
+  .board-empty { padding: 28px 16px; text-align: center; }
+
+  .board-card { border: 1px solid var(--line-2); border-radius: 6px; background: rgba(236, 231, 225, 0.02); padding: 18px; display: grid; gap: 14px; }
+  .pc-head { display: flex; align-items: center; gap: 12px; }
+  .pc-avatar { width: 44px; height: 44px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 15px; color: var(--bg); background: var(--accent); text-transform: uppercase; }
+  .pc-name { font-size: 22px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .pc-grid > div { border: 1px solid var(--line-2); border-radius: 4px; padding: 10px; display: grid; gap: 4px; min-width: 0; }
+  .pc-grid .wide { grid-column: 1 / -1; }
+  .pc-k { font-family: var(--mono); font-size: 11px; color: var(--faint); white-space: nowrap; }
+  .pc-v { font-family: var(--mono); font-size: 18px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; }
+  .pc-v.accent { color: var(--accent); font-size: 22px; }
+  .pc-history { border: 1px solid var(--line-2); border-radius: 4px; padding: 10px; display: grid; gap: 8px; }
+  #pc-spark { width: 100%; height: 64px; display: block; }
 </style>
 
 <script type="module">
@@ -229,6 +349,135 @@
       setTimeout(() => { i = (i + 1) % ADS.length; secs = 0.4; paint(); el.ad.style.opacity = '1'; }, 260);
     }, 4000);
   }
+</script>
+
+<script type="module">
+  import { api, $, $$, show } from '/app.js';
+  import { mountGlobe, flag, countryName } from '/globe.js';
+
+  /* Siralama — yalnizca `listed` profiller; sunucu adres dondurmuyor.
+     Takma adlar sunucuda dar bir alfabeyle dogrulaniyor ama yine de
+     DOM'a yalnizca textContent ile giriyor. */
+
+  /** Stroop → "$0.0450" / "$12.35". 1 USDC alti kucuk tutarlar okunur kalsin. */
+  function money(s) {
+    const v = BigInt(s), whole = v / 10000000n;
+    const frac = (v % 10000000n).toString().padStart(7, '0');
+    // 1 USDC alti: 4 haneye kadar, sondaki sifirlar atilir ama en az 2 kalir.
+    const f = whole > 0n ? frac.slice(0, 2) : frac.slice(0, 4).replace(/0+$/, '').padEnd(2, '0');
+    return '$' + whole.toLocaleString('en-US') + '.' + f;
+  }
+  const int = (n) => Number(n).toLocaleString('en-US');
+
+  const state = { period: 'all', country: '', selected: null };
+  const el = {
+    rows: $('#board-rows'), empty: $('#board-empty'), emptyTitle: $('#board-empty-title'),
+    card: $('#board-card'), select: $('#scope-country'), global: $('#scope-global'),
+    tip: $('#globe-tip'), stats: $('#globe-stats'),
+  };
+
+  const globe = mountGlobe($('#globe'), {
+    onHover(c) {
+      show(el.tip, !!c);
+      if (!c) return;
+      el.tip.textContent = `${flag(c.code)} ${c.name} · ${c.devs} ${c.devs === 1 ? 'developer' : 'developers'}`;
+      el.tip.style.left = c.x + 'px'; el.tip.style.top = c.y + 'px';
+    },
+    onSelect(code) { setCountry(code); $('#board').scrollIntoView({ block: 'start' }); },
+  });
+
+  async function loadCountries() {
+    const { countries } = await api('/v1/leaderboard/countries', { auth: false });
+    globe.setLights(countries);
+    const devs = countries.reduce((a, c) => a + c.devs, 0);
+    el.stats.innerHTML = devs
+      ? `<b>${int(devs)}</b> listed ${devs === 1 ? 'developer' : 'developers'} · <b>${countries.length}</b> ${countries.length === 1 ? 'country' : 'countries'} · drag to spin`
+      : 'drag to spin';
+    for (const c of countries) {
+      const o = document.createElement('option');
+      o.value = c.country; o.textContent = `${flag(c.country)} ${countryName(c.country)}`;
+      el.select.append(o);
+    }
+  }
+
+  function setCountry(code) {
+    state.country = code;
+    el.select.value = code;
+    el.select.classList.toggle('on', !!code);
+    el.global.classList.toggle('on', !code);
+    el.global.setAttribute('aria-pressed', String(!code));
+    loadRows();
+  }
+
+  async function loadRows() {
+    const q = new URLSearchParams({ period: state.period, limit: '50' });
+    if (state.country) q.set('country', state.country);
+    const { rows } = await api('/v1/leaderboard?' + q, { auth: false });
+
+    el.rows.replaceChildren(...rows.map((r) => {
+      const tr = document.createElement('tr');
+      tr.dataset.nick = r.nickname;
+      tr.tabIndex = 0;
+      const rank = r.rank <= 3 ? ['🥇', '🥈', '🥉'][r.rank - 1] : String(r.rank);
+      tr.innerHTML = '<td class="rank"></td><td><span class="who"><span class="flag"></span><span class="nick"></span></span></td><td class="num col-imp"></td><td class="num earned"></td>';
+      tr.cells[0].textContent = rank;
+      tr.querySelector('.flag').textContent = flag(r.country);
+      tr.querySelector('.flag').title = countryName(r.country);
+      tr.querySelector('.nick').textContent = r.nickname;
+      tr.cells[2].textContent = int(r.impressions);
+      tr.cells[3].textContent = money(r.earnedStroops);
+      tr.onclick = () => select(r.nickname);
+      tr.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(r.nickname); } };
+      return tr;
+    }));
+
+    show(el.empty, rows.length === 0);
+    el.emptyTitle.textContent = state.country || state.period !== 'all'
+      ? 'Nobody listed here for this period.' : 'Nobody is listed yet.';
+    const keep = rows.find((r) => r.nickname === state.selected);
+    if (rows.length) select(keep ? keep.nickname : rows[0].nickname);
+    else show(el.card, false);
+  }
+
+  async function select(nick) {
+    state.selected = nick;
+    $$('#board-rows tr').forEach((tr) => tr.classList.toggle('sel', tr.dataset.nick === nick));
+    let d;
+    try { d = await api(`/v1/leaderboard/profile/${encodeURIComponent(nick)}?period=${state.period}`, { auth: false }); }
+    catch { show(el.card, false); return; }
+    if (state.selected !== nick) return;   // bu arada baska satira tiklandi
+
+    $('#pc-avatar').textContent = d.nickname.slice(0, 2);
+    $('#pc-name').textContent = d.nickname;
+    $('#pc-country').textContent = d.country ? `${flag(d.country)} ${countryName(d.country)}` : 'No country set';
+    $('#pc-global').textContent = '#' + d.rank;
+    $('#pc-crank').textContent = d.countryRank ? '#' + d.countryRank : '—';
+    $('#pc-imp').textContent = int(d.impressions);
+    $('#pc-earned').textContent = money(d.earnedStroops);
+
+    const days = d.dailyStroops.map(Number);
+    const total = d.dailyStroops.reduce((a, s) => a + BigInt(s), 0n);
+    $('#pc-avg').textContent = 'avg ' + money((total / BigInt(days.length)).toString()) + '/day';
+    const max = Math.max(...days, 1);
+    const pts = days.map((v, i) => `${(i / (days.length - 1)) * 300},${60 - (v / max) * 54}`);
+    $('#pc-spark').innerHTML =
+      `<polygon points="0,64 ${pts.join(' ')} 300,64" fill="var(--accent-bg)"/>` +
+      `<polyline points="${pts.join(' ')}" fill="none" stroke="var(--accent)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
+    show(el.card, true);
+  }
+
+  el.global.onclick = () => setCountry('');
+  el.select.onchange = () => setCountry(el.select.value);
+  $$('#period .seg-btn').forEach((b) => b.onclick = () => {
+    state.period = b.dataset.period;
+    $$('#period .seg-btn').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); });
+    loadRows();
+  });
+
+  // Sunucuya ulasilamazsa bolum bos tablo + bos kureyle kalir; sayfanin
+  // geri kalani etkilenmez.
+  loadCountries().catch(() => {});
+  loadRows().catch(() => show(el.empty, true));
 </script>
 </body>
 </html>

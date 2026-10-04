@@ -24,16 +24,23 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Pipeline } from './pipeline.js'
+import { readServerEnv } from './env.js'
 import { Ledger } from './ledger/ledger.js'
 import { CampaignStore } from './ads/campaign-store.js'
 import { DepositWatcher, sqliteCursor } from './advertisers/deposits.js'
-import { WithdrawService } from './payouts/withdraw.js'
+import { WithdrawService, createSerial } from './payouts/withdraw.js'
 import { accountId, PLATFORM_REVENUE } from './ledger/accounts.js'
 import { openDb, MEMORY, vacuumExpired } from './store/db.js'
 import {
   SqliteLedgerStore, SqliteTokenStore, SqlitePayoutStore,
-  SqliteImpressionMirror, walletPersistence,
+  SqliteImpressionMirror, walletPersistence, profilePersistence,
 } from './store/persistent.js'
+import { ProfileStore } from './leaderboard/profiles.js'
+import { Leaderboard } from './leaderboard/leaderboard.js'
+import { openCountryDb } from './leaderboard/geo.js'
+import { PoolStore } from './pools/pool-store.js'
+import { poolReserve, poolCampaignIds, type ReserveDeps } from './pools/reserve.js'
+import { randomBytes } from 'node:crypto'
 import { PayoutRunner } from './payouts/runner.js'
 import { StellarRail, HORIZON as HORIZON_URLS, TESTNET_USDC } from '@dwell/payments'
 import { WalletStore } from '@dwell/payments'
@@ -54,7 +61,8 @@ const HOST = process.env['HOST'] ?? '127.0.0.1'
  * Uretimde token'lar yalnizca `dwell login` ile, cuzdan imzasi karsiliginda
  * uretilir.
  */
-const IS_PROD = process.env['DWELL_ENV'] === 'production'
+const ENV = readServerEnv(process.env)
+const IS_PROD = ENV.isProd
 const DEV_TOKEN = IS_PROD ? null : (process.env['DWELL_DEV_TOKEN'] ?? 'dwl_dev_token_0123456789abcdef0123')
 const DEV_PUBLISHER = 'dev-publisher'
 const DEV_ADVERTISER = 'dev-advertiser'
@@ -89,11 +97,16 @@ const ledger = new Ledger(
 //
 // `topupId` sabit oldugu icin idempotent: defter zaten yazilmissa ikinci
 // kez eklemez. Yoksa her yeniden baslatmada 100.000 USDC daha basardik.
-ledger.deposit({
-  advertiserId: DEV_ADVERTISER,
-  amount: stroops(1_000_000_000_000n),          // 100.000 USDC
-  topupId: 'dev-seed',
-})
+//
+// URETIMDE YAZILMAZ: karsiligi zincirde olmayan 100.000 USDC, odeme gucu
+// hesabini ve defterin "her kurus bir yatirmadan gelir" iddiasini bozar.
+if (!IS_PROD) {
+  ledger.deposit({
+    advertiserId: DEV_ADVERTISER,
+    amount: stroops(1_000_000_000_000n),        // 100.000 USDC
+    topupId: 'dev-seed',
+  })
+}
 
 /* ─────────────────────────── kampanyalar ─────────────────────────── */
 
@@ -106,13 +119,22 @@ ledger.deposit({
  */
 const campaignStore = new CampaignStore(db, clock, () => ids.impressionId())
 
+// NEXT.md §10 — sponsor havuzlari. Kod govdesi 6 buyuk harf hex.
+const pools = new PoolStore(db, clock, () => ids.impressionId(),
+  () => randomBytes(3).toString('hex').toUpperCase())
+const reserveDeps: ReserveDeps = {
+  pools, campaigns: campaignStore, spentOn: (campaignIds) => pipeline.spentOn(campaignIds),
+}
+
 /* ─────────────────────────── boru hatti ─────────────────────────── */
 
 const config: RemoteConfig = {
   ...FALLBACK_CONFIG,
   renderEnabled: true,
   surfaces: { statusline: true, spinnerVerb: true, spinnerTip: true },
-  minClientVersion: '0.0.0',
+  // ADR-016 kapisi artik ortamdan: hatali bir surum bulundugunda deploy
+  // gerekmeden `DWELL_MIN_CLIENT_VERSION` ile kapatilabilir.
+  minClientVersion: ENV.minClientVersion,
   minImpressionMs: 10_000,
   rotateMs: 20_000,
   idleGraceMs: 4_000,
@@ -123,7 +145,7 @@ const config: RemoteConfig = {
 
 const mirror = new SqliteImpressionMirror(db)
 
-const pipeline = new Pipeline({
+const pipeline: Pipeline = new Pipeline({
   clock, ids, ledger,
   persist: {
     loadImpressions: () => mirror.loadImpressions(),
@@ -132,11 +154,22 @@ const pipeline = new Pipeline({
     saveDelivery: (d) => mirror.saveDelivery(d),
   },
   campaigns: () => campaignStore.all(),
+  poolOf: (publisherId) => pools.poolOf(publisherId),
+  // NEXT.md §10 — butce ve uye siniri. `pipeline` asagida tanimli; bu
+  // kapanislar yalnizca istek aninda cagrildigi icin sorun degil.
+  poolAllows: (publisherId, poolId, rate): boolean => {
+    const p = pools.get(poolId)
+    if (!p) return false
+    const ids = poolCampaignIds(reserveDeps, poolId)
+    if (pipeline.servedToday(publisherId, ids) >= p.dailyCapPerMember) return false
+    return pipeline.spentOn(ids) + rate <= p.budget
+  },
+  reservedForPools: (advertiserId) => poolReserve(reserveDeps, advertiserId),
   minImpressionMs: config.minImpressionMs,
   minClientVersion: config.minClientVersion,
-  // Gelistirmede 24 saat beklemek isi imkansiz kilar; uretimde 24 saat
-  // (§9 katman 2 — zincir ustu odeme geri alinamaz).
-  pendingMs: Number(process.env['DWELL_PENDING_MS'] ?? 30_000),
+  // Uretimde 24 saat (§9 katman 2 — zincir ustu odeme geri alinamaz),
+  // gelistirmede 30 saniye. Bkz. `env.ts`.
+  pendingMs: ENV.pendingMs,
   dailyCap: 400,
 })
 
@@ -211,16 +244,30 @@ const wallets = new WalletStore({
 const HOT_SECRET = process.env['DWELL_HOT_SECRET']
 /** Reklamverenin para gonderecegi adres. */
 const hotAddress = HOT_SECRET ? Keypair.fromSecret(HOT_SECRET).publicKey() : null
+/**
+ * Sicak cuzdan TEK: tek ray, tek kuyruk.
+ *
+ * Eskiden her cekim servisi kendi `StellarRail`'ini kuruyordu ve ayni anda
+ * calisabiliyorlardi. Ayni kaynak hesaptan iki es zamanli islem ayni
+ * sequence'i alir; ikincisi `tx_bad_seq` ile duser ve para
+ * `payouts_in_flight`ta asili kalirdi. `hotWallet` butun cekimleri ve
+ * mutabakati siraya sokuyor.
+ */
+const hotRail = HOT_SECRET
+  ? new StellarRail({
+      horizonUrl: HORIZON,
+      networkPassphrase: NETWORKS.testnet,
+      sourceSecret: HOT_SECRET,
+      assetCode: process.env['DWELL_ASSET_CODE'] ?? TESTNET_USDC.code,
+      assetIssuer: process.env['DWELL_ASSET_ISSUER'] ?? TESTNET_USDC.issuer,
+    })
+  : null
+const hotWallet = createSerial()
+
 const payoutRunner = HOT_SECRET
   ? new PayoutRunner({
       clock, wallets, ledger, store: payouts,
-      rail: new StellarRail({
-        horizonUrl: HORIZON,
-        networkPassphrase: NETWORKS.testnet,
-        sourceSecret: HOT_SECRET,
-        assetCode: process.env['DWELL_ASSET_CODE'] ?? TESTNET_USDC.code,
-        assetIssuer: process.env['DWELL_ASSET_ISSUER'] ?? TESTNET_USDC.issuer,
-      }),
+      rail: hotRail!,
       threshold: PAYOUT_THRESHOLD,
       newBatchId: () => `b-${ids.impressionId()}`,
       log,
@@ -235,16 +282,16 @@ const withdraw = HOT_SECRET
   ? new WithdrawService({
       clock, ledger, store: payouts,
       kind: 'advertiser',
-      rail: new StellarRail({
-        horizonUrl: HORIZON,
-        networkPassphrase: NETWORKS.testnet,
-        sourceSecret: HOT_SECRET,
-        assetCode: process.env['DWELL_ASSET_CODE'] ?? TESTNET_USDC.code,
-        assetIssuer: process.env['DWELL_ASSET_ISSUER'] ?? TESTNET_USDC.issuer,
-      }),
-      spendable: (a) => pipeline.spendable(a),
+      rail: hotRail!,
+      // NEXT.md §10 — acik havuzlara ayrilan para cekilemez; sponsor once
+      // havuzu kapatir (ya da butcesini dusurur), sonra ceker.
+      spendable: (a) => {
+        const left = pipeline.spendable(a) - poolReserve(reserveDeps, a)
+        return stroops(left > 0n ? left : 0n)
+      },
       newBatchId: () => `w-${ids.impressionId()}`,
       log,
+      serial: hotWallet,
     })
   : null
 
@@ -259,16 +306,11 @@ const publisherWithdraw = HOT_SECRET
   ? new WithdrawService({
       clock, ledger, store: payouts,
       kind: 'publisher',
-      rail: new StellarRail({
-        horizonUrl: HORIZON,
-        networkPassphrase: NETWORKS.testnet,
-        sourceSecret: HOT_SECRET,
-        assetCode: process.env['DWELL_ASSET_CODE'] ?? TESTNET_USDC.code,
-        assetIssuer: process.env['DWELL_ASSET_ISSUER'] ?? TESTNET_USDC.issuer,
-      }),
+      rail: hotRail!,
       spendable: (p) => ledger.balance(accountId('publisher', p)),
       newBatchId: () => `w-${ids.impressionId()}`,
       log,
+      serial: hotWallet,
     })
   : null
 
@@ -282,16 +324,11 @@ const platformWithdraw = HOT_SECRET
   ? new WithdrawService({
       clock, ledger, store: payouts,
       kind: 'platform_revenue',
-      rail: new StellarRail({
-        horizonUrl: HORIZON,
-        networkPassphrase: NETWORKS.testnet,
-        sourceSecret: HOT_SECRET,
-        assetCode: process.env['DWELL_ASSET_CODE'] ?? TESTNET_USDC.code,
-        assetIssuer: process.env['DWELL_ASSET_ISSUER'] ?? TESTNET_USDC.issuer,
-      }),
+      rail: hotRail!,
       spendable: () => ledger.balance(PLATFORM_REVENUE),
       newBatchId: () => `w-${ids.impressionId()}`,
       log,
+      serial: hotWallet,
     })
   : null
 
@@ -311,9 +348,18 @@ if (payoutRunner) {
    * eski otomatik turdan, ister yeni istege bagli cekimden), yeniden
    * baslatmada zincire sorup karari veren tek yer burasi.
    */
-  void payoutRunner.resumeUnresolved().then((n) => {
-    if (n > 0) log(`${n} asili batch cozuldu`)
-  })
+  //
+  // Yalnizca acilista DEGIL, periyodik: zincire ulasilamayan ya da
+  // `pending` donen bir cekim, sunucu yeniden baslayana kadar asili
+  // kaliyordu — kullanicinin parasi gunlerce "yolda" gorunebilirdi.
+  // Cekimlerle AYNI kuyrukta: mutabakat bir cekimin ortasina girmez.
+  const coz = (): void => {
+    void hotWallet(() => payoutRunner.resumeUnresolved())
+      .then((n) => { if (n > 0) log(`${n} asili batch cozuldu`) })
+      .catch((e) => log(`⚠ asili batch mutabakati patladi: ${e instanceof Error ? e.message : String(e)}`))
+  }
+  coz()
+  setInterval(coz, Number(process.env['DWELL_RECONCILE_MS'] ?? 60_000)).unref()
   log('istege bagli cekim acik · otomatik odeme turu kapali (bkz. main.ts)')
 } else {
   log('odeme KAPALI — DWELL_HOT_SECRET tanimli degil')
@@ -396,16 +442,33 @@ setInterval(() => {
   }
 }, 10_000).unref()
 
+/* ─────────────────────────── siralama ─────────────────────────── */
+
+const profiles = new ProfileStore(profilePersistence(db))
+const leaderboard = new Leaderboard({
+  entries: () => ledger.entries(),
+  profiles,
+  advertiserOf: (id) => campaignStore.get(id)?.advertiserId ?? null,
+  now: () => clock.now(),
+})
+
 /* ─────────────────────────── sunucu ─────────────────────────── */
 
 const app = createApp({
   clock, ids, pipeline, ledger, tokens,
   config: () => config,
   walletAuth,
-  ipSalt: process.env['DWELL_IP_SALT'] ?? 'dev-salt-degistir',
+  ipSalt: ENV.ipSalt,
   payoutThreshold: PAYOUT_THRESHOLD,
   payouts,
   campaigns: campaignStore,
+  profiles,
+  leaderboard,
+  pools,
+  // DB-IP Lite ulke veritabani; Docker derlemesinde indiriliyor. Yoksa tahmin
+  // kapanir, kullanici ulkesini elle secer.
+  countryLookup: openCountryDb(process.env['DWELL_GEOIP_DB']
+    ?? join(dirname(fileURLToPath(import.meta.url)), 'geo', 'dbip-country-lite.mmdb')),
   trustlineXdr,
   ...(withdraw ? { withdraw } : {}),
   ...(publisherWithdraw ? { publisherWithdraw } : {}),

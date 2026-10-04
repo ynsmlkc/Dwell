@@ -173,6 +173,30 @@
         <p class="err hidden" id="e-create"></p>
       </div>
     </section>
+
+    <!-- NEXT.md §10 — sponsor havuzlari. Para ayni bakiye; havuz projeleri
+         bu hesaba faturalaniyor, takimlar hicbir sey odemiyor. -->
+    <section style="margin-top: clamp(38px, 6vw, 64px); padding-bottom: 0">
+      <h2 style="font-size: clamp(22px, 2.6vw, 30px); margin-bottom: 8px">Sponsor pools</h2>
+      <p class="small" style="margin: 0 0 22px; max-width: 64ch">Fund a closed pool for a hackathon or your ecosystem. Participants join with a code and submit their own project as one line. People in the pool only see each other's projects, and every impression is paid from this balance. When you close the pool, whatever is left stays here and can be withdrawn.</p>
+
+      <div class="grid-1px hidden" id="pools" style="margin-bottom: clamp(24px, 4vw, 36px)"></div>
+
+      <div class="card">
+        <h3 style="margin-bottom: 6px">Open a pool</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 18px; margin-top: 18px; align-items: end">
+          <label class="field">Pool name<input type="text" id="pool-name" maxlength="60" placeholder="Stellar Hack Istanbul"></label>
+          <label class="field">CPM in USD, for every project<input type="text" id="pool-cpm" value="5"></label>
+          <label class="field">Pool budget in USD<input type="text" id="pool-budget" value="50"></label>
+          <label class="field">Max impressions per member per day<input type="text" id="pool-cap" value="200"></label>
+        </div>
+        <p class="small" style="margin: 12px 0 0" id="pool-perimp"></p>
+        <div style="margin-top: 20px">
+          <button class="btn btn-primary" id="pool-create"><span class="spinner hidden" id="pool-spin"></span><span>Open pool</span></button>
+        </div>
+        <p class="err hidden" id="pool-error"></p>
+      </div>
+    </section>
   </div>
 </main>
 
@@ -232,7 +256,11 @@ const wBox = $('#withdraw-box');
 $('#withdraw').onclick = () => {
   show(wBox, true);
   $('#w-addr').textContent = short(me.advertiserId);
-  $('#w-avail').textContent = `${usd(me.withdrawableStroops)} available to withdraw.`;
+  // Acik havuzlara ayrilan para cekilemez — neden daha az cekebildigini soyle.
+  const inPools = BigInt(me.reservedForPoolsStroops || '0');
+  $('#w-avail').textContent = `${usd(me.withdrawableStroops)} available to withdraw.` + (inPools > 0n
+    ? ` ${usd(inPools.toString())} is set aside for your open sponsor pools; close a pool or lower its budget to free it.`
+    : '');
   show($('#w-error'), false); show($('#w-done'), false);
   wBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 };
@@ -322,7 +350,9 @@ function render() {
   // olmayan dugmeden kotu.
   show($('#withdraw'), BigInt(me.withdrawableStroops || '0') > 0n);
 
-  const cs = me.campaigns || [];
+  // Havuz projeleri asagida kendi havuzlarinin altinda; burada yalnizca
+  // reklamverenin kendi yazdigi satirlar.
+  const cs = (me.campaigns || []).filter((c) => !c.poolId);
   show($('#no-campaigns'), cs.length === 0);
   show($('#campaigns'), cs.length > 0);
   $('#campaigns').innerHTML = cs.map((c) => {
@@ -354,6 +384,7 @@ function render() {
 
   view('v-funded');
   validate();
+  void loadPools();
 }
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
@@ -370,6 +401,129 @@ async function toggle(id, to) {
     show(errEl, true);
   }
 }
+
+/* ─────────── sponsor havuzlari (NEXT.md §10) ─────────── */
+
+async function loadPools() {
+  let data;
+  try { data = await api('/v1/advertiser/pools'); } catch { return; }
+  const ps = data.pools || [];
+  show($('#pools'), ps.length > 0);
+  $('#pools').innerHTML = ps.map((p) => {
+    const open = p.status === 'open';
+    const projects = (p.projects || []).map((c) => {
+      const active = c.status === 'active';
+      return `
+        <div style="display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; align-items: center; margin-top: 10px">
+          <div class="term-status" style="border: 1px solid var(--line); border-radius: 4px; padding: 9px 12px; min-height: 0">
+            <span class="ad" style="opacity:${active ? 1 : 0.45}">
+              <span style="color: var(--accent)">✶</span>
+              <span class="ad-text"><span class="brand-name">${esc(c.brand)}</span><span class="sep"> — ${esc(c.text)} · </span><span class="cta">${esc(c.cta)}</span></span>
+            </span>
+          </div>
+          ${open ? `<button class="btn btn-sm btn-quiet" data-toggle="${c.id}" data-to="${active ? 'paused' : 'active'}">${active ? 'Pause' : 'Start'}</button>` : ''}
+          <div class="err hidden" data-err="${c.id}" style="grid-column: 1 / -1"></div>
+        </div>`;
+    }).join('');
+    return `
+      <div style="padding: 18px 20px">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: baseline">
+          <div>
+            <h3 style="font-size: 20px">${esc(p.name)}</h3>
+            <p class="small" style="margin: 4px 0 0">${p.members} ${p.members === 1 ? 'member' : 'members'} · ${(p.projects || []).length} projects · ${usd(p.bidCpmStroops)} CPM · max ${p.dailyCapPerMember}/member/day</p>
+            ${budgetBar(p)}
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center">
+            <span class="mono" style="font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: ${open ? 'var(--accent)' : 'var(--faint)'}">${p.status}</span>
+            ${open ? `<button class="btn btn-sm btn-quiet" data-close-pool="${p.id}">Close pool</button>` : ''}
+          </div>
+        </div>
+        ${open ? `
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px">
+          <code style="font-size: 15px; letter-spacing: 0.06em">${esc(p.code)}</code>
+          <button class="btn btn-sm btn-quiet" data-copy-code="${esc(p.code)}"><span class="tag">copy code</span></button>
+          <span class="small">Participants enter this code in their Dwell panel.</span>
+        </div>` : ''}
+        ${open ? `
+        <div style="display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin-top: 14px">
+          <label class="field" style="max-width: 180px">New budget in USD<input type="text" data-budget-input="${p.id}" placeholder="${usd(p.budgetStroops).slice(1)}"></label>
+          <button class="btn btn-sm btn-quiet" data-budget-save="${p.id}">Update budget</button>
+          <span class="err hidden" data-budget-err="${p.id}" style="margin: 0"></span>
+        </div>` : ''}
+        ${projects || `<p class="small" style="margin: 12px 0 0">No projects yet.</p>`}
+      </div>`;
+  }).join('');
+
+  document.querySelectorAll('#pools [data-budget-save]').forEach((b) => {
+    b.onclick = async () => {
+      const id = b.dataset.budgetSave;
+      const errEl = document.querySelector(`[data-budget-err="${id}"]`);
+      const v = toStroops(document.querySelector(`[data-budget-input="${id}"]`).value);
+      show(errEl, false);
+      if (v === null) { errEl.textContent = 'Enter an amount, e.g. 100'; show(errEl, true); return; }
+      try { await api(`/v1/advertiser/pools/${id}/budget`, { method: 'POST', body: { budgetStroops: v.toString() } }); await loadPools(); }
+      catch (e) { errEl.textContent = e.message; show(errEl, true); }
+    };
+  });
+  document.querySelectorAll('#pools [data-toggle]').forEach((b) => { b.onclick = () => toggle(b.dataset.toggle, b.dataset.to); });
+  document.querySelectorAll('#pools [data-copy-code]').forEach((b) => copyButton(b, () => b.dataset.copyCode));
+  document.querySelectorAll('#pools [data-close-pool]').forEach((b) => {
+    b.onclick = async () => {
+      // Iki adim: ilk tik dugmeyi "emin misin"e cevirir. Tarayici confirm()
+      // penceresi kullanmiyoruz; kapanan havuz geri acilmiyor.
+      if (b.dataset.armed !== '1') { b.dataset.armed = '1'; b.textContent = 'Click again to close'; return; }
+      try { await api(`/v1/advertiser/pools/${b.dataset.closePool}/close`, { method: 'POST' }); } catch { /* liste yine yenilenir */ }
+      void loadPools();
+    };
+  });
+}
+
+/* Butce cubugu: harcanan / ayrilan. Butce bakiyeden buyukse uyar — havuz
+   bakiyenin yettigi yerde durur, ayrilan rakam yalnizca bir ust sinir. */
+function budgetBar(p) {
+  const budget = BigInt(p.budgetStroops), spent = BigInt(p.spentStroops);
+  const pct = budget > 0n ? Number((spent * 100n) / budget) : 0;
+  return `
+    <div style="margin-top: 10px; max-width: 360px">
+      <div style="height: 6px; border-radius: 3px; background: var(--line-2); overflow: hidden">
+        <div style="height: 100%; width: ${Math.min(100, pct)}%; background: var(--accent)"></div>
+      </div>
+      <p class="small" style="margin: 6px 0 0">${usd(p.spentStroops)} spent of ${usd(p.budgetStroops)} budget</p>
+    </div>`;
+}
+
+const poolCpm = () => toStroops($('#pool-cpm').value);
+function poolHint() {
+  const c = poolCpm();
+  $('#pool-perimp').textContent = c && c >= MIN_CPM
+    ? `${usd((c / 1000n).toString())} per impression, paid from your balance. Half goes to the developer who saw it. The budget is set aside from your balance: your own campaigns can't spend it while the pool is open.`
+    : 'Minimum is $0.10 per 1000 impressions.';
+}
+$('#pool-cpm').addEventListener('input', poolHint);
+poolHint();
+
+$('#pool-create').onclick = async () => {
+  show($('#pool-error'), false);
+  const c = poolCpm();
+  if (!c || c < MIN_CPM) { $('#pool-error').textContent = 'Minimum is $0.10 per 1000 impressions.'; show($('#pool-error'), true); return; }
+  show($('#pool-spin'), true);
+  try {
+    const budget = toStroops($('#pool-budget').value);
+    const cap = Number($('#pool-cap').value);
+    if (budget === null || budget === 0n) throw new Error('Enter a pool budget, e.g. 50');
+    if (!Number.isInteger(cap) || cap < 1) throw new Error('Max impressions per member: a whole number, at least 1');
+    await api('/v1/advertiser/pools', { method: 'POST', body: {
+      name: $('#pool-name').value.trim(), bidCpmStroops: c.toString(),
+      budgetStroops: budget.toString(), dailyCapPerMember: cap,
+    } });
+    $('#pool-name').value = '';
+    await loadPools();
+  } catch (e) {
+    $('#pool-error').textContent = e.message; show($('#pool-error'), true);
+  } finally {
+    show($('#pool-spin'), false);
+  }
+};
 
 /* ─────────── yatirma beklemesi ─────────── */
 

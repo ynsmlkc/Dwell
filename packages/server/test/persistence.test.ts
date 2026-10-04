@@ -307,6 +307,7 @@ describe('gosterimler ve sunumlar', () => {
     l1.deposit({ advertiserId: 'adv', amount: stroops(10_000_000_000n), topupId: 't1' })
     const p1 = kurPipeline(db, l1)
     const sel = p1.serveAd('alice')!
+    clock.advance(15_000)                       // reklam ekranda kaldi
     expect(sel).toBeTruthy()
 
     const yeni = yenidenBaslat()
@@ -328,6 +329,7 @@ describe('gosterimler ve sunumlar', () => {
     l1.deposit({ advertiserId: 'adv', amount: stroops(10_000_000_000n), topupId: 't1' })
     const p1 = kurPipeline(db, l1)
     const sel = p1.serveAd('alice')!
+    clock.advance(15_000)                       // reklam ekranda kaldi
     p1.ingest.ingest('alice', [{
       id: '01M0' + 'B'.repeat(22), campaignId: 'c1', nonce: sel.nonce, sessionId: 's1',
       surface: 'statusline', durationMs: 15_000, clientTs: clock.now(),
@@ -351,6 +353,7 @@ describe('gosterimler ve sunumlar', () => {
     l1.deposit({ advertiserId: 'adv', amount: stroops(10_000_000_000n), topupId: 't1' })
     const p1 = kurPipeline(db, l1)
     const sel = p1.serveAd('alice')!
+    clock.advance(15_000)                       // reklam ekranda kaldi
     const olay = {
       id: '01M0' + 'C'.repeat(22), campaignId: 'c1', nonce: sel.nonce, sessionId: 's1',
       surface: 'statusline', durationMs: 15_000, clientTs: clock.now(),

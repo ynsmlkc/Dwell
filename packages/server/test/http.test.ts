@@ -10,6 +10,7 @@ import { fixedClock, stroops, FALLBACK_CONFIG, PROTOCOL_HEADER } from '@dwell/pr
 import type { RemoteConfig, ImpressionEvent } from '@dwell/protocol'
 import type { PaymentRail, PayoutBatch, SubmissionReceipt } from '@dwell/payments'
 import { createApp } from '../src/http/app.js'
+import { RateLimiter } from '../src/http/rate-limit.js'
 import { TokenStore, hashToken } from '../src/http/auth.js'
 import { Pipeline } from '../src/pipeline.js'
 import { Ledger } from '../src/ledger/ledger.js'
@@ -69,6 +70,8 @@ beforeEach(() => {
     config: () => config,
     ipSalt: 'test-salt',
     payoutThreshold: stroops(10_000_000n),
+    // Butce testleri yuzlerce teslimat istiyor; hiz siniri ayri test ediliyor.
+    adRateLimit: new RateLimiter({ now: () => clock.now(), capacity: 1_000_000 }),
   })
 })
 
@@ -190,8 +193,12 @@ describe('POST /v1/impressions', () => {
     ...over,
   })
 
-  const post = (events: ImpressionEvent[], headers = auth()) =>
-    app.request('/v1/impressions', { method: 'POST', headers, body: JSON.stringify({ events }) })
+  // Reklam ekranda kaldigi kadar zaman gecer — sunucu teslimattan once
+  // biten bir gosterimi kabul etmez.
+  const post = (events: ImpressionEvent[], headers = auth()) => {
+    clock.advance(15_000)
+    return app.request('/v1/impressions', { method: 'POST', headers, body: JSON.stringify({ events }) })
+  }
 
   it('gecerli gosterim kabul edilir', async () => {
     const { nonce } = await asJson(await app.request('/v1/ads/next', { method: 'POST', headers: auth() }))
@@ -231,6 +238,7 @@ describe('POST /v1/impressions', () => {
 
   it('bilinmeyen alanlar sessizce dusurulur — ileri uyumluluk', async () => {
     const { nonce } = await asJson(await app.request('/v1/ads/next', { method: 'POST', headers: auth() }))
+    clock.advance(15_000)
     const r = await app.request('/v1/impressions', {
       method: 'POST', headers: auth(),
       body: JSON.stringify({ events: [{ ...ev(nonce), gelecekteAlan: 'x' }] }),
@@ -242,6 +250,7 @@ describe('POST /v1/impressions', () => {
 describe('GET /v1/me/balance', () => {
   it('bekleyen ve odenebilir ayri gosterilir', async () => {
     const { nonce } = await asJson(await app.request('/v1/ads/next', { method: 'POST', headers: auth() }))
+    clock.advance(15_000)
     await app.request('/v1/impressions', {
       method: 'POST', headers: auth(),
       body: JSON.stringify({ events: [{
@@ -461,6 +470,7 @@ describe('/v1/admin/*', () => {
   it('gosterim ozeti gercek pipeline durumunu yansitir', async () => {
     const { withApp } = appWithAdmin()
     const { nonce } = await asJson(await withApp.request('/v1/ads/next', { method: 'POST', headers: auth() }))
+    clock.advance(15_000)
     await withApp.request('/v1/impressions', {
       method: 'POST', headers: auth(),
       body: JSON.stringify({ events: [{
@@ -522,5 +532,44 @@ describe('protokol ve hatalar', () => {
     const r = await app.request('/v1/yok')
     const text = JSON.stringify(await asJson(r))
     expect(text).not.toMatch(/at \w+|\.ts:|node_modules/)
+  })
+})
+
+describe('POST /v1/ads/next — hiz siniri (PROBLEMS #1.4)', () => {
+  it('kova bitince 429 + retry-after; zaman gecince yeniden acilir', async () => {
+    const limited = createApp({
+      clock, ids: { impressionId: () => `rl-${Math.random()}`, randomHex: (n) => 'a'.repeat(n * 2) },
+      pipeline, ledger, tokens, config: () => config,
+      ipSalt: 'test-salt', payoutThreshold: stroops(10_000_000n),
+      adRateLimit: new RateLimiter({ now: () => clock.now(), capacity: 3, refillMs: 10_000 }),
+    })
+    const iste = () => limited.request('/v1/ads/next', { method: 'POST', headers: auth() })
+
+    for (let i = 0; i < 3; i++) expect((await iste()).status).toBe(200)
+    const r = await iste()
+    expect(r.status).toBe(429)
+    expect(r.headers.get('retry-after')).toBe('10')
+
+    clock.advance(10_000)
+    expect((await iste()).status).toBe(200)
+    expect((await iste()).status).toBe(429)
+  })
+
+  it('toplu nonce toplamak imkansiz — bir saatte kova + dolum kadar', async () => {
+    const limiter = new RateLimiter({ now: () => clock.now() })
+    let alinan = 0
+    for (let s = 0; s < 3600; s++) {
+      // Saniyede 10 istek: saldirgan butun nonce'lari toplamaya calisiyor.
+      for (let k = 0; k < 10; k++) if (limiter.take('p') === 0) alinan++
+      clock.advance(1_000)
+    }
+    expect(alinan).toBeLessThanOrEqual(10 + 360)
+  })
+
+  it('yayincilar birbirinin kovasini tuketmez', () => {
+    const limiter = new RateLimiter({ now: () => clock.now(), capacity: 1 })
+    expect(limiter.take('a')).toBe(0)
+    expect(limiter.take('a')).toBeGreaterThan(0)
+    expect(limiter.take('b')).toBe(0)
   })
 })

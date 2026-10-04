@@ -54,6 +54,9 @@ function impress(over: Partial<ImpressionEvent> = {}, publisherId = PUB): string
   const sel = pipe.serveAd(publisherId)
   if (!sel) return null
   const id = nextUlid()
+  // Reklam ekranda kaldigi kadar zaman gecer — sunucu teslimattan once
+  // biten bir gosterimi kabul etmez.
+  clock.advance(over.durationMs ?? 15_000)
   pipe.ingest.ingest(publisherId, [{
     id, campaignId: sel.campaign.id, nonce: sel.nonce, sessionId: 's1',
     surface: 'statusline', durationMs: 15_000, clientTs: clock.now(),

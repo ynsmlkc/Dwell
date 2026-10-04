@@ -17,7 +17,7 @@ import { openDb, type Db } from '../src/store/db.js'
 import { SqliteLedgerStore, SqlitePayoutStore } from '../src/store/persistent.js'
 import { Ledger } from '../src/ledger/ledger.js'
 import { accountId, PLATFORM_REVENUE } from '../src/ledger/accounts.js'
-import { WithdrawService, MIN_WITHDRAW } from '../src/payouts/withdraw.js'
+import { WithdrawService, MIN_WITHDRAW, createSerial } from '../src/payouts/withdraw.js'
 
 const ADV = 'GA' + 'A'.repeat(53) + 'WHF5'
 
@@ -356,5 +356,69 @@ describe('platform cekimi — kind: platform_revenue', () => {
     await t.svc.withdraw(PLATFORM_ADDR, stroops(20_000_000n))
     expect(t.ledger.balance(PLATFORM_REVENUE)).toBe(20_000_000n)
     expect(t.ledger.audit()).toEqual([])
+  })
+})
+
+/**
+ * Sicak cuzdan yarislari — iki ayri hata, ayni kok: `spendable` kontrolu ile
+ * `payoutSubmit` arasinda ag cagrilari bekleniyordu.
+ */
+describe('yarislar', () => {
+  it('kontrol ile yazma arasinda butce rezerve edilirse cekim REDDEDILIR', async () => {
+    const t = kur(20_000_000n)
+    let spendable = 20_000_000n
+    const svc = new WithdrawService({
+      clock, ledger: t.ledger, rail: t.rail, store: new SqlitePayoutStore(db),
+      kind: 'advertiser',
+      spendable: () => stroops(spendable),
+      newBatchId: () => `w-${++n}`,
+      log: () => {},
+    })
+    // `prepare` beklenirken yeni reklamlar teslim edildi ve butceyi rezerve etti.
+    const orijinal = t.rail.prepare.bind(t.rail)
+    t.rail.prepare = async (b) => { spendable = 5_000_000n; return orijinal(b) }
+
+    const r = await svc.withdraw(ADV, stroops(20_000_000n))
+
+    expect(r.ok).toBe(false)
+    expect(bakiye(t.ledger), 'defter hic yazilmamali').toBe(20_000_000n)
+    expect(t.ledger.audit()).toEqual([])
+  })
+
+  it('ayni kuyrugu paylasan servisler sicak cuzdani AYNI ANDA kullanmaz', async () => {
+    const t = kur(20_000_000n)
+    let ayniAnda = 0, enFazla = 0
+    const orijinal = t.rail.prepare.bind(t.rail)
+    t.rail.prepare = async (b) => {
+      enFazla = Math.max(enFazla, ++ayniAnda)
+      await new Promise((r) => setTimeout(r, 5))
+      return orijinal(b)
+    }
+    t.rail.reconcile = async (r) => {
+      ayniAnda--
+      return { state: 'settled', txHash: r.txHash, ledger: 1, feeCharged: 100n, opResults: [] }
+    }
+
+    const serial = createSerial()
+    const yap = (id: string) => new WithdrawService({
+      clock, ledger: t.ledger, rail: t.rail, store: new SqlitePayoutStore(db),
+      kind: 'advertiser', spendable: () => stroops(20_000_000n),
+      newBatchId: () => `w-${++n}`, log: () => {}, serial,
+    }).withdraw(id, stroops(1_000_000n))
+
+    const DIGER = 'GB' + 'B'.repeat(53) + 'WHF5'
+    t.ledger.deposit({ advertiserId: DIGER, amount: stroops(20_000_000n), topupId: 't-diger' })
+    const sonuclar = await Promise.all([yap(ADV), yap(DIGER), yap(ADV + '')])
+
+    expect(enFazla, 'iki prepare ust uste binmemeli').toBe(1)
+    expect(sonuclar.filter((r) => r.ok).length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('kuyrukta bir isin patlamasi sonrakileri durdurmaz', async () => {
+    const serial = createSerial()
+    const a = serial(async () => { throw new Error('boom') })
+    const b = serial(async () => 42)
+    await expect(a).rejects.toThrow('boom')
+    await expect(b).resolves.toBe(42)
   })
 })

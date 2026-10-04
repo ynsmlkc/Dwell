@@ -25,6 +25,13 @@ import type { WalletAuth } from './wallet-auth.js'
 import type { PayoutStore } from '../payouts/store.js'
 import type { CampaignStore } from '../ads/campaign-store.js'
 import { compareVersions } from '../impressions/ingest.js'
+import { validateProfile, type ProfileStore, type Profile } from '../leaderboard/profiles.js'
+import { PERIODS, type Leaderboard, type Period } from '../leaderboard/leaderboard.js'
+import type { PoolStore, Pool } from '../pools/pool-store.js'
+import { countryFromRequest, type CountryLookup } from '../leaderboard/geo.js'
+import { poolReserve, poolSpent } from '../pools/reserve.js'
+import { COUNTRY_CODES } from '../leaderboard/countries.js'
+import { RateLimiter } from './rate-limit.js'
 
 export interface AppDeps {
   readonly clock: Clock
@@ -70,6 +77,15 @@ export interface AppDeps {
     | { ok: true; xdr: string; networkPassphrase: string }
     | { ok: false; reason: string }
   >
+  /** Yayinci profilleri. Verilmezse `/v1/me/profile` ve `/v1/leaderboard*` kapali. */
+  readonly profiles?: ProfileStore
+  readonly leaderboard?: Leaderboard
+  /** IP → ulke kodu (yerel veritabani). Yoksa yalnizca platform basliklarina bakilir. */
+  readonly countryLookup?: CountryLookup | null
+  /** Sponsor havuzlari (NEXT.md §10). `campaigns` da verilmezse uclar kapali. */
+  readonly pools?: PoolStore
+  /** `/v1/ads/next` hiz siniri. Verilmezse varsayilan kova (bkz. rate-limit.ts). */
+  readonly adRateLimit?: RateLimiter
 }
 
 type Vars = { auth: AuthContext }
@@ -92,10 +108,13 @@ const toCampaignJson = (c: import('../ads/selector.js').Campaign) => ({
   status: c.status,
   // Onizleme: reklamverenin gorecegi satir, kullanicinin gordugunun aynisi.
   preview: `✶ ${c.creative.brand} — ${c.creative.text} · ${c.creative.cta ?? ''}`,
+  // NEXT.md §10 — havuz projesi mi. Panel bunlari normal kampanya listesinden ayiriyor.
+  poolId: c.poolId ?? null,
 })
 
 export function createApp(deps: AppDeps) {
   const app = new Hono<{ Variables: Vars }>()
+  const adLimit = deps.adRateLimit ?? new RateLimiter({ now: () => deps.clock.now() })
 
   app.use('*', async (c, next) => {
     c.header(PROTOCOL_HEADER, PROTOCOL_VERSION)
@@ -233,6 +252,14 @@ export function createApp(deps: AppDeps) {
       return c.json(err('DWL_3005'), 503)
     }
 
+    // Nonce hizi = gosterim hizi (bkz. rate-limit.ts). Siniri asan istemci
+    // 429 alir; daemon bunu diger hatalar gibi sessizce karsilar.
+    const bekle = adLimit.take(publisherId)
+    if (bekle > 0) {
+      c.header('retry-after', String(Math.ceil(bekle / 1000)))
+      return c.json(err('DWL_9001', 'reklam isteme hizi siniri'), 429)
+    }
+
     const sel = deps.pipeline.serveAd(publisherId)
     // Kampanya yoksa 404 degil 204: bu bir hata degil, "su an gosterecek bir
     // sey yok" durumu. Istemci sessizce hicbir sey basmaz.
@@ -279,7 +306,9 @@ export function createApp(deps: AppDeps) {
     const { publisherId } = c.get('auth')
     const pubAcc = accountId('publisher', publisherId)
     const payable = deps.ledger.balance(pubAcc)
-    const inFlight = deps.ledger.balance(accountId('payouts_in_flight'))
+    // Yalnizca BU yayincinin yoldaki parasi. `payouts_in_flight` hesabinin
+    // kendisi herkesin toplami — onu donmek baskalarinin cekimlerini sizdirirdi.
+    const inFlight = deps.ledger.inFlightFrom(pubAcc)
 
     // Bekleyen: henuz dogrulanmamis gosterimlerin degeri. Ledger'da YOK,
     // cunku dogrulanana kadar para degil.
@@ -294,7 +323,8 @@ export function createApp(deps: AppDeps) {
       pendingStroops: pending.toString(),
       payableStroops: payable.toString(),
       inFlightStroops: inFlight.toString(),
-      lifetimeStroops: payable.toString(),
+      // Kazanilan her sey — cekimden sonra DUSMEZ (eskiden `payable`'di).
+      lifetimeStroops: deps.ledger.earned(pubAcc).toString(),
       // Su an cekilebilecek tutar — istege bagli cekim. Esigin altindaysa
       // sifir: kullaniciya cekemeyecegi bir rakam gostermek, dugmeye basip
       // hata almasina yol acardi (bkz. reklamveren tarafindaki ayni desen).
@@ -382,6 +412,10 @@ export function createApp(deps: AppDeps) {
         // altindaysa sifir: kullaniciya cekilemeyecek bir rakam gostermek,
         // dugmeye basip hata almasina yol acardi.
         withdrawableStroops: (deps.withdraw?.available(advertiserId) ?? 0n).toString(),
+        // NEXT.md §10 — acik havuzlara ayrilan, cekilemeyen kisim.
+        ...(deps.pools ? { reservedForPoolsStroops: poolReserve({
+          pools: deps.pools, campaigns: store, spentOn: (ids) => deps.pipeline.spentOn(ids),
+        }, advertiserId).toString() } : {}),
         campaigns: store.forAdvertiser(advertiserId).map(toCampaignJson),
       })
     })
@@ -455,6 +489,198 @@ export function createApp(deps: AppDeps) {
       const r = store.setStatus(c.req.param('id'), advertiserId, durum)
       if (!r.ok) return c.json(err('DWL_9001', r.reason), 404)
       return c.json(toCampaignJson(r.campaign))
+    })
+  }
+
+  /* ─────────────────── profil ve siralama ─────────────────── */
+
+  if (deps.profiles && deps.leaderboard) {
+    const profiles = deps.profiles
+    const board = deps.leaderboard
+
+    const toProfileJson = (p: Profile | null) =>
+      p ? { nickname: p.nickname, country: p.country, listed: p.listed } : null
+
+    /**
+     * Kendi profilini okuma/yazma. Ayri bir kapsam YOK: yayincinin her
+     * token'inda `read:balance` var ve yeni bir kapsam, mevcut herkesi
+     * yeniden giris yapmaya zorlardi. Calinmis bir token'in yapabilecegi en
+     * kotu sey takma adi degistirmek — para yolu degil.
+     */
+    app.get('/v1/me/profile', requireScope('read:balance'), (c) => {
+      const profile = profiles.get(c.get('auth').publisherId)
+      // CCgather yaklasimi: ulke yalnizca HENUZ SECILMEMISSE tahmin edilir ve
+      // yalnizca formu onceden doldurur — kullanici onaylamadan hicbir yere
+      // yazilmaz, sectigi ulkenin ustune de asla yazilmaz.
+      const suggestedCountry = profile?.country
+        ? null
+        : countryFromRequest((n) => c.req.header(n), deps.countryLookup ?? null)
+      return c.json({ profile: toProfileJson(profile), suggestedCountry })
+    })
+
+    app.put('/v1/me/profile', requireScope('read:balance'), async (c) => {
+      const v = validateProfile(await c.req.json().catch(() => null))
+      if (!v.ok) return c.json(err('DWL_9001', v.reason), 400)
+      const r = profiles.set(c.get('auth').publisherId, v.value, deps.clock.now())
+      // 409: takma ad baskasinda — istek gecerli ama su an olmaz.
+      if (!r.ok) return c.json(err('DWL_9001', r.reason), 409)
+      return c.json({ profile: toProfileJson(r.profile) })
+    })
+
+    /**
+     * Genel uclar — yetki ISTEMEZ, ana sayfa bunlari cagiriyor.
+     *
+     * `/health`'in "kullanici sayisi sizdirmaz" kurali burada da gecerli:
+     * yalnizca `listed` profiller sayiliyor, yani buradan cikan her bilgi
+     * sahibinin acikca yayinlamayi sectigi bilgi.
+     */
+    const period = (raw: string | undefined): Period =>
+      (PERIODS as readonly string[]).includes(raw ?? '') ? raw as Period : 'all'
+
+    app.get('/v1/leaderboard', (c) => {
+      const country = c.req.query('country')?.toUpperCase() ?? null
+      const limit = Math.min(Math.max(Number(c.req.query('limit')) || 50, 1), 100)
+      c.header('cache-control', 'public, max-age=30')
+      // Bilinmeyen kod kimsenin secemeyecegi bir ulke: bos liste, genel
+      // siralamaya dusmek degil.
+      if (country !== null && !COUNTRY_CODES.has(country)) return c.json({ rows: [] })
+      return c.json({ rows: board.top(period(c.req.query('period')), country, limit) })
+    })
+
+    app.get('/v1/leaderboard/countries', (c) => {
+      c.header('cache-control', 'public, max-age=30')
+      return c.json({ countries: board.countries() })
+    })
+
+    app.get('/v1/leaderboard/profile/:nickname', (c) => {
+      const d = board.profile(c.req.param('nickname'), period(c.req.query('period')))
+      if (!d) return c.json(err('DWL_9001', 'no such listed profile'), 404)
+      c.header('cache-control', 'public, max-age=30')
+      return c.json(d)
+    })
+  }
+
+  /* ─────────────────── sponsor havuzlari ─────────────────── */
+
+  /**
+   * NEXT.md §10. Para sponsorun reklamveren hesabinda; havuz projeleri onun
+   * adina faturalaniyor. Bu yuzden sponsor uclari reklamveren kapsamini,
+   * katilimci uclari yayinci kapsamini istiyor — calinmis bir daemon token'i
+   * havuz acamaz, bir reklamveren token'i da baskasi adina havuza katilamaz.
+   */
+  if (deps.pools && deps.campaigns) {
+    const pools = deps.pools
+    const store = deps.campaigns
+
+    const reserveDeps = { pools, campaigns: store, spentOn: (ids: ReadonlySet<string>) => deps.pipeline.spentOn(ids) }
+    const poolJson = (p: Pool) => ({
+      id: p.id, name: p.name, code: p.code, status: p.status,
+      bidCpmStroops: p.bidCpm.toString(), budgetStroops: p.budget.toString(),
+      spentStroops: poolSpent(reserveDeps, p).toString(), dailyCapPerMember: p.dailyCapPerMember,
+      createdAt: p.createdAt, closedAt: p.closedAt,
+    })
+    const intText = (v: unknown) => (typeof v === 'string' && /^\d+$/.test(v) ? BigInt(v) : null)
+
+    app.post('/v1/advertiser/pools', requireScope('manage:campaigns'), async (c) => {
+      const body = await c.req.json().catch(() => null)
+      const bid = intText(body?.bidCpmStroops)
+      const budget = intText(body?.budgetStroops)
+      if (bid === null || budget === null) {
+        return c.json(err('DWL_9001', '`bidCpmStroops` ve `budgetStroops` tam sayi metni olmali'), 400)
+      }
+      const r = pools.create({
+        sponsorId: c.get('auth').publisherId,
+        name: typeof body?.name === 'string' ? body.name : '',
+        bidCpm: stroops(bid),
+        budget: stroops(budget),
+        ...(body?.dailyCapPerMember !== undefined ? { dailyCapPerMember: Number(body.dailyCapPerMember) } : {}),
+      })
+      if (!r.ok) return c.json(err('DWL_9001', r.reason), 400)
+      return c.json(poolJson(r.pool), 201)
+    })
+
+    app.get('/v1/advertiser/pools', requireScope('manage:campaigns'), (c) => {
+      const sponsorId = c.get('auth').publisherId
+      return c.json({
+        spendableStroops: deps.pipeline.spendable(sponsorId).toString(),
+        // Acik havuzlara ayrilmis, henuz harcanmamis tutar — cekilemez.
+        reservedForPoolsStroops: poolReserve(reserveDeps, sponsorId).toString(),
+        pools: pools.forSponsor(sponsorId).map((p) => ({
+          ...poolJson(p),
+          members: pools.memberCount(p.id),
+          // Katilimcinin adresi sponsora da gosterilmiyor; yalnizca satir.
+          projects: store.forPool(p.id).map(toCampaignJson),
+        })),
+      })
+    })
+
+    app.post('/v1/advertiser/pools/:id/budget', requireScope('manage:campaigns'), async (c) => {
+      const budget = intText((await c.req.json().catch(() => null))?.budgetStroops)
+      if (budget === null) return c.json(err('DWL_9001', '`budgetStroops` tam sayi metni olmali'), 400)
+      const r = pools.setBudget(c.req.param('id'), c.get('auth').publisherId, stroops(budget))
+      if (!r.ok) return c.json(err('DWL_9001', r.reason), r.reason === 'pool not found' ? 404 : 409)
+      return c.json(poolJson(r.pool))
+    })
+
+    app.post('/v1/advertiser/pools/:id/close', requireScope('manage:campaigns'), (c) => {
+      const r = pools.close(c.req.param('id'), c.get('auth').publisherId)
+      if (!r.ok) return c.json(err('DWL_9001', r.reason), 404)
+      return c.json(poolJson(r.pool))
+    })
+
+    const myProject = (publisherId: string, poolId: string) =>
+      store.forPool(poolId).find((x) => x.submittedBy === publisherId) ?? null
+
+    app.get('/v1/me/pool', requireScope('read:balance'), (c) => {
+      const me = c.get('auth').publisherId
+      const p = pools.membership(me)
+      const project = p ? myProject(me, p.id) : null
+      return c.json({
+        pool: p ? { name: p.name, code: p.code, status: p.status, members: pools.memberCount(p.id) } : null,
+        project: project ? toCampaignJson(project) : null,
+      })
+    })
+
+    app.post('/v1/me/pool/join', requireScope('read:balance'), async (c) => {
+      const body = await c.req.json().catch(() => null)
+      const r = pools.join(typeof body?.code === 'string' ? body.code : '', c.get('auth').publisherId)
+      if (!r.ok) return c.json(err('DWL_9001', r.reason), 404)
+      return c.json({ name: r.pool.name, code: r.pool.code })
+    })
+
+    app.post('/v1/me/pool/leave', requireScope('read:balance'), (c) => {
+      pools.leave(c.get('auth').publisherId)
+      return c.json({ ok: true })
+    })
+
+    app.post('/v1/me/pool/project', requireScope('read:balance'), async (c) => {
+      const me = c.get('auth').publisherId
+      const p = pools.membership(me)
+      if (!p || p.status !== 'open') return c.json(err('DWL_9001', 'join an open pool first'), 409)
+      // Takim basina tek proje: kapali grupta satir sayisini sisirip
+      // dongudeki payini buyutmek bedava olmasin.
+      if (myProject(me, p.id)) return c.json(err('DWL_9001', 'you already submitted a project to this pool'), 409)
+
+      const body = await c.req.json().catch(() => null)
+      const r = store.createPoolProject({
+        sponsorId: p.sponsorId, poolId: p.id, submittedBy: me, bidCpm: p.bidCpm,
+        brand: typeof body?.brand === 'string' ? body.brand : '',
+        text: typeof body?.text === 'string' ? body.text : '',
+        cta: typeof body?.cta === 'string' ? body.cta : '',
+      })
+      if (!r.ok) return c.json(err('DWL_9001', r.reason), 400)
+      return c.json(toCampaignJson(r.campaign), 201)
+    })
+
+    /** Genel ozet — hackathon sayfasinda paylasilabilsin. Para ve adres yok. */
+    app.get('/v1/pools/:code', (c) => {
+      const p = pools.byCode(c.req.param('code'))
+      if (!p) return c.json(err('DWL_9001', 'no such pool'), 404)
+      const projects = store.forPool(p.id).filter((x) => x.status === 'active')
+      return c.json({
+        name: p.name, status: p.status, members: pools.memberCount(p.id),
+        projects: projects.map((x) => ({ brand: x.creative.brand, text: x.creative.text, cta: x.creative.cta })),
+      })
     })
   }
 

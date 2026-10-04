@@ -29,6 +29,16 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm --filter @dwell/server build
 
+# IP → ulke veritabani (DB-IP "IP to Country Lite", CC BY 4.0, ~8 MB).
+# Yalnizca profil formunda ulkeyi onceden doldurmak icin; IP disari cikmaz.
+# Her ay yeni surum cikiyor, derleme aninin ayini cekiyoruz. Indirme
+# basarisiz olursa derleme DURMAZ: sunucu dosyayi bulamazsa tahmini kapatir,
+# kullanici ulkesini elle secer.
+RUN mkdir -p /app/geo \
+ && (wget -qO- "https://download.db-ip.com/free/dbip-country-lite-$(date +%Y-%m).mmdb.gz" \
+       | gunzip > /app/geo/dbip-country-lite.mmdb \
+     || rm -f /app/geo/dbip-country-lite.mmdb)
+
 # ─────────────────────────── calisma ───────────────────────────
 FROM node:24-alpine
 
@@ -48,6 +58,7 @@ COPY --from=build --chown=dwell:dwell /app/packages/server/dist/server.mjs ./ser
 # Site. Sunucu bunlari `/` altinda servis ediyor; API `/v1/*` altinda kaliyor.
 # Ayni adres olmasi CORS'u tamamen ortadan kaldiriyor.
 COPY --from=build --chown=dwell:dwell /app/packages/server/public ./public
+COPY --from=build --chown=dwell:dwell /app/geo ./geo
 COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Konteynerde 0.0.0.0 SART: 127.0.0.1'e baglanan bir sunucuya disaridan

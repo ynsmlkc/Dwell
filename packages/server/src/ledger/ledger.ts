@@ -87,6 +87,11 @@ export class Ledger {
     return this.store.balance(account, asset)
   }
 
+  /** Butun kayitlar, salt okunur — siralama gibi raporlar icin. */
+  entries(): readonly Entry[] {
+    return this.store.all()
+  }
+
   /**
    * Defterde kaydi olan tum publisher'lar.
    *
@@ -100,6 +105,49 @@ export class Ledger {
       if (e.publisherId) set.add(e.publisherId)
     }
     return [...set]
+  }
+
+  /**
+   * Bir hesabin "yolda" olan parasi — YALNIZCA o hesaptan cikan odemeler.
+   *
+   * `payouts_in_flight` tekil, paylasilan bir hesap: bakiyesi BUTUN
+   * kullanicilarin yoldaki parasinin toplami. Onu bir yayinciya gostermek
+   * hem yanlis rakam hem baskalarinin cekimlerini sizdirmak demekti.
+   *
+   * Ayirt edici: `payoutSubmit` grubunun borc tarafi `account`. O grubun
+   * ref'leri (ve onlarin ters kayitlari) `payouts_in_flight` uzerinde
+   * toplanir; settle ve reversal ayni ref'i tasidigi icin net sonuc dogru.
+   */
+  inFlightFrom(account: AccountId, asset: Asset = 'USDC'): Stroops {
+    const all = this.store.all()
+    const refs = new Set<string>()
+    for (const e of all) {
+      if (e.type === 'payout_submit' && e.accountId === account) refs.add(e.refId)
+    }
+    const inFlight = accountId('payouts_in_flight')
+    let total = ZERO
+    for (const e of all) {
+      if (e.accountId !== inFlight || e.asset !== asset) continue
+      const ref = e.refType === 'reversal' ? e.refId.replace(/:reversal$/, '') : e.refId
+      if (refs.has(ref)) total = add(total, e.amount)
+    }
+    return total
+  }
+
+  /**
+   * Bir yayincinin kazanci — cekimlerden BAGIMSIZ.
+   *
+   * Gosterim kayitlari ve onlarin ters kayitlari; odeme kayitlari kazanc
+   * degil, paranin yer degistirmesi. Ayirt edici `campaignId`: odeme
+   * kayitlarinda ve onlarin ters kayitlarinda yok.
+   */
+  earned(account: AccountId, asset: Asset = 'USDC'): Stroops {
+    let total = ZERO
+    for (const e of this.store.all()) {
+      if (e.accountId !== account || e.asset !== asset || e.campaignId === null) continue
+      if (e.type === 'impression' || e.type === 'reversal') total = add(total, e.amount)
+    }
+    return total
   }
 
   entriesFor(refType: RefType, refId: string): readonly Entry[] {
@@ -223,6 +271,20 @@ export class Ledger {
     // `platform_revenue` sahipsiz, tekil bir hesap — `accountId(kind, owner)`
     // deseni burada uygulanmiyor.
     const fromAccount = kind === 'platform_revenue' ? PLATFORM_REVENUE : accountId(kind, input.publisherId)
+
+    // Son savunma hatti. Cagiranlar `spendable`'i zaten kontrol ediyor, ama
+    // `audit()` eksi bakiyeyi ancak YAZILDIKTAN sonra goruyor — o anda para
+    // zincire cikmis olabilir. Odeme hicbir hesabi eksiye dusuremez.
+    //
+    // Idempotent tekrar (ayni batch ikinci kez) bu kontrole takilmamali:
+    // ilk yazma bakiyeyi zaten dusurdu, `#post` orijinali dondurecek.
+    const tekrar = this.store.byIdempotencyKey(`payout_submit:${key}:publisher`)
+    if (!tekrar && this.store.balance(fromAccount, asset) < input.amount) {
+      throw new LedgerError(
+        `odeme hesabi eksiye dusururdu: ${fromAccount} bakiye ${this.store.balance(fromAccount, asset)} < ${input.amount}`,
+        'DWL_5006',
+      )
+    }
 
     return this.#post([
       this.#entry({

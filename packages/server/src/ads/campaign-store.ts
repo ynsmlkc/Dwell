@@ -70,6 +70,8 @@ export class CampaignStore {
         status: String(r.status) as CampaignStatus,
         frequencyCap: Number(r.frequency_cap),
         dailyBudgetStroops: r.daily_budget_stroops == null ? null : (BigInt(r.daily_budget_stroops as string) as Stroops),
+        poolId: r.pool_id == null ? null : String(r.pool_id),
+        submittedBy: r.submitted_by == null ? null : String(r.submitted_by),
       })
     }
   }
@@ -78,6 +80,10 @@ export class CampaignStore {
 
   forAdvertiser(advertiserId: string): readonly Campaign[] {
     return this.all().filter((c) => c.advertiserId === advertiserId)
+  }
+
+  forPool(poolId: string): readonly Campaign[] {
+    return this.all().filter((c) => c.poolId === poolId)
   }
 
   get(id: string): Campaign | null { return this.#byId.get(id) ?? null }
@@ -117,6 +123,39 @@ export class CampaignStore {
     return { ok: true, campaign }
   }
 
+  /**
+   * NEXT.md §10 — havuz projesi. Faturasi sponsora (`sponsorId`) kesilir,
+   * teklif havuzun sabit teklifidir; takim para ya da teklif girmez.
+   *
+   * Normal kampanyanin aksine AKTIF baslar: hackathon'da her takimin
+   * sponsordan onay beklemesi isi durdurur. Katilimci satiri panelde
+   * onizleyip gonderiyor; sponsor istemedigi projeyi `setStatus` ile
+   * durdurabilir (fatura onun adina oldugu icin sahiplik kontrolu gecer).
+   */
+  createPoolProject(input: {
+    sponsorId: string; poolId: string; submittedBy: string; bidCpm: Stroops
+    brand: string; text: string; cta: string
+  }): CampaignResult {
+    const v = validateCreative(input)
+    if (!v.ok) return v
+
+    const campaign: Campaign = {
+      id: `c-${this.newId()}`,
+      advertiserId: input.sponsorId,
+      bidCpm: input.bidCpm,
+      revShareBps: DEFAULT_REV_SHARE_BPS,
+      creative: { brand: input.brand.trim(), text: input.text.trim(), cta: input.cta.trim().toLowerCase() },
+      status: 'active',
+      frequencyCap: 0,
+      dailyBudgetStroops: null,
+      poolId: input.poolId,
+      submittedBy: input.submittedBy,
+    }
+    this.#write(campaign)
+    this.#byId.set(campaign.id, campaign)
+    return { ok: true, campaign }
+  }
+
   /** Durum degistirir. Baskasinin kampanyasina dokunulamaz. */
   setStatus(id: string, advertiserId: string, status: CampaignStatus): CampaignResult {
     const c = this.#byId.get(id)
@@ -134,8 +173,8 @@ export class CampaignStore {
   #write(c: Campaign): void {
     this.db.prepare(`
       INSERT INTO campaigns
-        (id, advertiser_id, bid_cpm, rev_share_bps, brand, text, cta, status, frequency_cap, daily_budget_stroops, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (id, advertiser_id, bid_cpm, rev_share_bps, brand, text, cta, status, frequency_cap, daily_budget_stroops, created_at, pool_id, submitted_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         bid_cpm = excluded.bid_cpm, brand = excluded.brand, text = excluded.text,
         cta = excluded.cta, status = excluded.status
@@ -144,6 +183,7 @@ export class CampaignStore {
       c.creative.brand, c.creative.text, c.creative.cta ?? '', c.status, c.frequencyCap,
       c.dailyBudgetStroops == null ? null : c.dailyBudgetStroops.toString(),
       this.clock.now(),
+      c.poolId ?? null, c.submittedBy ?? null,
     )
   }
 }

@@ -185,6 +185,40 @@ function migrate(db: Db): void {
       consumed      INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS ix_deliveries_expires ON deliveries (expires_at);
+
+    -- Siralamadaki genel kimlik. Adres burada YOK; publisher_id ile baglanir.
+    CREATE TABLE IF NOT EXISTS profiles (
+      publisher_id  TEXT PRIMARY KEY,
+      nickname      TEXT NOT NULL,
+      country       TEXT,
+      listed        INTEGER NOT NULL,
+      updated_at    INTEGER NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_profiles_nickname ON profiles (lower(nickname));
+
+    -- NEXT.md §10 — sponsor havuzlari. Para sponsorun reklamveren hesabinda
+    -- durur; burada yalnizca havuzun kimligi ve kurallari var.
+    CREATE TABLE IF NOT EXISTS pools (
+      id          TEXT PRIMARY KEY,
+      sponsor_id  TEXT NOT NULL,
+      name        TEXT NOT NULL,
+      code        TEXT NOT NULL UNIQUE,
+      bid_cpm     TEXT NOT NULL,
+      budget      TEXT NOT NULL,
+      daily_cap_per_member INTEGER NOT NULL,
+      status      TEXT NOT NULL,
+      created_at  INTEGER NOT NULL,
+      closed_at   INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS ix_pools_sponsor ON pools (sponsor_id);
+
+    -- Yayinci ayni anda tek havuzda: publisher_id birincil anahtar.
+    CREATE TABLE IF NOT EXISTS pool_members (
+      publisher_id  TEXT PRIMARY KEY,
+      pool_id       TEXT NOT NULL,
+      joined_at     INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_pool_members_pool ON pool_members (pool_id);
   `)
 
   // Ilk gercek ALTER TABLE — Railway'deki canli DB bu sutun olmadan acildi.
@@ -192,6 +226,12 @@ function migrate(db: Db): void {
   // var olan tabloya sutun boyle eklenir. SQLite'ta `ADD COLUMN IF NOT
   // EXISTS` yok, bu yuzden once sema okunuyor.
   addColumnIfMissing(db, 'campaigns', 'daily_budget_stroops', 'TEXT')
+  // NEXT.md §10 — NULL = genel ag kampanyasi.
+  addColumnIfMissing(db, 'campaigns', 'pool_id', 'TEXT')
+  addColumnIfMissing(db, 'campaigns', 'submitted_by', 'TEXT')
+  // Yerel gelistirme DB'leri `pools`'u bu sutunlar olmadan acmis olabilir.
+  addColumnIfMissing(db, 'pools', 'budget', "TEXT NOT NULL DEFAULT '0'")
+  addColumnIfMissing(db, 'pools', 'daily_cap_per_member', 'INTEGER NOT NULL DEFAULT 200')
 }
 
 function addColumnIfMissing(db: Db, table: string, column: string, ddl: string): void {

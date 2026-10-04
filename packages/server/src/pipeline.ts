@@ -28,6 +28,12 @@ export interface PipelineOptions {
   readonly pendingMs: number
   readonly dailyCap: number
   readonly isDatacenterIp?: (ipHash: string | null) => boolean
+  /** NEXT.md §10 — yayincinin uye oldugu acik sponsor havuzu. */
+  readonly poolOf?: (publisherId: string) => string | null
+  /** Havuz butcesi ve uye gunluk siniri izin veriyor mu (bkz. `AdSelector`). */
+  readonly poolAllows?: (publisherId: string, poolId: string, rate: Stroops) => boolean
+  /** Sponsorun acik havuzlarina ayrilmis, henuz harcanmamis tutar. */
+  readonly reservedForPools?: (advertiserId: string) => Stroops
 
   /**
    * Kalicilik kancalari.
@@ -60,6 +66,9 @@ export class Pipeline {
       campaigns: opts.campaigns,
       spendableBalance: (advertiserId) => this.spendable(advertiserId),
       spentToday: (campaignId) => this.spentToday(campaignId),
+      ...(opts.poolOf ? { poolOf: opts.poolOf } : {}),
+      ...(opts.poolAllows ? { poolAllows: opts.poolAllows } : {}),
+      ...(opts.reservedForPools ? { reservedForPools: opts.reservedForPools } : {}),
     })
 
     this.ingest = new ImpressionIngest({
@@ -155,6 +164,45 @@ export class Pipeline {
       }
     }
     return spent
+  }
+
+  /**
+   * NEXT.md §10 — bu kampanyalara yapilmis TUM harcama: teslim edilip henuz
+   * raporlanmamis + `pending` + `verified`. `spendable()` ile ayni sebepten
+   * teslimat aninda sayiliyor; yoksa havuz butcesi raporlama gecikmesi
+   * kadar asilabilirdi.
+   *
+   * Gosterim kayitlari 90 gun sonra temizleniyor (`vacuumExpired`); havuzlar
+   * hackathon suresince yasadigi icin bu yeterli. Daha uzun omurlu havuz
+   * gerekirse kaynak defter olmali.
+   */
+  spentOn(campaignIds: ReadonlySet<string>): Stroops {
+    const now = this.opts.clock.now()
+    let spent = ZERO
+    for (const d of this.#deliveries.values()) {
+      if (campaignIds.has(d.campaignId) && !d.consumed && d.expiresAt >= now) spent = add(spent, stroops(d.rate))
+    }
+    for (const i of this.#impressions.values()) {
+      if (campaignIds.has(i.campaignId) && (i.state === 'pending' || i.state === 'verified')) {
+        spent = add(spent, stroops(i.rateStroops))
+      }
+    }
+    return spent
+  }
+
+  /** Bu yayinciya BUGUN bu kampanyalardan sunulan gosterim sayisi (raporlanmamis teslimatlar dahil). */
+  servedToday(publisherId: string, campaignIds: ReadonlySet<string>): number {
+    const now = this.opts.clock.now()
+    const dayStart = now - (now % 86_400_000)
+    let n = 0
+    for (const d of this.#deliveries.values()) {
+      if (d.publisherId === publisherId && campaignIds.has(d.campaignId) && !d.consumed && d.expiresAt >= now) n++
+    }
+    for (const i of this.#impressions.values()) {
+      if (i.publisherId === publisherId && campaignIds.has(i.campaignId)
+        && (i.state === 'pending' || i.state === 'verified') && i.serverTs >= dayStart) n++
+    }
+    return n
   }
 
   /** `POST /v1/ads/next` — teslimat kaydedilir ki nonce dogrulanabilsin. */

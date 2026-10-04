@@ -17,7 +17,7 @@ beforeEach(() => {
   deliveries = new Map([[NONCE, {
     nonce: NONCE, publisherId: PUB, campaignId: 'c1', advertiserId: 'adv-1',
     rate: stroops(300_000n), revShareBps: 5000,
-    expiresAt: clock.now() + 300_000, consumed: false,
+    expiresAt: clock.now() + 240_000, consumed: false,   // 60 sn once teslim edildi
   }]])
 
   ingest = new ImpressionIngest({
@@ -70,7 +70,7 @@ describe('idempotency — ADR-004', () => {
     deliveries.set('b'.repeat(32), {
       nonce: 'b'.repeat(32), publisherId: 'pub-2', campaignId: 'c1',
       advertiserId: 'adv-1', rate: stroops(300_000n), revShareBps: 5000,
-      expiresAt: clock.now() + 300_000, consumed: false,
+      expiresAt: clock.now() + 240_000, consumed: false,   // 60 sn once teslim edildi
     })
     const r = ingest.ingest('pub-2', [ev({ nonce: 'b'.repeat(32) })])
     expect(r.accepted, 'ayni ULID, farkli publisher → kabul').toHaveLength(1)
@@ -170,7 +170,7 @@ describe('toplu gonderim', () => {
       deliveries.set(n.repeat(32), {
         nonce: n.repeat(32), publisherId: PUB, campaignId: 'c1', advertiserId: 'adv-1',
         rate: stroops(300_000n), revShareBps: 5000,
-        expiresAt: clock.now() + 300_000, consumed: false,
+        expiresAt: clock.now() + 240_000, consumed: false,   // 60 sn once teslim edildi
       })
     }
     const r = ingest.ingest(PUB, [
@@ -180,5 +180,38 @@ describe('toplu gonderim', () => {
     ])
     expect(r.accepted).toHaveLength(2)
     expect(r.rejected).toHaveLength(1)
+  })
+})
+
+/**
+ * Duvar saati kurali (PROBLEMS #1.2) — sunucu saatiyle. Reklam teslim
+ * edilmeden ekranda olamaz.
+ */
+describe('sure, teslimattan bu yana gecen sureyi asamaz', () => {
+  const taze = (nonce: string) => deliveries.set(nonce, {
+    nonce, publisherId: PUB, campaignId: 'c1',
+    advertiserId: 'adv-1', rate: stroops(300_000n), revShareBps: 5000,
+    expiresAt: clock.now() + 300_000, consumed: false,              // SIMDI teslim edildi
+  })
+
+  it('az once alinan nonce ile uzun gosterim bildirilemez', () => {
+    taze('c'.repeat(32))
+    clock.advance(3_000)
+    const r = ingest.ingest(PUB, [ev({ nonce: 'c'.repeat(32), durationMs: 15_000 })])
+    expect(r.accepted).toHaveLength(0)
+    expect(r.rejected[0]!.reason).toMatch(/teslimattan bu yana/)
+  })
+
+  it('gercekten gecen sure kadar gosterim kabul edilir', () => {
+    taze('d'.repeat(32))
+    clock.advance(16_000)
+    expect(ingest.ingest(PUB, [ev({ nonce: 'd'.repeat(32), durationMs: 15_000 })]).accepted).toHaveLength(1)
+  })
+
+  it('istemci saati (clientTs) kurala dokunamaz', () => {
+    taze('e'.repeat(32))
+    clock.advance(3_000)
+    const r = ingest.ingest(PUB, [ev({ nonce: 'e'.repeat(32), durationMs: 15_000, clientTs: clock.now() + 3600_000 })])
+    expect(r.accepted).toHaveLength(0)
   })
 })

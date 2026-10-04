@@ -15,6 +15,7 @@ import { hashToken, type DeviceTokenRecord } from '../http/auth.js'
 import type { PayoutStore, PayoutItemRecord, PayoutItemState } from '../payouts/store.js'
 import type { StoredImpression, DeliveredAd } from '../impressions/ingest.js'
 import type { SubmissionReceipt, WalletBinding } from '@dwell/payments'
+import type { Profile } from '../leaderboard/profiles.js'
 import { type Db, numOrNull, strOrNull, toInt, toBool } from './db.js'
 
 /* ─────────────────────────── defter ─────────────────────────── */
@@ -456,6 +457,34 @@ export function walletPersistence(db: Db) {
           hold_until       = excluded.hold_until,
           previous_address = excluded.previous_address
       `).run(b.publisherId, b.address, b.network, b.verifiedAt, b.holdUntil, b.previousAddress)
+    },
+  }
+}
+
+/* ─────────────────────────── profiller ─────────────────────────── */
+
+/** `ProfileStore`'un kalicilik kancasi. */
+export function profilePersistence(db: Db) {
+  return {
+    load: (): readonly Profile[] =>
+      (db.prepare('SELECT * FROM profiles').all() as any[]).map((r) => ({
+        publisherId: String(r.publisher_id),
+        nickname: String(r.nickname),
+        country: strOrNull(r.country),
+        listed: toBool(r.listed),
+        updatedAt: Number(r.updated_at),
+      })),
+
+    save: (p: Profile): void => {
+      db.prepare(`
+        INSERT INTO profiles (publisher_id, nickname, country, listed, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(publisher_id) DO UPDATE SET
+          nickname   = excluded.nickname,
+          country    = excluded.country,
+          listed     = excluded.listed,
+          updated_at = excluded.updated_at
+      `).run(p.publisherId, p.nickname, p.country, toInt(p.listed), p.updatedAt)
     },
   }
 }

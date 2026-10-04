@@ -16,3 +16,7 @@ packages/*/dist/
 # Icinde saldiri senaryolari ve savunmalarin nerede tutmadigi yaziyor;
 # depoyu goren birine yol tarifi olurdu.
 PROBLEMS.md
+
+# IP → ulke veritabani; Docker derlemesinde indiriliyor (bkz. Dockerfile)
+*.mmdb
+*.mmdb.gz

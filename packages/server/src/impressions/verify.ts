@@ -70,10 +70,17 @@ export class Verifier {
     // 3. Insanustu duzenli aralik (§9 katman 5).
     //
     // Gercek bir oturumun kaotik bir ritmi vardir: model bazen 8 saniye
-    // bazen 90 saniye dusunur. Sentetik trafik duzenlidir. Ayni oturumdaki
-    // ardisik gosterimlerin araligi neredeyse sabitse bu bir bot isaretidir.
+    // bazen 90 saniye dusunur. Sentetik trafik duzenlidir. Ayni yayincinin
+    // ardisik gosterimlerinin araligi neredeyse sabitse bu bir bot isaretidir.
+    //
+    // YAYINCI basina, oturum basina DEGIL (PROBLEMS #1.3): `sessionId`
+    // istemciden geliyor. Her gosterime farkli bir oturum kimligi veren
+    // saldirgan, oturum basina calisan kurali hic tetiklemiyordu — 6 kayit
+    // hicbir oturumda birikmiyordu. Ustelik oturum kimlikleri yayincilar
+    // arasinda tekil degil; baskasinin kimligini taklit etmek onun serisine
+    // karismak demekti.
     const sameSession = siblings
-      .filter((s) => s.sessionId === imp.sessionId && s.id !== imp.id)
+      .filter((s) => s.publisherId === imp.publisherId && s.id !== imp.id)
       .map((s) => s.serverTs)
       .concat(imp.serverTs)
       .sort((a, b) => a - b)

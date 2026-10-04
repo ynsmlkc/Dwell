@@ -201,7 +201,7 @@ td.num { text-align: right; color: var(--ink); white-space: nowrap; }
 
 /* ── formlar ── */
 label.field { display: grid; gap: 8px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
-input[type="text"], input[type="number"] {
+input[type="text"], input[type="number"], select {
   padding: 11px 13px; border: 1px solid rgba(236, 231, 225, 0.16); border-radius: 4px;
   background: rgba(236, 231, 225, 0.03); color: var(--ink);
   font-family: var(--mono); font-size: 14px; text-transform: none; letter-spacing: 0; width: 100%;

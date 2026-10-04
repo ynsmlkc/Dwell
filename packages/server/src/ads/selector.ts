@@ -41,6 +41,20 @@ export interface Campaign {
    * sekilde elenir; ertesi gun otomatik acilir, ban yok.
    */
   readonly dailyBudgetStroops?: Stroops | null
+  /**
+   * NEXT.md §10 — sponsor havuzu. `null`/`undefined` = genel ag.
+   *
+   * Havuz kampanyasi YALNIZCA o havuzun uyelerine, genel ag kampanyasi
+   * YALNIZCA havuzsuz yayincilara sunulur. Fatura `advertiserId`'ye kesilir;
+   * havuzda bu sponsorun adresidir, projeyi giren takim para odemez.
+   */
+  readonly poolId?: string | null
+  /**
+   * Havuz projesini giren katilimcinin publisherId'si. Bu kisiye kendi
+   * projesi sunulmaz: kapali bir grupta kendi satirini izleyerek sponsorun
+   * butcesini kendine aktarmak bedava olurdu.
+   */
+  readonly submittedBy?: string | null
 }
 
 export interface AdSelection {
@@ -62,6 +76,20 @@ export interface SelectorDeps {
   readonly spendableBalance: (advertiserId: string) => Stroops
   /** Bu kampanyanin BUGUN (raporlanmis, henuz dogrulanmamis dahil) harcadigi tutar. */
   readonly spentToday: (campaignId: string) => Stroops
+  /** Yayincinin uye oldugu ACIK havuz; yoksa `null`. Verilmezse herkes genel agda. */
+  readonly poolOf?: (publisherId: string) => string | null
+  /**
+   * Havuz butcesi bir gosterim daha karsilar mi ve uye bugunku sinirinda
+   * mi? `false` ise havuz bu kisi icin susar — kapali dongude baska secenek
+   * yok, genel aga dusmez.
+   */
+  readonly poolAllows?: (publisherId: string, poolId: string, rate: Stroops) => boolean
+  /**
+   * Sponsorun acik havuzlarina ayrilmis tutar. Sponsorun NORMAL
+   * kampanyalari bakiyenin yalnizca bu tutarin disinda kalanini harcayabilir;
+   * havuz parasi havuzundur.
+   */
+  readonly reservedForPools?: (advertiserId: string) => Stroops
   readonly nonceTtlMs?: number
 }
 
@@ -82,8 +110,14 @@ export class AdSelector {
    * susmak dogrudur (ADR-003).
    */
   select(publisherId: string): AdSelection | null {
+    const pool = this.deps.poolOf?.(publisherId) ?? null
     const eligible = this.deps.campaigns()
       .filter((c) => c.status === 'active')
+      // Kapali dongu: havuz uyesi yalnizca kendi havuzunu, digerleri yalnizca
+      // genel agi gorur. Kapanmis havuzun kampanyasi kimseyle eslesmez.
+      .filter((c) => (c.poolId ?? null) === pool)
+      .filter((c) => c.submittedBy == null || c.submittedBy !== publisherId)
+      .filter((c) => pool === null || (this.deps.poolAllows?.(publisherId, pool, rateFromCpm(c.bidCpm)) ?? true))
       // Gosterim basina oran sifira dusuyorsa satacak bir sey yok.
       .filter((c) => rateFromCpm(c.bidCpm) > 0n)
       /**
@@ -100,7 +134,7 @@ export class AdSelector {
        *
        * Tek bir reklamverenin bakiyesinin dip yapmasi herkesi susturmamali.
        */
-      .filter((c) => this.deps.spendableBalance(c.advertiserId) >= rateFromCpm(c.bidCpm))
+      .filter((c) => this.#spendableFor(c) >= rateFromCpm(c.bidCpm))
       /**
        * PROBLEMS.md #8c — gunluk harcama tavani, teklikten bagimsiz.
        *
@@ -121,7 +155,7 @@ export class AdSelector {
     // Karsilanabilirlik yukaridaki filtrede kontrol edildi; burasi son
     // savunma. Tetiklenirse yukaridaki filtre bozulmus demektir.
     const rate = rateFromCpm(chosen.bidCpm)
-    if (this.deps.spendableBalance(chosen.advertiserId) < rate) return null
+    if (this.#spendableFor(chosen) < rate) return null
 
     this.#remember(publisherId, chosen.id)
 
@@ -131,6 +165,18 @@ export class AdSelector {
       nonceExpiresAt: this.deps.clock.now() + (this.deps.nonceTtlMs ?? DEFAULT_NONCE_TTL_MS),
       rate,
     }
+  }
+
+  /**
+   * Bu kampanyanin harcayabilecegi bakiye. Havuz kampanyasi sponsorun
+   * bakiyesinin tamamini gorur (havuz siniri `poolAllows`'ta); normal
+   * kampanya, sponsorun havuzlara ayirdigi tutari GOREMEZ.
+   */
+  #spendableFor(c: Campaign): Stroops {
+    const all = this.deps.spendableBalance(c.advertiserId)
+    if (c.poolId != null) return all
+    const left = all - (this.deps.reservedForPools?.(c.advertiserId) ?? 0n)
+    return stroops(left > 0n ? left : 0n)
   }
 
   /**

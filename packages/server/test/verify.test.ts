@@ -114,9 +114,21 @@ describe('§9 katman 5 — insanustu duzenli aralik', () => {
     expect(v.evaluate(target, sib).state).toBe('verified')
   })
 
-  it('farkli oturumlar birbirine karismaz', () => {
+  it('her gosterime farkli oturum kimligi vermek kurali ATLATAMAZ (PROBLEMS #1.3)', () => {
+    // `sessionId` istemciden geliyor; kural eskiden oturum basina calisiyordu
+    // ve bu kacis bedavaydi.
     const sib = series([20_000, 20_000, 20_000, 20_000, 20_000, 20_000])
       .map((s, k) => ({ ...s, sessionId: `oturum-${k}` }))
+    const target = sib.at(-1)!
+    clock.advance(PENDING_MS + 200_000)
+    const r = v.evaluate(target, sib)
+    expect(r.state).toBe('rejected')
+    if (r.state === 'rejected') expect(r.reason).toMatch(/insanustu duzenli/)
+  })
+
+  it('farkli yayincilar birbirine karismaz', () => {
+    const sib = series([20_000, 20_000, 20_000, 20_000, 20_000, 20_000])
+      .map((s, k) => ({ ...s, publisherId: `yayinci-${k}` }))
     const target = imp({ serverTs: clock.now() + 200_000 })
     clock.advance(PENDING_MS + 300_000)
     expect(v.evaluate(target, sib).state).toBe('verified')

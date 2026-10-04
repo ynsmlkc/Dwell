@@ -55,7 +55,35 @@ export interface WithdrawDeps {
   readonly spendable: (id: string) => Stroops
   readonly newBatchId: () => string
   readonly log: (m: string) => void
+  /** Sicak cuzdan kuyrugu — bkz. `createSerial`. Verilmezse sirasiz calisir. */
+  readonly serial?: Serial
 }
+
+/**
+ * Sicak cuzdandan cikan islemleri SIRAYA sokar.
+ *
+ * Butun cekimler (reklamveren, yayinci, platform) ve mutabakat ayni kaynak
+ * hesabi kullaniyor. Iki cekim ayni anda `prepare` ederse ikisi de ayni
+ * sequence'i alir; ikincisi `tx_bad_seq` ile duser, `reconcile` onu
+ * "henuz zincirde yok" diye `pending` sayar ve para `payouts_in_flight`ta
+ * asili kalir. Tek kuyruk bunu yapisal olarak imkansiz kiliyor.
+ *
+ * Ayni ornek BUTUN servislere verilmeli — servis basina ayri kuyruk hicbir
+ * seyi cozmez.
+ */
+export type Serial = <T>(fn: () => Promise<T>) => Promise<T>
+
+export function createSerial(): Serial {
+  let tail: Promise<unknown> = Promise.resolve()
+  return <T>(fn: () => Promise<T>): Promise<T> => {
+    const run = tail.then(fn, fn)
+    // Bir isin patlamasi kuyrugu kilitlemesin.
+    tail = run.catch(() => {})
+    return run
+  }
+}
+
+const direct: Serial = (fn) => fn()
 
 export type WithdrawResult =
   | { readonly ok: true; readonly txHash: string; readonly amount: Stroops }
@@ -77,7 +105,7 @@ export class WithdrawService {
     }
     this.#busy.add(id)
     try {
-      return await this.#run(id, amount)
+      return await (this.deps.serial ?? direct)(() => this.#run(id, amount))
     } finally {
       this.#busy.delete(id)
     }
@@ -137,6 +165,15 @@ export class WithdrawService {
     }
 
     // ── 2. Defter ve kayit, gonderimden ONCE. ──
+    //
+    // `spendable` YENIDEN okunuyor: yukaridaki kontrolden bu yana iki ag
+    // cagrisi bekledik. O arada reklamverenin butcesi yeni teslimatlarla
+    // rezerve edilmis olabilir — eski rakamla yazarsak hesap eksiye duser
+    // ve yayincilara karsiligi olmayan para yazilir. Bu satir ile
+    // `payoutSubmit` arasinda `await` YOK; kontrol ve yazma bolunmez.
+    if (amount > this.deps.spendable(id)) {
+      return { ok: false, reason: 'bakiye bu arada degisti — tekrar dene', retryable: true }
+    }
     this.deps.ledger.payoutSubmit({ batchId, publisherId: id, amount, kind: this.deps.kind })
     this.deps.store.recordSubmit({ receipt, items, at: this.deps.clock.now() })
     this.deps.log(`cekim gonderildi (${this.deps.kind}) ${id.slice(0, 8)}… ${amount} stroop`)

@@ -58,7 +58,18 @@ export interface IngestDeps {
   readonly minImpressionMs: number
   /** ADR-016 — bu surumun altindaki istemciler reddedilir. */
   readonly minClientVersion: string
+  /**
+   * Nonce'un omru — teslim anini `expiresAt`'ten geri hesaplamak icin.
+   * Varsayilan `AdSelector`'unki (5 dk); ikisi ayni olmali.
+   */
+  readonly nonceTtlMs?: number
 }
+
+/** Bkz. `ads/selector.ts` `DEFAULT_NONCE_TTL_MS`. */
+const DEFAULT_NONCE_TTL_MS = 5 * 60_000
+
+/** Saat cozunurlugu ve ag gecikmesi icin pay — durust istemci bunu hic kullanmaz. */
+const DURATION_SLACK_MS = 2_000
 
 export interface IngestResult {
   readonly accepted: readonly string[]
@@ -142,6 +153,18 @@ export class ImpressionIngest {
     if (delivery.expiresAt < this.deps.clock.now()) return 'nonce suresi dolmus'
     if (delivery.publisherId !== publisherId) return 'nonce baska publisher\'a ait'
     if (delivery.campaignId !== ev.campaignId) return 'nonce baska kampanyaya ait'
+
+    // Duvar saati kurali (PROBLEMS #1.2), SUNUCU saatiyle. Reklam teslim
+    // edilmeden ekranda olamaz: bildirilen sure, teslimattan bu yana gecen
+    // sureden uzun olamaz. Iki uc da bizim saatimiz — istemcinin `clientTs`'i
+    // ya da saat ayari burada hicbir sey degistirmez. Nonce hiz siniriyla
+    // birlikte: bir yayincinin bildirebilecegi toplam gosterim suresi,
+    // gercekten gecen sureyle sinirli.
+    const deliveredAt = delivery.expiresAt - (this.deps.nonceTtlMs ?? DEFAULT_NONCE_TTL_MS)
+    const gecen = this.deps.clock.now() - deliveredAt
+    if (ev.durationMs > gecen + DURATION_SLACK_MS) {
+      return `sure ${ev.durationMs}ms teslimattan bu yana gecen ${gecen}ms'den uzun`
+    }
 
     // Saat tutarliligi: istemcinin saati cok ileriyse veya cok geridiyse
     // ya bozuk ya kurcalanmis.
