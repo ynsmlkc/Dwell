@@ -309,3 +309,18 @@ describe('hesaba ozel raporlar — /v1/me/balance', () => {
     expect(ledger.earned(pubAcc)).toBe(2_000_000n)
   })
 })
+
+describe('blok sayaci — kampanya basina faturalanmis gosterim', () => {
+  beforeEach(() => ledger.deposit({ advertiserId: ADV, amount: stroops(10_000_000n), topupId: 't0' }))
+
+  it('gosterim basina bir; ters kayit geri alir; tekrar yazma cift saymaz', () => {
+    expect(ledger.billedImpressions(CAMP)).toBe(0)
+    impression('i1', 100n)
+    impression('i2', 100n)
+    impression('i2', 100n)                              // idempotent tekrar
+    expect(ledger.billedImpressions(CAMP)).toBe(2)
+    ledger.reverse('impression', 'i1', 'fraud')
+    expect(ledger.billedImpressions(CAMP)).toBe(1)
+    expect(ledger.billedImpressions('baska-kampanya')).toBe(0)
+  })
+})

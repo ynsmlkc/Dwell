@@ -17,7 +17,7 @@
  */
 
 import { loadCredentials } from '../credentials.js'
-import { out, ok, warn, info, fail, dim, bold, green, yellow, usdc, banner, rows } from './output.js'
+import { out, ok, info, fail, dim, bold, green, yellow, usdc, banner, rows } from './output.js'
 
 export interface BalanceResponse {
   readonly pendingStroops: string
@@ -89,10 +89,10 @@ function render(b: BalanceResponse, address: string, jsonOut: string | null): vo
   /* ── odeme ne zaman ── */
 
   if (payable >= threshold) {
-    ok(`threshold cleared — going out in the next payout round`)
+    ok(`ready to withdraw — any amount, anytime, from the dashboard`)
   } else if (b.blockedReason) {
-    const kalan = threshold - payable
-    warn(`${usdc(kalan)} more needed ${dim(`(threshold ${usdc(threshold)})`)}`)
+    // Esik 1 stroop: buraya ancak bakiye sifirken dusulur.
+    info(dim('nothing to withdraw yet — waiting for the first verified impression'))
     // Sunucunun kendi gerekcesi farkliysa onu da goster — esik disinda bir
     // sebep olabilir (cuzdan bekleme suresi, trustline eksigi).
     if (!/threshold/i.test(b.blockedReason)) info(dim(b.blockedReason))

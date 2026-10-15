@@ -35,11 +35,15 @@ export function prodProblems(env: Env): string[] {
     if (!env[k]) out.push(`${k} tanimli degil`)
   }
 
-  // Acikca verilmisse bile alt sinir var: uretimde birkac saniyelik pencere,
+  // Acikca verilmisse bile pubnet'te alt sinir var: birkac saniyelik pencere,
   // anomali kontrolunun para cikmadan once calismasini anlamsiz kilar.
+  // Testnet'te para gercek degil; demo icin pencere kisaltilabilir (0 dahil).
   const pending = env['DWELL_PENDING_MS']
-  if (pending !== undefined && !(Number(pending) >= 3600_000)) {
-    out.push(`DWELL_PENDING_MS uretimde en az 1 saat olmali (verilen: ${pending})`)
+  const mainnet = env['DWELL_NETWORK'] === 'pubnet'
+  if (pending !== undefined && !(Number(pending) >= (mainnet ? 3600_000 : 0))) {
+    out.push(mainnet
+      ? `DWELL_PENDING_MS pubnet'te en az 1 saat olmali (verilen: ${pending})`
+      : `DWELL_PENDING_MS gecerli bir sure degil (verilen: ${pending})`)
   }
 
   const min = env['DWELL_MIN_CLIENT_VERSION']

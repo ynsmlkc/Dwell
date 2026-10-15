@@ -10,7 +10,11 @@
  */
 
 import { type Stroops, stroops, rateFromCpm, add } from '@dwell/protocol'
+import { MIN_BID_CPM } from './campaign-store.js'
 import type { Creative, IdGenerator, Clock } from '@dwell/protocol'
+
+/** Bir blok kac gosterim. Fiyat (`bidCpm`) da 1.000 gosterim icin. */
+export const IMPRESSIONS_PER_BLOCK = 1_000
 
 export type CampaignStatus = 'active' | 'paused' | 'suspended' | 'exhausted'
 
@@ -42,6 +46,13 @@ export interface Campaign {
    */
   readonly dailyBudgetStroops?: Stroops | null
   /**
+   * Satin alinan blok sayisi; 1 blok = 1.000 gosterim. `null`/`undefined` =
+   * sinirsiz (bakiye yettigi surece). Teslim edilen gosterim bu sayiya
+   * ulasinca kampanya sunulmaz — fazlasi reklamverenden ALINMAZ cunku hic
+   * sunulmaz.
+   */
+  readonly blocks?: number | null
+  /**
    * NEXT.md §10 — sponsor havuzu. `null`/`undefined` = genel ag.
    *
    * Havuz kampanyasi YALNIZCA o havuzun uyelerine, genel ag kampanyasi
@@ -61,8 +72,14 @@ export interface AdSelection {
   readonly campaign: Campaign
   readonly nonce: string
   readonly nonceExpiresAt: number
-  /** ADR-011 — bu ANIN fiyati, gosterim kaydina donacak. */
+  /**
+   * ADR-011 — bu ANIN fiyati, gosterim kaydina donacak. Ikinci fiyattan
+   * gelir (bkz. `clearingCpm`), teklif DEGIL: kazanan bir sonraki teklifi
+   * gececek kadarini oder, asla kendi teklifinden fazlasini degil.
+   */
   readonly rate: Stroops
+  /** Bu gosterimin blok (1.000 gosterim) basina karsiligi — panel ve test icin. */
+  readonly clearingCpm: Stroops
 }
 
 export interface SelectorDeps {
@@ -76,6 +93,12 @@ export interface SelectorDeps {
   readonly spendableBalance: (advertiserId: string) => Stroops
   /** Bu kampanyanin BUGUN (raporlanmis, henuz dogrulanmamis dahil) harcadigi tutar. */
   readonly spentToday: (campaignId: string) => Stroops
+  /**
+   * Bu kampanyaya ayrilmis gosterim sayisi: faturalanmis + `pending` +
+   * teslim edilip henuz raporlanmamis. Blok siniri bununla kontrol edilir.
+   * Verilmezse blok siniri uygulanmaz.
+   */
+  readonly committedImpressions?: (campaignId: string) => number
   /** Yayincinin uye oldugu ACIK havuz; yoksa `null`. Verilmezse herkes genel agda. */
   readonly poolOf?: (publisherId: string) => string | null
   /**
@@ -91,15 +114,32 @@ export interface SelectorDeps {
    */
   readonly reservedForPools?: (advertiserId: string) => Stroops
   readonly nonceTtlMs?: number
+  /**
+   * Yumusak siklik siniri: ayni yayinciya ayni kampanya son bir saatte bu
+   * kadar gosterildiyse, sinirda olmayan kampanyalar once gelir. Herkes
+   * sinirdaysa en yuksek teklif yine gosterilir. Varsayilan 3; 0 = kapali.
+   */
+  readonly hourlyCapPerPublisher?: number
+  /**
+   * Taban fiyat (reserve), blok basina. Rakipsiz kazanan bunu oder.
+   * Varsayilan `MIN_BID_CPM`. Ag buyudukce yukseltilebilir; teklifin
+   * ustundeyse fiyat teklife esitlenir (kimse teklifinden fazla odemez).
+   */
+  readonly reserveCpm?: Stroops
 }
+
+/** Ikinci fiyatin ustune eklenen adim: blok basina 1 kurus. */
+export const BID_INCREMENT_CPM = stroops(100_000n)
+export const DEFAULT_HOURLY_CAP = 3
+const HOUR = 3_600_000
 
 /** Nonce omru. Kisa: replay penceresini daraltir. */
 export const DEFAULT_NONCE_TTL_MS = 5 * 60_000
 
 export class AdSelector {
   readonly #recentByPublisher = new Map<string, string[]>()
-  /** SWRR biriken agirlik durumu, publisher basina, kampanya basina. */
-  readonly #weightByPublisher = new Map<string, Map<string, bigint>>()
+  /** Son bir saatte bu yayinciya sunulanlar — yumusak siklik siniri icin. Bellekte. */
+  readonly #shownByPublisher = new Map<string, { id: string; at: number }[]>()
 
   constructor(private readonly deps: SelectorDeps) {}
 
@@ -147,14 +187,24 @@ export class AdSelector {
         if (c.dailyBudgetStroops == null) return true
         return add(this.deps.spentToday(c.id), rateFromCpm(c.bidCpm)) <= c.dailyBudgetStroops
       })
+      /**
+       * Blok satin alma: teslim edilmis + bekleyen + yoldaki gosterimler
+       * satin alinan miktara ulastiysa kampanya biter. Teslim aninda
+       * sayiliyor; raporlamayi beklesek, gecikme kadar fazla gosterim
+       * dagitirdik.
+       */
+      .filter((c) => {
+        if (c.blocks == null || !this.deps.committedImpressions) return true
+        return this.deps.committedImpressions(c.id) < c.blocks * IMPRESSIONS_PER_BLOCK
+      })
 
     if (eligible.length === 0) return null
 
-    const chosen = this.#swrrPick(publisherId, eligible)
+    const { chosen, clearingCpm } = this.#auction(publisherId, eligible)
 
-    // Karsilanabilirlik yukaridaki filtrede kontrol edildi; burasi son
-    // savunma. Tetiklenirse yukaridaki filtre bozulmus demektir.
-    const rate = rateFromCpm(chosen.bidCpm)
+    // Karsilanabilirlik yukaridaki filtrede (teklif uzerinden, yani ust
+    // sinirla) kontrol edildi; burasi son savunma.
+    const rate = rateFromCpm(clearingCpm)
     if (this.#spendableFor(chosen) < rate) return null
 
     this.#remember(publisherId, chosen.id)
@@ -164,6 +214,7 @@ export class AdSelector {
       nonce: this.deps.ids.randomHex(16),
       nonceExpiresAt: this.deps.clock.now() + (this.deps.nonceTtlMs ?? DEFAULT_NONCE_TTL_MS),
       rate,
+      clearingCpm,
     }
   }
 
@@ -180,97 +231,59 @@ export class AdSelector {
   }
 
   /**
-   * Pürüzsüz agirlikli sira (SWRR) — nginx'in upstream yuk dengelemede
-   * kullandigi ayni algoritma. Agirlik = `bidCpm` (oran degil, ham teklif;
-   * oranti CPM orantisiyla birebir ayni ve bolme kalintisi tasimiyor).
+   * Fiyat sirali kuyruk + ikinci fiyat (NEXT.md "Reklam secimi", ADR-009
+   * ikinci revizyon).
    *
-   * Her tikte HER uygun kampanyanin biriken agirligi kendi agirligi kadar
-   * artar; en yuksek birikimli olan secilir ve toplam agirlik kadar geriye
-   * dusurulur. Bu, uzun vadede payi tam `agirlik / toplam_agirlik` orasina
-   * yaklastirir — rastgele agirlikli secimin aksine kumelenme yapmaz ve
-   * deterministiktir (bir reklamveren "neden B iki kez ust uste cikti da
-   * ben cikmadim" diye panele bakip haksiz yere supheye dusmez).
-   *
-   * Frekans kurali (`frequencyCap`) SWRR'nin UZERINE, secim anini daraltan
-   * bir filtre olarak biner: secilecek aday once bu filtreden gecmek
-   * zorunda, ama filtrelenen adayin biriken agirligi KAYBOLMAZ — bir
-   * sonraki tikte hala orada durur ve buyumeye devam eder. Bu yuzden
-   * kisitlama payi ERTELER, SILMEZ; havuz gercekten tukenirse (fresh bos)
-   * en yuksek birikimli olana geri donulur — reklam gostermemektense
-   * tekrar etmek iyidir.
+   * 1. Aday kumesi: bu yayinciya son bir saatte siklik sinirina ulasmamis
+   *    (ve kampanyanin kendi `frequencyCap`'ine takilmamis) kampanyalar.
+   *    Bos kalirsa butun uygunlar — sinir sirayi degistirir, kimseyi
+   *    susturmaz. Sert sinir az kampanyali agda yayinciyi saatin cogunda
+   *    reklamsiz birakirdi (eski %50/%50 kilidiyle ayni tuzak, PROBLEMS.md #8a).
+   * 2. En yuksek teklif kazanir. Esitlikte bu yayinciya en uzun suredir
+   *    gosterilmeyen; ikisi de hic gosterilmediyse rastgele. Sabit bir ID
+   *    sirasi, sik yeniden baslatmada hep ayni reklami kazandiriyordu
+   *    (denetim notu, 2026-09-06).
+   * 3. Fiyat: ayni aday kumesindeki bir sonraki teklif + 1 kurus, en fazla
+   *    kendi teklifi. Ayni reklamverenin diger kampanyalari rakip sayilmaz
+   *    (kendi fiyatini kendisi yukseltemez). Rakip yoksa taban fiyat.
+   *    Havuz kampanyasinda fiyat havuzun sabit fiyatidir — hepsi sponsorun
+   *    adina faturalanir, ikinci fiyat anlamsiz olurdu.
    */
-  #swrrPick(publisherId: string, eligible: readonly Campaign[]): Campaign {
-    const weights = this.#weightState(publisherId, eligible)
+  #auction(publisherId: string, eligible: readonly Campaign[]): { chosen: Campaign; clearingCpm: Stroops } {
+    const now = this.deps.clock.now()
     const recent = this.#recentByPublisher.get(publisherId) ?? []
+    const shown = (this.#shownByPublisher.get(publisherId) ?? []).filter((x) => now - x.at < HOUR)
+    const cap = this.deps.hourlyCapPerPublisher ?? DEFAULT_HOURLY_CAP
+    const shownCount = (id: string): number => shown.reduce((n, x) => n + (x.id === id ? 1 : 0), 0)
 
-    let total = 0n
-    for (const c of eligible) {
-      const next = (weights.get(c.id) ?? 0n) + c.bidCpm
-      weights.set(c.id, next)
-      total += c.bidCpm
-    }
+    // frequencyCap 0 → kisitlama yok. `slice(-0)` tum diziyi doner; bu yuzden
+    // 0 ayrica ele aliniyor, yoksa "kisitlama yok" tam tersine donerdi.
+    const fresh = eligible.filter((c) =>
+      (cap === 0 || shownCount(c.id) < cap)
+      && (c.frequencyCap === 0 || !recent.slice(-c.frequencyCap).includes(c.id)))
+    const candidates = fresh.length > 0 ? fresh : eligible
 
-    /**
-     * Esit agirlikta (ayni teklif, aynı birikim) eskiden ID string'ine gore
-     * sabit bir kazanan seciliyordu — bu, sunucu her yeniden basladiginda
-     * (deploy, restart) birikim sifirlanip esitlikler yeniden olustugunda,
-     * AYNI reklamin her seferinde kazanmasina yol aciyordu (gercek olayda
-     * yakalandi: sik deploy'lar birikimi hic olgunlasmadan sifirlayip
-     * hep ayni ID'yi kazandırdi — bkz. denetim notu, 2026-09-06).
-     *
-     * Simdi esitlikte "en once secilmis (ya da hic secilmemis) olan"
-     * kazaniyor — kendiliginden duzelen, deterministik bir kural: bir
-     * reklam kazandiktan sonra `recent`e girer ve bir sonraki esitlikte
-     * ARTIK dezavantajli olur, sirayla herkese firsat dogar. Hicbiri daha
-     * once secilmemisse (ilk tik, sunucu yeni acilmis) rastgele secilir —
-     * ama bu yalnizca BIR kez olur, sonrasi "en once secilmis" kuralina gecer.
-     */
     const lastPickIndex = (id: string): number => {
       const idx = recent.lastIndexOf(id)
       return idx === -1 ? -Infinity : idx
     }
-
-    const byWeightDesc = (a: Campaign, b: Campaign): number => {
-      const wa = weights.get(a.id)!
-      const wb = weights.get(b.id)!
-      if (wa !== wb) return wa > wb ? -1 : 1
+    const ranked = [...candidates].sort((a, b) => {
       if (a.bidCpm !== b.bidCpm) return a.bidCpm > b.bidCpm ? -1 : 1
       const la = lastPickIndex(a.id)
       const lb = lastPickIndex(b.id)
       if (la !== lb) return la < lb ? -1 : 1
-      // Ikisi de daha once hic secilmemis: gercekten kararsiz durum,
-      // sabit bir ID sirasina dusmemek icin rastgele.
       return this.deps.ids.randomHex(1) < '8' ? -1 : 1
-    }
+    })
+    const chosen = ranked[0]!
 
-    // frequencyCap 0 → kisitlama yok (bkz. Campaign.frequencyCap dokumani).
-    // `slice(-0)` JS'te `slice(0)` ile ayni seydir (tum diziyi doner!) —
-    // bu yuzden 0 durumu ayrica ele alinir, yoksa "kisitlama yok" niyeti
-    // "hep gosterilmisse hep dislan" gibi tam tersine donerdi.
-    const fresh = eligible.filter((c) =>
-      c.frequencyCap === 0 ? true : !recent.slice(-c.frequencyCap).includes(c.id)
-    )
-    const pool = fresh.length > 0 ? fresh : eligible
-    const chosen = [...pool].sort(byWeightDesc)[0]!
+    if (chosen.poolId != null) return { chosen, clearingCpm: chosen.bidCpm }
 
-    weights.set(chosen.id, weights.get(chosen.id)! - total)
-    return chosen
-  }
-
-  #weightState(publisherId: string, eligible: readonly Campaign[]): Map<string, bigint> {
-    let weights = this.#weightByPublisher.get(publisherId)
-    if (!weights) {
-      weights = new Map()
-      this.#weightByPublisher.set(publisherId, weights)
-    }
-    // Artik uygun olmayan kampanyalarin agirligini birikmeye birakmiyoruz —
-    // aksi halde uzun sure pasif kalip sonra donen bir kampanya, hakkinin
-    // cok ustunde bir baslangic avantajiyla geri gelir.
-    const eligibleIds = new Set(eligible.map((c) => c.id))
-    for (const id of weights.keys()) {
-      if (!eligibleIds.has(id)) weights.delete(id)
-    }
-    return weights
+    const rival = ranked.find((c) => c.advertiserId !== chosen.advertiserId)
+    const reserve = this.deps.reserveCpm ?? MIN_BID_CPM
+    const second = rival ? add(rival.bidCpm, BID_INCREMENT_CPM) : reserve
+    const floor = second > reserve ? second : reserve
+    const clearingCpm = floor < chosen.bidCpm ? floor : chosen.bidCpm
+    return { chosen, clearingCpm: stroops(clearingCpm) }
   }
 
   #remember(publisherId: string, campaignId: string): void {
@@ -278,5 +291,10 @@ export class AdSelector {
     list.push(campaignId)
     if (list.length > 32) list.shift()
     this.#recentByPublisher.set(publisherId, list)
+
+    const now = this.deps.clock.now()
+    const shown = (this.#shownByPublisher.get(publisherId) ?? []).filter((x) => now - x.at < HOUR)
+    shown.push({ id: campaignId, at: now })
+    this.#shownByPublisher.set(publisherId, shown)
   }
 }

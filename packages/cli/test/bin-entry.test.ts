@@ -133,6 +133,16 @@ describe.skipIf(!derlenmis)('gecici konumdan kurulum', () => {
 })
 
 /** Sitedeki komut ile paketin gercekten sagladigi sey ayni olmali. */
+/**
+ * Sitede panoya kopyalanan kurulum komutu. Iki bicim kabul: dogrudan
+ * `copyButton($('#copy-install'), () => '...')` ya da sayfanin bir
+ * `const INSTALL = '...'` sabitinden kopyalamasi.
+ */
+function panodakiKomut(h: string): string | undefined {
+  return /copyButton\(\$\('#copy-install'\), \(\) => '([^']+)'/.exec(h)?.[1]
+    ?? /const INSTALL = '([^']+)'/.exec(h)?.[1]
+}
+
 describe('sitedeki kurulum komutu', () => {
   const oku = (p: string) =>
     readFileSync(fileURLToPath(new URL(p, import.meta.url)), 'utf8')
@@ -161,16 +171,21 @@ describe('sitedeki kurulum komutu', () => {
    */
   it('kopyalanan metin ile ekranda yazan ayni', () => {
     const h = oku('../../server/public/index.html')
-    const panoda = /copyButton\(\$\('#copy-install'\), \(\) => '([^']+)'/.exec(h)?.[1]
+    const panoda = panodakiKomut(h)
     expect(panoda).toBeTruthy()
     expect(h).toContain(panoda!.replace(/&/g, '&amp;'))
+    // Her kopyalama dugmesi AYNI komutu kopyalamali.
+    const dugmeler = [...h.matchAll(/copyButton\(\$\('#(copy-install[^']*)'\), \(\) => ([A-Z_]+|'[^']+')\)/g)]
+    expect(dugmeler.length).toBeGreaterThan(0)
+    for (const d of dugmeler) {
+      expect(d[2] === 'INSTALL' || d[2] === `'${panoda}'`, `#${d[1]}`).toBe(true)
+    }
   })
 
   /** Spinner katmani ISTENIYORSA komutta bayragi olmali — init onu varsayilan kurmuyor. */
   it('spinner isteniyorsa komut --spinner tasiyor', () => {
     const h = oku('../../server/public/index.html')
-    const panoda = /copyButton\(\$\('#copy-install'\), \(\) => '([^']+)'/.exec(h)?.[1] ?? ''
-    expect(panoda).toContain('--spinner')
+    expect(panodakiKomut(h) ?? '').toContain('--spinner')
     expect(oku('../README.md')).toContain('--spinner')
   })
 })

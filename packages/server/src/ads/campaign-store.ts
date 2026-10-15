@@ -10,7 +10,7 @@
  * sorusunu soruyoruz.
  */
 
-import { assertClean, type Stroops, type Creative } from '@dwell/protocol'
+import { assertClean, rateFromCpm, type Stroops, type Creative } from '@dwell/protocol'
 import type { Clock } from '@dwell/protocol'
 import type { Campaign, CampaignStatus } from './selector.js'
 import type { Db } from '../store/db.js'
@@ -22,6 +22,13 @@ export interface CampaignInput {
   /** Gosterilecek alan adi. Tiklama hedefi de burasi olmak zorunda. */
   readonly cta: string
   readonly bidCpm: Stroops
+  /**
+   * Gunluk harcama tavani — teslimat hizini belirler. `null`/yok = sinirsiz,
+   * bakiye yettigi surece en hizli. Fiyati DEGISTIRMEZ, yalnizca gunu yayar.
+   */
+  readonly dailyBudget?: Stroops | null
+  /** Satin alinan blok sayisi (1 blok = 1.000 gosterim). Yok = sinirsiz. */
+  readonly blocks?: number | null
 }
 
 // DIKKAT: `revShareBps` burada YOK ve olmayacak.
@@ -52,6 +59,9 @@ export const MIN_BID_CPM: Stroops = 1_000_000n as Stroops
  */
 export const MAX_LINE_LENGTH = 80
 
+/** Tek kampanyada en fazla blok: 10.000 blok = 10 milyon gosterim. */
+export const MAX_BLOCKS = 10_000
+
 export class CampaignStore {
   readonly #byId = new Map<string, Campaign>()
 
@@ -70,6 +80,7 @@ export class CampaignStore {
         status: String(r.status) as CampaignStatus,
         frequencyCap: Number(r.frequency_cap),
         dailyBudgetStroops: r.daily_budget_stroops == null ? null : (BigInt(r.daily_budget_stroops as string) as Stroops),
+        blocks: r.blocks == null ? null : Number(r.blocks),
         poolId: r.pool_id == null ? null : String(r.pool_id),
         submittedBy: r.submitted_by == null ? null : String(r.submitted_by),
       })
@@ -95,6 +106,14 @@ export class CampaignStore {
     if (input.bidCpm < MIN_BID_CPM) {
       return { ok: false, reason: `teklif en az ${MIN_BID_CPM} stroop olmali`, field: 'bidCpm' }
     }
+    // Tek bir gosterimin bedelinden kucuk tavan, kampanyayi sessizce hic
+    // yayinlanmaz hale getirirdi.
+    if (input.dailyBudget != null && input.dailyBudget < rateFromCpm(input.bidCpm)) {
+      return { ok: false, reason: 'gunluk butce en az bir gosterimin bedeli kadar olmali', field: 'dailyBudget' }
+    }
+    if (input.blocks != null && (!Number.isInteger(input.blocks) || input.blocks < 1 || input.blocks > MAX_BLOCKS)) {
+      return { ok: false, reason: `blok sayisi 1-${MAX_BLOCKS} arasinda tam sayi olmali`, field: 'blocks' }
+    }
 
     const campaign: Campaign = {
       id: `c-${this.newId()}`,
@@ -113,9 +132,9 @@ export class CampaignStore {
       // kilitliyordu. Bir reklamverenin ayni satiri arka arkaya cok sik
       // gormek istememesi durumunda bu alan ileride panelden ayarlanabilir.
       frequencyCap: 0,
-      // PROBLEMS.md #8c. Panelden ayarlanabilir hale getirilmedi (frequencyCap
-      // ile ayni durumda); su an yalnizca kod/DB seviyesinde bir alan.
-      dailyBudgetStroops: null,
+      // PROBLEMS.md #8c. Panelde "teslimat hizi" olarak ayarlaniyor.
+      dailyBudgetStroops: input.dailyBudget ?? null,
+      blocks: input.blocks ?? null,
     }
 
     this.#write(campaign)
@@ -173,8 +192,8 @@ export class CampaignStore {
   #write(c: Campaign): void {
     this.db.prepare(`
       INSERT INTO campaigns
-        (id, advertiser_id, bid_cpm, rev_share_bps, brand, text, cta, status, frequency_cap, daily_budget_stroops, created_at, pool_id, submitted_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (id, advertiser_id, bid_cpm, rev_share_bps, brand, text, cta, status, frequency_cap, daily_budget_stroops, created_at, pool_id, submitted_by, blocks)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         bid_cpm = excluded.bid_cpm, brand = excluded.brand, text = excluded.text,
         cta = excluded.cta, status = excluded.status
@@ -184,6 +203,7 @@ export class CampaignStore {
       c.dailyBudgetStroops == null ? null : c.dailyBudgetStroops.toString(),
       this.clock.now(),
       c.poolId ?? null, c.submittedBy ?? null,
+      c.blocks ?? null,
     )
   }
 }

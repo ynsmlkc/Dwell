@@ -82,21 +82,19 @@ describe('dwell balance', () => {
     expect(ekran()).toContain('awaiting verification')
   })
 
-  it('esigin altindayken NE KADAR kaldigi soylenir', async () => {
+  it('bakiye sifirken cekilecek bir sey olmadigi soylenir', async () => {
     girisYap()
     await cmdBalance([], cevap({
-      payableStroops: '4000000', payoutThresholdStroops: '10000000',
-      blockedReason: 'threshold 10000000 stroop, balance 4000000',
+      payableStroops: '0', payoutThresholdStroops: '1',
+      blockedReason: 'threshold 1 stroop, balance 0',
     }))
-    const s = ekran()
-    expect(s).toContain('$0.6')          // 1.00 − 0.40
-    expect(s).toContain('$1')            // esik
+    expect(ekran()).toMatch(/nothing to withdraw yet/)
   })
 
-  it('esik asildiysa odemenin gelecegi soylenir', async () => {
+  it('bakiye varsa istedigi an cekebilecegi soylenir', async () => {
     girisYap()
     await cmdBalance([], cevap({ payableStroops: '25000000' }))
-    expect(ekran()).toMatch(/threshold cleared/)
+    expect(ekran()).toMatch(/ready to withdraw/)
   })
 
   /**

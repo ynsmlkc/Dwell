@@ -50,6 +50,9 @@ beforeEach(() => {
 
   pipeline = new Pipeline({
     clock, ids, ledger, campaigns: () => campaigns,
+    // Bu testler rezervasyon/dogrulama mekanigini sinar, fiyatlandirmayi degil:
+    // taban fiyat tekliflerin ustunde → fiyat = teklif (ikinci fiyat testleri ads.test.ts'te).
+    reserveCpm: stroops(10n ** 15n),
     minImpressionMs: 10_000, minClientVersion: '1.0.0',
     pendingMs: 24 * 3600_000, dailyCap: 400,
   })

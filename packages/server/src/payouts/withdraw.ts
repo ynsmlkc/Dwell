@@ -57,7 +57,18 @@ export interface WithdrawDeps {
   readonly log: (m: string) => void
   /** Sicak cuzdan kuyrugu — bkz. `createSerial`. Verilmezse sirasiz calisir. */
   readonly serial?: Serial
+  /**
+   * Gonderimden sonra zincirin onayini en fazla bu kadar bekle. Stellar'da
+   * ledger ~5 sn'de kapanir; gonderimin hemen ardindaki tek sorgu cogu zaman
+   * "henuz degil" der ve kullanici cevabi alamaz. Sure dolarsa sonuc yine
+   * `pending` — mutabakat dongusu sonra kapatir. Varsayilan 0: tek sorgu.
+   */
+  readonly confirmWaitMs?: number
+  /** Testler icin enjekte edilebilir bekleme. */
+  readonly sleep?: (ms: number) => Promise<void>
 }
+
+const CONFIRM_POLL_MS = 2_000
 
 /**
  * Sicak cuzdandan cikan islemleri SIRAYA sokar.
@@ -89,8 +100,12 @@ export type WithdrawResult =
   | { readonly ok: true; readonly txHash: string; readonly amount: Stroops }
   | { readonly ok: false; readonly reason: string; readonly retryable: boolean }
 
-/** Zincir ucreti cekilecek tutarin altinda kalmali; toz cekimini engelle. */
-export const MIN_WITHDRAW: Stroops = 1_000_000n as Stroops       // $0.10
+/**
+ * Taban yok: yayinci bakiyesinin TAMAMINI istedigi an cekebilir. Yalnizca
+ * sifir/negatif tutar reddediliyor. Bedeli bilerek kabul edildi: toz cekimde
+ * islem ucreti tutardan buyuk olabilir, onu platform oduyor.
+ */
+export const MIN_WITHDRAW: Stroops = 1n as Stroops
 
 export class WithdrawService {
   #busy = new Set<string>()
@@ -186,7 +201,12 @@ export class WithdrawService {
     }
 
     // ── 4. Zincire sor. Tek dogru cevap orada. ──
-    const settlement = await this.deps.rail.reconcile(receipt)
+    let settlement = await this.deps.rail.reconcile(receipt)
+    const sleep = this.deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
+    for (let left = this.deps.confirmWaitMs ?? 0; settlement.state === 'pending' && left > 0; left -= CONFIRM_POLL_MS) {
+      await sleep(CONFIRM_POLL_MS)
+      try { settlement = await this.deps.rail.reconcile(receipt) } catch { /* RPC hatasi: tekrar dene */ }
+    }
 
     if (settlement.state === 'settled') {
       this.deps.ledger.payoutSettled({

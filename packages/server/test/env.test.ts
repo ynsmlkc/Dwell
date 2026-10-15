@@ -33,8 +33,12 @@ describe('uretim ayarlari', () => {
   })
 
   it('uretimde birkac saniyelik dogrulama penceresi reddedilir', () => {
-    expect(() => readServerEnv({ ...TAM, DWELL_PENDING_MS: '30000' })).toThrow(/en az 1 saat/)
-    expect(() => readServerEnv({ ...TAM, DWELL_PENDING_MS: 'abc' })).toThrow(/en az 1 saat/)
+    const MAIN = { ...TAM, DWELL_NETWORK: 'pubnet' }
+    expect(() => readServerEnv({ ...MAIN, DWELL_PENDING_MS: '30000' })).toThrow(/en az 1 saat/)
+    expect(() => readServerEnv({ ...MAIN, DWELL_PENDING_MS: 'abc' })).toThrow(/en az 1 saat/)
+    // testnet: demo icin kisa pencereye izin var, ama sayi olmayana yok
+    expect(readServerEnv({ ...TAM, DWELL_PENDING_MS: '30000' }).pendingMs).toBe(30_000)
+    expect(() => readServerEnv({ ...TAM, DWELL_PENDING_MS: 'abc' })).toThrow(/gecerli bir sure degil/)
     expect(readServerEnv({ ...TAM, DWELL_PENDING_MS: '7200000' }).pendingMs).toBe(7_200_000)
   })
 

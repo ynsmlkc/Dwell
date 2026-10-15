@@ -23,6 +23,8 @@ export interface PipelineOptions {
   readonly ids: IdGenerator
   readonly ledger: Ledger
   readonly campaigns: () => readonly Campaign[]
+  /** Acik artirmanin taban fiyati, blok basina. Bkz. `SelectorDeps.reserveCpm`. */
+  readonly reserveCpm?: Stroops
   readonly minImpressionMs: number
   readonly minClientVersion: string
   readonly pendingMs: number
@@ -66,9 +68,11 @@ export class Pipeline {
       campaigns: opts.campaigns,
       spendableBalance: (advertiserId) => this.spendable(advertiserId),
       spentToday: (campaignId) => this.spentToday(campaignId),
+      committedImpressions: (campaignId) => this.committedImpressions(campaignId),
       ...(opts.poolOf ? { poolOf: opts.poolOf } : {}),
       ...(opts.poolAllows ? { poolAllows: opts.poolAllows } : {}),
       ...(opts.reservedForPools ? { reservedForPools: opts.reservedForPools } : {}),
+      ...(opts.reserveCpm != null ? { reserveCpm: opts.reserveCpm } : {}),
     })
 
     this.ingest = new ImpressionIngest({
@@ -188,6 +192,23 @@ export class Pipeline {
       }
     }
     return spent
+  }
+
+  /**
+   * Kampanyaya ayrilmis gosterim: defterde faturalanmis + `pending` +
+   * teslim edilip raporlanmamis. Faturalanmis kisim DEFTERDEN geliyor;
+   * gosterim kayitlari 90 gunde temizlenince sayac geri dusmesin diye.
+   */
+  committedImpressions(campaignId: string): number {
+    const now = this.opts.clock.now()
+    let n = this.opts.ledger.billedImpressions(campaignId)
+    for (const d of this.#deliveries.values()) {
+      if (d.campaignId === campaignId && !d.consumed && d.expiresAt >= now) n++
+    }
+    for (const i of this.#impressions.values()) {
+      if (i.campaignId === campaignId && i.state === 'pending') n++
+    }
+    return n
   }
 
   /** Bu yayinciya BUGUN bu kampanyalardan sunulan gosterim sayisi (raporlanmamis teslimatlar dahil). */

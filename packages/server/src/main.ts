@@ -225,7 +225,9 @@ if (DEV_TOKEN) {
 
 /* ─────────────────────── odeme ─────────────────────── */
 
-const PAYOUT_THRESHOLD = stroops(10_000_000n)          // $1
+// Esik yok — bkz. MIN_WITHDRAW. Bakiye ucu bunu `payoutThresholdStroops` olarak
+// raporluyor; 1 stroop = "bakiyesi olan herkes cekebilir".
+const PAYOUT_THRESHOLD = stroops(1n)
 const payouts = new SqlitePayoutStore(db)
 const wallets = new WalletStore({
   clock,
@@ -292,6 +294,7 @@ const withdraw = HOT_SECRET
       newBatchId: () => `w-${ids.impressionId()}`,
       log,
       serial: hotWallet,
+      confirmWaitMs: 40_000,
     })
   : null
 
@@ -311,6 +314,7 @@ const publisherWithdraw = HOT_SECRET
       newBatchId: () => `w-${ids.impressionId()}`,
       log,
       serial: hotWallet,
+      confirmWaitMs: 40_000,
     })
   : null
 
@@ -329,6 +333,7 @@ const platformWithdraw = HOT_SECRET
       newBatchId: () => `w-${ids.impressionId()}`,
       log,
       serial: hotWallet,
+      confirmWaitMs: 40_000,
     })
   : null
 

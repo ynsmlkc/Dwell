@@ -32,6 +32,7 @@ import { countryFromRequest, type CountryLookup } from '../leaderboard/geo.js'
 import { poolReserve, poolSpent } from '../pools/reserve.js'
 import { COUNTRY_CODES } from '../leaderboard/countries.js'
 import { RateLimiter } from './rate-limit.js'
+import { advertiserStats } from '../advertisers/stats.js'
 
 export interface AppDeps {
   readonly clock: Clock
@@ -105,6 +106,8 @@ const toCampaignJson = (c: import('../ads/selector.js').Campaign) => ({
   text: c.creative.text,
   cta: c.creative.cta,
   bidCpmStroops: c.bidCpm.toString(),
+  dailyBudgetStroops: c.dailyBudgetStroops == null ? null : c.dailyBudgetStroops.toString(),
+  blocks: c.blocks ?? null,
   status: c.status,
   // Onizleme: reklamverenin gorecegi satir, kullanicinin gordugunun aynisi.
   preview: `✶ ${c.creative.brand} — ${c.creative.text} · ${c.creative.cta ?? ''}`,
@@ -416,8 +419,18 @@ export function createApp(deps: AppDeps) {
         ...(deps.pools ? { reservedForPoolsStroops: poolReserve({
           pools: deps.pools, campaigns: store, spentOn: (ids) => deps.pipeline.spentOn(ids),
         }, advertiserId).toString() } : {}),
-        campaigns: store.forAdvertiser(advertiserId).map(toCampaignJson),
+        // `delivered`: blok ilerlemesi — faturalanmis + bekleyen + yoldaki.
+        campaigns: store.forAdvertiser(advertiserId).map((c) => ({
+          ...toCampaignJson(c), delivered: deps.pipeline.committedImpressions(c.id),
+        })),
       })
+    })
+
+    /** Panel icin: kampanya basina gosterim, harcama, erisim ve gunluk seri. */
+    app.get('/v1/advertiser/stats', requireScope('read:spend'), (c) => {
+      const { publisherId: advertiserId } = c.get('auth')
+      const days = Math.min(90, Math.max(1, Number(c.req.query('days') ?? 30) || 30))
+      return c.json(advertiserStats(deps.pipeline.impressions(), advertiserId, deps.clock.now(), days))
     })
 
     app.post('/v1/advertiser/campaigns', requireScope('manage:campaigns'), async (c) => {
@@ -429,12 +442,19 @@ export function createApp(deps: AppDeps) {
         return c.json(err('DWL_9001', '`bidCpmStroops` tam sayi metni olmali'), 400)
       }
 
+      const daily = body?.dailyBudgetStroops
+      if (daily != null && (typeof daily !== 'string' || !/^\d+$/.test(daily))) {
+        return c.json({ ...err('DWL_9001', '`dailyBudgetStroops` tam sayi metni olmali'), field: 'dailyBudget' }, 400)
+      }
+
       const r = store.create({
         advertiserId,
         brand: String(body?.brand ?? ''),
         text: String(body?.text ?? ''),
         cta: String(body?.cta ?? ''),
         bidCpm: stroops(BigInt(bid)),
+        dailyBudget: daily == null ? null : stroops(BigInt(daily)),
+        blocks: body?.blocks == null ? null : Number(body.blocks),
       })
       // Red sebebi ALANIYLA birlikte donuyor: form hangi kutuyu
       // kirmizi yapacagini bilsin.

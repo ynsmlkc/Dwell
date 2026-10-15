@@ -42,6 +42,9 @@ beforeEach(() => {
   pipe = new Pipeline({
     clock, ids: realIds, ledger,
     campaigns: () => campaigns,
+    // Bu testler rezervasyon/dogrulama mekanigini sinar, fiyatlandirmayi degil:
+    // taban fiyat tekliflerin ustunde → fiyat = teklif (ikinci fiyat testleri ads.test.ts'te).
+    reserveCpm: stroops(10n ** 15n),
     minImpressionMs: 10_000,
     minClientVersion: '1.0.0',
     pendingMs: PENDING_MS,
@@ -163,7 +166,7 @@ describe('gunluk tavan boru hattinda', () => {
     ledger.deposit({ advertiserId: ADV, amount: stroops(10_000_000_000n), topupId: 't1' })
     pipe = new Pipeline({
       clock, ids: { impressionId: () => `e${ulidSeq++}`, randomHex: (n) => 'a'.repeat(n * 2) + ulidSeq++ },
-      ledger, campaigns: () => campaigns,
+      ledger, campaigns: () => campaigns, reserveCpm: stroops(10n ** 15n),
       minImpressionMs: 10_000, minClientVersion: '1.0.0',
       pendingMs: PENDING_MS, dailyCap: 3,
     })

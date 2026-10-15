@@ -72,6 +72,31 @@ describe('kampanya olusturma', () => {
     expect(r.ok === false && r.field).toBe('bidCpm')
   })
 
+  it('gunluk butce saklanir; bir gosterimden kucukse reddedilir', () => {
+    // 300 USDC CPM → gosterim basina 300_000 micro
+    const r = store().create({ ...iyi, dailyBudget: stroops(5_000_000n) })
+    expect(r.ok && r.campaign.dailyBudgetStroops).toBe(5_000_000n)
+
+    const az = store().create({ ...iyi, dailyBudget: stroops(299_999n) })
+    expect(az.ok === false && az.field).toBe('dailyBudget')
+
+    const yok = store().create(iyi)
+    expect(yok.ok && yok.campaign.dailyBudgetStroops).toBe(null)
+  })
+
+  it('blok sayisi saklanir ve yeniden acilista korunur; gecersizi reddedilir', () => {
+    const r = store().create({ ...iyi, blocks: 5 })
+    expect(r.ok && r.campaign.blocks).toBe(5)
+    if (!r.ok) return
+    expect(store().get(r.campaign.id)?.blocks).toBe(5)
+
+    for (const blocks of [0, 1.5, -1, 10_001]) {
+      const kotu = store().create({ ...iyi, blocks })
+      expect(kotu.ok === false && kotu.field).toBe('blocks')
+    }
+    expect(store().create(iyi).ok && store().create(iyi)).toBeTruthy()
+  })
+
   it('kampanya yeniden baslatmadan sonra duruyor', () => {
     const r = store().create(iyi)
     expect(r.ok).toBe(true)

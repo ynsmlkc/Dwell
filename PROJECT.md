@@ -388,6 +388,15 @@ Bir kreatifte ESC bulunması "biraz dağınık girdi" değil, saldırı denemesi
 >
 > Auction motoru hâlâ yok — bu, "kim kazanır" sorusunu rastgele/sabit sıradan **orantılı**'ya taşıyan bir değişiklik, gerçek bir ihale mekanizması değil. Arayüz (`AdSelector.select`) değişmedi, PROBLEMS.md #8'deki (b) ve (c) maddeleri (çok kampanyada ortalama fiyatın düşmesi, bütçenin 4 kat hızlı bitmesi) hâlâ açık.
 
+> ## ⟳ İkinci revizyon — 2026-10-10
+>
+> **SWRR kaldırıldı. Yeni model: fiyat sıralı kuyruk + ikinci fiyat + hız ayarı + yumuşak kişi başı sıklık sınırı.** Ayrıntı ve örnek: NEXT.md "Reklam seçimi".
+>
+> - En yüksek teklif kazanır; eşitlikte bu yayıncıya en uzun süredir gösterilmeyen.
+> - Kazanan bir sonraki rakip teklif + blok başına $0.01 öder, en fazla kendi teklifi; rakip yoksa taban fiyat (`reserveCpm`, varsayılan `MIN_BID_CPM`). Aynı reklamverenin diğer kampanyaları rakip değildir. Havuz kampanyaları sabit havuz fiyatını öder.
+> - Aynı yayıncıya bir saatte 3 kez gösterilen kampanya o yayıncı için sıranın sonuna geçer; herkes sınırdaysa en yüksek teklif yine gösterilir. Bu, eski `frequencyCap`'in %50/%50 kilidine (#8a) düşmeden çeşitlilik sağlar.
+> - PROBLEMS.md #8b ve #8c kapanıyor: ortalama fiyat rekabetle belirlenir, teklifi artırmak payı değil sırayı satın alır.
+
 ### ADR-010 — Kimlik: hesap açmanın bir maliyeti olmalı
 
 **Karar:** Publisher hesabı **GitHub OAuth** ile açılır. Her cihaz için ayrı, iptal edilebilir bir **device token** üretilir; `~/.dwell/credentials.json` içinde `0600` izinle saklanır. Tüm API çağrıları bu token ile authenticate olur.

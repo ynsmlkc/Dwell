@@ -358,6 +358,47 @@ hackathon'ları ve Stellar Türkiye etkinlikleri doğal pilot alanı.
 
 ---
 
+## Reklam seçimi: fiyat sıralı kuyruk + ikinci fiyat (karar 2026-10-10, Linger'dan 2026-10-15)
+
+ADR-009'un ikinci revizyonu. SWRR (teklife orantılı pay) yerine geçiyor.
+
+### Neden değişiyor
+
+- **SWRR'de teşvik bozuk.** Teklifi 2 katına çıkaran hem gösterim başına 2 kat ödüyor hem 2 kat pay alıyor: harcama 4 kat (PROBLEMS.md #8c). "Daha çok ödeyip önce çıkmak" diye bir seçenek yok.
+- **Yayıncı eksik kazanıyor.** Pahalı reklamın bütçesi dururken ucuz reklam da gösteriliyor; her fırsat olabileceğinden ucuza satılıyor.
+- **Tahmin edilemiyor.** "Bloklarım ne zaman biter" sorusunun cevabı diğerlerinin teklifine göre sürekli değişiyor.
+- **Kickbacks'in saf kuyruğu da yeterli değil.** Hız ayarı olmadan tek pahalı reklamveren bütün ağı tutuyor (kullanıcı saatlerce aynı satırı görüyor) ve birinci fiyat, reklamvereni rakibin teklifini tahmin etmeye zorluyor.
+
+### Kurallar
+
+1. **Fiyat sıralı kuyruk.** Her gösterim fırsatında uygun kampanyalar blok başına teklife göre sıralanır, en yüksek kazanır. Eşitlikte bu yayıncıya en uzun süredir gösterilmeyen önce gelir (yeniden başlatmada hep aynı kampanyanın kazanmasını önleyen eski kural korunuyor).
+2. **İkinci fiyat.** Kazanan kendi teklifini değil, aynı fırsat için yarışan bir sonraki teklifin bir kuruş (blok başına $0.01) fazlasını öder; asla kendi teklifinden fazla değil. Rakip yoksa taban fiyatı (`MIN_BID_CPM`, blok başına $0.10) öder. Aynı reklamverenin diğer kampanyaları "rakip" sayılmaz: kendi fiyatını kendisi yükseltemez. Fiyat teslim anında dondurulur (ADR-011), defter değişmez.
+3. **Hız ayarı (pacing).** Slow / Medium / Fast günlük tavana dönüşür (toplam ÷ 7 gün / 3 gün / sınırsız). Panelde varsayılan **Medium**. Tavanına gelen kampanya o gün kuyruktan çıkar, fırsat sıradakine düşer: pahalı reklamveren ağı tek başına tutamaz.
+4. **Kişi başı sıklık sınırı (yumuşak).** Aynı yayıncıya aynı kampanya son 1 saatte 3 kez gösterildiyse, o yayıncı için sınırda olmayan kampanyalar önce gelir. Herkes sınırdaysa en yüksek teklif yine gösterilir: sınır sırayı değiştirir, kimseyi susturmaz. Sert sınır olsaydı az kampanyalı bir ağda yayıncı saatin çoğunda reklamsız kalırdı (eski `frequencyCap` %50/%50 kilidiyle aynı tuzak, PROBLEMS.md #8a).
+
+### Örnek
+
+A blok başına $3 teklif, B $2, C $0.50. Hepsi uygun, kimse sınırda değil:
+- A kazanır, blok başına **$2.01** öder (B + 1 kuruş). Gösterim başına $0.00201; yarısı geliştiriciye.
+- A o yayıncıya bu saat 3 kez gösterildiyse sıradaki fırsatı B kazanır ve **$0.51** öder (C + 1 kuruş).
+- A'nın günlük tavanı dolduysa A o gün kuyrukta yok; B kazanır, $0.51 öder.
+
+### Yapılacaklar
+
+- [x] `selector.ts`: SWRR yerine fiyat sıralaması, ikinci fiyat, yumuşak sıklık sınırı, ayarlanabilir taban fiyat (`reserveCpm`)
+- [x] Ödenen fiyat `AdSelection.rate`'e (teslimatta dondurulan) yazılsın; bütçe kontrolleri teklif üzerinden (üst sınır) kalsın
+- [x] Ortalama ödenen blok fiyatı: panel `/v1/advertiser/stats`'taki harcama ÷ gösterimden hesaplıyor, ayrı alan gerekmedi
+- [x] Panel: "ödediğin fiyat" sütunu, varsayılan hız Medium, ikinci fiyat açıklaması
+- [x] ADR-009 testleri yeniden yazılsın (SWRR pay testleri kalkıyor)
+- [x] PROJECT.md ADR-009'a revizyon notu
+- [ ] Gerçek ağda doğrulama: iki reklamveren, fonlanmış bakiye, ödenen fiyatın defterde ikinci fiyat olduğunu gör
+
+### Bilinen sınırlar
+
+- Sıklık sayacı bellekte tutuluyor, yeniden başlatmada sıfırlanır (sınır yumuşak olduğu için zararı küçük).
+- Günlük tavan gün başında harcamayı öne yığar; gün içinde eşit yayma (saatlik tavan) ileride.
+- Az rekabette gelir düşer: tek reklamveren taban fiyatı öder. Taban fiyat ileride ağ büyüklüğüne göre yükseltilebilir.
+
 ## Küçük ama biriken işler
 
 | # | İş | Nereden |

@@ -229,6 +229,8 @@ function migrate(db: Db): void {
   // NEXT.md §10 — NULL = genel ag kampanyasi.
   addColumnIfMissing(db, 'campaigns', 'pool_id', 'TEXT')
   addColumnIfMissing(db, 'campaigns', 'submitted_by', 'TEXT')
+  // Blok satin alma — NULL = sinirsiz (bakiye yettigi surece).
+  addColumnIfMissing(db, 'campaigns', 'blocks', 'INTEGER')
   // Yerel gelistirme DB'leri `pools`'u bu sutunlar olmadan acmis olabilir.
   addColumnIfMissing(db, 'pools', 'budget', "TEXT NOT NULL DEFAULT '0'")
   addColumnIfMissing(db, 'pools', 'daily_cap_per_member', 'INTEGER NOT NULL DEFAULT 200')

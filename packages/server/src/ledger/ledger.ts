@@ -93,6 +93,30 @@ export class Ledger {
   }
 
   /**
+   * Kampanya basina faturalanmis (dogrulanmis, ters cevrilmemis) gosterim
+   * sayisi. Blok satin alma bunun ustune kurulu: gosterim kayitlari 90 gunde
+   * temizleniyor, defter asla — sayac bu yuzden buradan.
+   *
+   * Her yazmada onbellek dusuyor ve ilk okumada yeniden kuruluyor. Yazma
+   * yalnizca dogrulama turunda ve odemelerde oluyor; okuma her reklam
+   * isteginde. Artimli sayac daha hizli olurdu ama idempotent tekrar
+   * yazmalarda cift sayma riski tasirdi.
+   */
+  billedImpressions(campaignId: string): number {
+    if (!this.#billed) {
+      const m = new Map<string, number>()
+      for (const e of this.store.all()) {
+        if (e.campaignId === null || !e.accountId.startsWith('advertiser:')) continue
+        if (e.type === 'impression') m.set(e.campaignId, (m.get(e.campaignId) ?? 0) + 1)
+        else if (e.type === 'reversal' && e.amount > 0n) m.set(e.campaignId, (m.get(e.campaignId) ?? 0) - 1)
+      }
+      this.#billed = m
+    }
+    return this.#billed.get(campaignId) ?? 0
+  }
+  #billed: Map<string, number> | null = null
+
+  /**
    * Defterde kaydi olan tum publisher'lar.
    *
    * Ayri bir publisher tablosu YOK ve olmamali: kimin parasi oldugunu bilen
@@ -451,6 +475,7 @@ export class Ledger {
         'DWL_5006',
       )
     }
+    this.#billed = null
     return this.store.append(entries)
   }
 }

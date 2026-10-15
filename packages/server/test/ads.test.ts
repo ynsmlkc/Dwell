@@ -33,8 +33,12 @@ describe('ADR-009 — teklif sirali secim', () => {
   })
 
   it('fiyat CPM/1000 — kalan platform lehine atilir', () => {
-    const { sel } = setup([camp('a', 30)])           // $30 CPM
-    expect(sel.select('p1')!.rate).toBe(300_000n)    // $0.003 = 300.000 stroop
+    // Rakip $2.001 → kazanan $2.011/blok oder → 20_110 stroop/gosterim (kesirsiz).
+    const { sel } = setup([
+      camp('a', 0, { bidCpm: stroops(30_000_000n) }),
+      camp('b', 0, { bidCpm: stroops(20_010_000n) }),
+    ])
+    expect(sel.select('p1')!.rate).toBe(20_110n)
   })
 
   it('pasif ve askiya alinmis kampanyalar servis edilmez', () => {
@@ -131,43 +135,87 @@ describe('frekans kurali', () => {
   })
 })
 
-describe('ADR-009 (revize) — SWRR ile teklife orantili pay', () => {
-  function shareOf(sel: AdSelector, publisherId: string, ticks: number): Record<string, number> {
-    const counts: Record<string, number> = {}
-    for (let i = 0; i < ticks; i++) {
-      const id = sel.select(publisherId)!.campaign.id
-      counts[id] = (counts[id] ?? 0) + 1
-    }
-    for (const id of Object.keys(counts)) counts[id] = counts[id]! / ticks
-    return counts
-  }
+describe('ADR-009 (ikinci revizyon) — fiyat sirali kuyruk + ikinci fiyat', () => {
+  const usd = (x: number): Stroops => stroops(BigInt(Math.round(x * 10_000_000)))
+  const c = (id: string, blockUsd: number, over: Partial<Campaign> = {}) =>
+    camp(id, 0, { bidCpm: usd(blockUsd), ...over })
 
-  it('2 kampanya, 5:1 teklif orani — kisitlama yoksa pay da ~5:1 olur (PROBLEMS.md #8)', () => {
-    const { sel } = setup([camp('pahali', 50), camp('ucuz', 10)])
-    const share = shareOf(sel, 'p1', 3000)
-    // Beklenen: 50/60 ~ 0.833 ve 10/60 ~ 0.167.
-    expect(share['pahali']!).toBeGreaterThan(0.78)
-    expect(share['pahali']!).toBeLessThan(0.89)
-    expect(share['ucuz']!).toBeGreaterThan(0.11)
-    expect(share['ucuz']!).toBeLessThan(0.22)
+  it('en yuksek teklif kazanir, bir sonraki teklif + 1 kurus oder (NEXT.md ornegi)', () => {
+    const { sel } = setup([c('a', 3), c('b', 2), c('c', 0.5)])
+    const s1 = sel.select('p1')!
+    expect(s1.campaign.id).toBe('a')
+    expect(s1.clearingCpm).toBe(usd(2.01))
+    expect(s1.rate).toBe(20_100n)                        // gosterim basina $0.00201
   })
 
-  it('eskiden hep ayni kampanya kazanirdi — artik ikinci de payini aliyor', () => {
-    const { sel } = setup([camp('pahali', 50), camp('ucuz', 10)])
-    const share = shareOf(sel, 'p1', 3000)
-    expect(share['ucuz']).toBeGreaterThan(0)
+  it('rakipsiz kazanan taban fiyati oder', () => {
+    const { sel } = setup([c('tek', 40)])
+    expect(sel.select('p1')!.clearingCpm).toBe(usd(0.1))
   })
 
-  it('3 kampanya — pay agirlik oranina yakinsar (dokumandaki A/B/C senaryosu)', () => {
-    const { sel } = setup([camp('a', 30), camp('b', 15), camp('c', 15)])
-    const share = shareOf(sel, 'p1', 6000)
-    // toplam agirlik 60: a=%50, b=%25, c=%25.
-    expect(share['a']!).toBeGreaterThan(0.44)
-    expect(share['a']!).toBeLessThan(0.56)
-    expect(share['b']!).toBeGreaterThan(0.19)
-    expect(share['b']!).toBeLessThan(0.31)
-    expect(share['c']!).toBeGreaterThan(0.19)
-    expect(share['c']!).toBeLessThan(0.31)
+  it('asla kendi teklifinden fazla odemez — esit teklifte teklif kadar', () => {
+    const { sel } = setup([c('a', 3), c('b', 3)])
+    expect(sel.select('p1')!.clearingCpm).toBe(usd(3))
+  })
+
+  it('ayni reklamverenin diger kampanyasi rakip sayilmaz', () => {
+    const { sel } = setup([
+      c('a', 3, { advertiserId: 'adv-1' }),
+      c('a2', 2, { advertiserId: 'adv-1' }),
+      c('baska', 0.5, { advertiserId: 'adv-2' }),
+    ])
+    const s1 = sel.select('p1')!
+    expect(s1.campaign.id).toBe('a')
+    expect(s1.clearingCpm).toBe(usd(0.51))
+  })
+
+  it('taban fiyat ayarlanabilir; teklifin ustundeyse fiyat teklife esitlenir', () => {
+    const kur = (reserve: number, bid: number) => new AdSelector({
+      clock: fixedClock(1), ids: fakeIdGenerator('n'), campaigns: () => [c('a', bid)],
+      spendableBalance: () => stroops(10n ** 15n), spentToday: () => stroops(0n), reserveCpm: usd(reserve),
+    })
+    expect(kur(1, 3).select('p1')!.clearingCpm).toBe(usd(1))
+    expect(kur(5, 3).select('p1')!.clearingCpm).toBe(usd(3))
+  })
+
+  it('havuz kampanyasi havuzun sabit fiyatini oder', () => {
+    const sel = new AdSelector({
+      clock: fixedClock(1), ids: fakeIdGenerator('n'),
+      campaigns: () => [c('p1', 5, { poolId: 'pool', advertiserId: 'sponsor' }), c('p2', 5, { poolId: 'pool', advertiserId: 'sponsor' })],
+      spendableBalance: () => stroops(10n ** 15n), spentToday: () => stroops(0n), poolOf: () => 'pool',
+    })
+    expect(sel.select('u')!.clearingCpm).toBe(usd(5))
+  })
+
+  it('yumusak siklik siniri: saatte 3 kez sonra sira digerine gecer, herkes sinirdaysa en yuksek doner', () => {
+    const { sel } = setup([c('a', 3), c('b', 2)])
+    const sira = Array.from({ length: 8 }, () => sel.select('p1')!.campaign.id)
+    expect(sira).toEqual(['a', 'a', 'a', 'b', 'b', 'b', 'a', 'a'])
+  })
+
+  it('sinirda olan rakip fiyati belirlemez — B, A sinirdayken taban oder', () => {
+    const { sel } = setup([c('a', 3), c('b', 2)])
+    for (let i = 0; i < 3; i++) sel.select('p1')
+    const s4 = sel.select('p1')!
+    expect(s4.campaign.id).toBe('b')
+    expect(s4.clearingCpm).toBe(usd(0.1))
+  })
+
+  it('siklik siniri bir saat sonra sifirlanir ve yayinciya ozeldir', () => {
+    const { sel, clock } = setup([c('a', 3), c('b', 2)])
+    for (let i = 0; i < 3; i++) sel.select('p1')
+    expect(sel.select('p1')!.campaign.id).toBe('b')
+    expect(sel.select('p2')!.campaign.id, 'p2 etkilenmez').toBe('a')
+    clock.advance(3_600_000)
+    expect(sel.select('p1')!.campaign.id, 'saat doldu').toBe('a')
+  })
+
+  it('siklik siniri 0 ise kapali: hep en yuksek', () => {
+    const sel = new AdSelector({
+      clock: fixedClock(1), ids: fakeIdGenerator('n'), campaigns: () => [c('a', 3), c('b', 2)],
+      spendableBalance: () => stroops(10n ** 15n), spentToday: () => stroops(0n), hourlyCapPerPublisher: 0,
+    })
+    expect(Array.from({ length: 6 }, () => sel.select('p1')!.campaign.id)).toEqual(Array(6).fill('a'))
   })
 
   /**
@@ -200,16 +248,6 @@ describe('ADR-009 (revize) — SWRR ile teklife orantili pay', () => {
     expect(kazananlar.size).toBe(2)
   })
 
-  it('frequencyCap > 0 hala payi 1/(N+1) ile kilitler — bilinen gerilim (PROBLEMS.md #8a)', () => {
-    // Ayni 5:1 teklif orani, ama "ardisik tekrar yok" (cap 1) acikca istendi.
-    const { sel } = setup([
-      camp('pahali', 50, { frequencyCap: 1 }),
-      camp('ucuz', 10, { frequencyCap: 1 }),
-    ])
-    const share = shareOf(sel, 'p1', 200)
-    expect(share['pahali']).toBeCloseTo(0.5, 1)
-    expect(share['ucuz']).toBeCloseTo(0.5, 1)
-  })
 })
 
 describe('nonce', () => {
@@ -225,5 +263,29 @@ describe('nonce', () => {
     const s = sel.select('p1')!
     expect(s.nonceExpiresAt).toBeGreaterThan(clock.now())
     expect(s.nonceExpiresAt - clock.now()).toBeLessThanOrEqual(5 * 60_000)
+  })
+})
+
+describe('blok satin alma — 1 blok = 1.000 gosterim', () => {
+  const kur = (campaigns: Campaign[], committed: Record<string, number>) => new AdSelector({
+    clock: fixedClock(1_700_000_000_000), ids: fakeIdGenerator('n'),
+    campaigns: () => campaigns,
+    spendableBalance: () => stroops(10n ** 15n),
+    spentToday: () => stroops(0n),
+    committedImpressions: (id) => committed[id] ?? 0,
+  })
+
+  it('bloklar dolana kadar sunulur, dolunca biter', () => {
+    expect(kur([camp('a', 30, { blocks: 2 })], { a: 1_999 }).select('p1')?.campaign.id).toBe('a')
+    expect(kur([camp('a', 30, { blocks: 2 })], { a: 2_000 }).select('p1')).toBeNull()
+  })
+
+  it('biten kampanya digerlerinin onunu tikamaz', () => {
+    const sel = kur([camp('bitti', 50, { blocks: 1 }), camp('devam', 10)], { bitti: 1_000 })
+    expect(sel.select('p1')?.campaign.id).toBe('devam')
+  })
+
+  it('blok verilmemisse sinirsiz', () => {
+    expect(kur([camp('a', 30)], { a: 10_000_000 }).select('p1')?.campaign.id).toBe('a')
   })
 })
