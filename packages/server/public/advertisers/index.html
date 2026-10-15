@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Buy the line — Dwell for advertisers</title>
 <meta name="description" content="One line of plain text in front of developers who are waiting for their AI assistant. 80 characters, no images, no tracking pixels.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28' fill='%23f97335'>✶</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text x='16' y='16' font-size='28' text-anchor='middle' dominant-baseline='central' transform='rotate(90 16 16)' fill='%23f97335'>✶</text></svg>">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -62,14 +62,14 @@
 
   <section>
     <h2 style="font-size: clamp(24px, 2.8vw, 34px); margin-bottom: 22px">What it costs</h2>
-    <p class="body" style="margin: 0 0 26px; max-width: 60ch">You set the CPM. Minimum $0.10 per 1000 impressions; publishers receive 50%. There is no pricing table — the number is yours to choose.</p>
-    <div class="mono" style="border: 1px solid rgba(236,231,225,0.11); background: rgba(236,231,225,0.02); padding: 22px; display: grid; gap: 16px; max-width: 520px; font-size: 13px">
-      <label style="display: grid; gap: 10px; color: var(--faint)">Your CPM (USD per 1000 impressions)
+    <p class="body" style="margin: 0 0 26px; max-width: 60ch">You buy blocks of 1,000 impressions and set your bid per block, minimum $0.10. The highest bid is shown first. You pay one cent more than the next bid, never more than your own. Publishers receive 50%.</p>
+    <div class="mono" style="border: 1px solid var(--line); background: var(--bg-2); border-radius: 10px; padding: 22px; display: grid; gap: 16px; max-width: 520px; font-size: 13px">
+      <label style="display: grid; gap: 10px; color: var(--faint)">Your bid per block (1,000 impressions, USD)
         <input type="range" min="0.1" max="80" step="0.1" value="40" id="cpm" style="accent-color: var(--accent); width: 100%">
       </label>
       <div style="display: flex; flex-wrap: wrap; gap: 8px 28px">
-        <span style="color: var(--faint)">CPM <span style="color: var(--ink)" id="cpm-label"></span></span>
-        <span style="color: var(--faint)">per impression <span style="color: var(--ink)" id="per-imp"></span></span>
+        <span style="color: var(--faint)">bid <span style="color: var(--ink)" id="cpm-label"></span></span>
+        <span style="color: var(--faint)">at most per impression <span style="color: var(--ink)" id="per-imp"></span></span>
       </div>
       <span style="color: var(--dim)">stroops: <span id="stroops"></span></span>
     </div>
@@ -110,7 +110,7 @@ function paint() {
   // Dolar → stroop, float'a ugramadan. Panelde ayni hesap yapiliyor;
   // burada float kullanmak orada da kullanmaya davet olurdu.
   const s = toStroops(parseFloat(slider.value).toFixed(7));
-  $('#cpm-label').textContent = usd(s.toString()) + ' CPM';
+  $('#cpm-label').textContent = usd(s.toString()) + ' / block';
   $('#per-imp').textContent = usd((s / 1000n).toString());
   $('#stroops').textContent = s.toString();
 }

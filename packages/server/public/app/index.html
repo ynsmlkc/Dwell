@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Your earnings — Dwell</title>
 <meta name="robots" content="noindex">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28' fill='%23f97335'>✶</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text x='16' y='16' font-size='28' text-anchor='middle' dominant-baseline='central' transform='rotate(90 16 16)' fill='%23f97335'>✶</text></svg>">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -27,7 +27,7 @@
     <h1 style="font-size: clamp(24px, 3vw, 32px); margin-bottom: 12px">Connect your wallet</h1>
     <p class="body" style="margin: 0 0 26px">This is the wallet you will be paid into. There is no account and no password — your address is your identity.</p>
 
-    <div class="note note-accent hidden" id="no-freighter" style="margin-bottom: 18px">
+    <div class="note note-accent hidden" id="no-wallet" style="margin-bottom: 18px">
       Freighter is not installed in this browser.
       <a href="https://freighter.app" target="_blank" rel="noopener" style="color: var(--accent)">Install it</a>, then reload this page.
     </div>
@@ -46,9 +46,9 @@
 
   <!-- ═══ yukleniyor ═══ -->
   <div id="v-loading" class="hidden" style="display: grid; gap: 18px; max-width: 640px">
-    <div style="height: 64px; border-radius: 4px; background: rgba(236,231,225,0.045)"></div>
-    <div style="height: 40px; border-radius: 4px; background: rgba(236,231,225,0.045)"></div>
-    <div style="height: 40px; border-radius: 4px; background: rgba(236,231,225,0.045)"></div>
+    <div style="height: 64px; border-radius: 10px; background: rgba(239,234,227,0.045)"></div>
+    <div style="height: 40px; border-radius: 10px; background: rgba(239,234,227,0.045)"></div>
+    <div style="height: 40px; border-radius: 10px; background: rgba(239,234,227,0.045)"></div>
     <p class="small" style="margin: 0">Loading your balance…</p>
   </div>
 
@@ -87,10 +87,10 @@
     <p class="small" style="margin: 0 0 clamp(26px, 4vw, 40px)">Paid in USDC on Stellar testnet.</p>
 
     <!-- bos -->
-    <div id="v-empty" class="hidden" style="border: 1px solid rgba(236,231,225,0.11); border-radius: 5px; padding: clamp(26px, 5vw, 46px)">
+    <div id="v-empty" class="hidden" style="border: 1px solid var(--line); background: var(--bg-2); border-radius: 10px; padding: clamp(26px, 5vw, 46px)">
       <h2 style="font-size: clamp(22px, 2.6vw, 28px); margin-bottom: 12px">No impressions yet</h2>
       <p class="body" style="margin: 0 0 24px; max-width: 60ch">Install the CLI and start a Claude Code session. The first line can take a few minutes to show up here.</p>
-      <button class="btn" id="copy-install"><span style="color: var(--faint)">$</span>npm i -g dwellsh &amp;&amp; dwell init --spinner<span class="tag">copy</span></button>
+      <button class="btn btn-cmd" id="copy-install"><span style="color: var(--faint)">$</span>npm i -g dwellsh &amp;&amp; dwell init --spinner<span class="tag">copy</span></button>
     </div>
 
     <!-- veri -->
@@ -103,7 +103,7 @@
 
           <div style="margin-top: 22px">
             <button class="btn btn-quiet hidden" id="withdraw">Withdraw</button>
-            <p class="small hidden" id="nothing-to-withdraw" style="margin: 8px 0 0">Nothing to withdraw yet — comes back the moment your balance clears the dust floor.</p>
+            <p class="small hidden" id="nothing-to-withdraw" style="margin: 8px 0 0">Nothing to withdraw yet — the button appears as soon as your first verified impression lands.</p>
           </div>
 
           <!-- Cekme kutusu — yalnizca acikca istendiginde. Reklamveren
@@ -160,7 +160,7 @@
       <div style="display: flex; flex-wrap: wrap; align-items: end; gap: 14px">
         <label class="field" style="max-width: 220px">Nickname<input type="text" id="p-nick" maxlength="20" autocomplete="nickname" spellcheck="false" placeholder="3–20 letters, digits, _ . -"></label>
         <label class="field" style="max-width: 240px">Country<select id="p-country"><option value="">Don't show</option></select></label>
-        <label class="mono" style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-soft); padding-bottom: 10px; cursor: pointer">
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink-soft); padding-bottom: 12px; cursor: pointer">
           <input type="checkbox" id="p-listed" style="accent-color: var(--accent)"> Show me on the leaderboard
         </label>
         <button class="btn btn-primary" id="p-save"><span class="spinner hidden" id="p-spin"></span><span>Save</span></button>
@@ -249,8 +249,8 @@ copyButton($('#copy-addr'), () => session.address || '');
 
 /* ─────────── giris ─────────── */
 
-// Eklenti tespiti ASENKRON: `postMessage` el sikismasi gerekiyor.
-freighterReady().then((ok) => show($('#no-freighter'), !ok));
+// Eklenti tespiti ASENKRON: eklentiler sayfadan sonra enjekte olabilir.
+freighterReady().then((ok) => show($('#no-wallet'), !ok));
 
 async function doLogin() {
   show($('#connect-error'), false);
@@ -261,7 +261,7 @@ async function doLogin() {
   } catch (e) {
     // Freighter'in reddi hata degil, KARARDIR. Kullaniciya "bir sey ters
     // gitti" demek yerine ne oldugunu soyluyoruz.
-    const msg = /reject|denied|closed|User declined/i.test(e.message)
+    const msg = /reject|denied|closed|declined/i.test(e.message)
       ? 'Freighter closed without signing. Nothing happened — you can start again.'
       : e.message;
     $('#connect-error-text').textContent = msg;
@@ -347,6 +347,7 @@ $('#p-save').onclick = async () => {
   }
 };
 
+
 let me = { withdrawableStroops: '0' };
 
 function render(d) {
@@ -388,7 +389,7 @@ function render(d) {
   show($('#no-payouts'), ps.length === 0);
   show($('#payouts-wrap'), ps.length > 0);
   if (ps.length === 0) {
-    $('#no-payouts').textContent = 'Nothing sent yet. Withdraw whenever you have a balance above the network\'s dust floor.';
+    $('#no-payouts').textContent = 'Nothing sent yet. Withdraw any amount, whenever you like.';
   } else {
     $('#payouts').innerHTML = ps.map((p) => `
       <tr>
@@ -467,20 +468,65 @@ $('#w-send').onclick = async () => {
       method: 'POST', body: { amountStroops: amount.toString() },
     });
     $('#w-done').innerHTML =
-      `Sent ${usd(r.amountStroops)}. `
+      `Confirmed — ${usd(r.amountStroops)} is in your wallet. `
       + `<a href="${explorer.tx(r.txHash)}" target="_blank" rel="noopener" style="color: var(--accent)">View on the chain ↗</a>`;
     show($('#w-done'), true);
     $('#w-amount').value = '';
-    await load();
-    show(wBox, true);
   } catch (e) {
-    $('#w-error').textContent = e.message;
-    show($('#w-error'), true);
+    // Sunucu "henuz onaylanmadi" diyorsa para yolda — hata degil. Asagidaki
+    // yenileme onaylanana kadar bakiyeyi izliyor.
+    if (/onaylanmadi/.test(e.message)) {
+      awaitingConfirm = true;
+      $('#w-done').textContent = 'Sent — waiting for the chain to confirm. Your balance updates here on its own.';
+      show($('#w-done'), true);
+      $('#w-amount').value = '';
+    } else {
+      $('#w-error').textContent = e.message;
+      show($('#w-error'), true);
+    }
   } finally {
     show($('#w-spin'), false);
     $('#w-send').disabled = false;
+    // Basarili, basarisiz ya da "henuz onaylanmadi" — her durumda bakiye
+    // degismis olabilir (para "yolda"ya gecer). Sayfa yenilemeden goster.
+    await refreshBalance();
   }
 };
+
+/**
+ * Bakiyeyi ekrani "yukleniyor"a cevirmeden tazeler. Para yoldaysa
+ * (zincir onayi cekim isteginden uzun surdu) onaylanana kadar birkac saniyede
+ * bir tekrar bakar — kullanici sayfayi yenilemek zorunda kalmasin.
+ */
+let balancePoll = null;
+let awaitingConfirm = false;
+async function refreshBalance(tries = 24) {
+  clearTimeout(balancePoll);
+  let d;
+  try { d = await api('/v1/me/balance'); } catch { return; }
+  const open = !wBox.classList.contains('hidden');
+  render(d);
+  if (open) show(wBox, true);
+  if (BigInt(d.inFlightStroops) > 0n) {
+    if (tries > 0) balancePoll = setTimeout(() => refreshBalance(tries - 1), 5000);
+    return;
+  }
+  // Yolda para kalmadi: bekleyen cekim sonuclandi. "Bekleniyor" yazisini
+  // zincirdeki sonucla degistir.
+  if (awaitingConfirm) {
+    awaitingConfirm = false;
+    const p = (d.recentPayouts || [])[0];
+    if (p && p.state === 'settled') {
+      $('#w-done').innerHTML =
+        `Confirmed — ${usd(p.amountStroops)} is in your wallet. `
+        + `<a href="${explorer.tx(p.txHash)}" target="_blank" rel="noopener" style="color: var(--accent)">View on the chain ↗</a>`;
+    } else {
+      show($('#w-done'), false);
+      $('#w-error').textContent = 'The withdrawal did not go through. The amount is back in your balance.';
+      show($('#w-error'), true);
+    }
+  }
+}
 
 load();
 
@@ -508,7 +554,7 @@ async function loadPool() {
     const c = d.project;
     $('#pool-project').innerHTML = `
       <p class="small" style="margin: 0 0 8px">Your project, as other teams see it${c.status === 'active' ? '' : ' (paused by the sponsor)'}:</p>
-      <div class="term-status" style="border: 1px solid var(--line); border-radius: 4px; padding: 11px 14px; min-height: 0">
+      <div class="term-status" style="border: 1px solid var(--line); border-radius: 8px; padding: 11px 14px; min-height: 0">
         <span class="ad"><span style="color: var(--accent)">✶</span>
           <span class="ad-text"><span class="brand-name">${poolEsc(c.brand)}</span><span class="sep"> — ${poolEsc(c.text)} · </span><span class="cta">${poolEsc(c.cta)}</span></span>
         </span>

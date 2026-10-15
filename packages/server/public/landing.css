@@ -1,0 +1,278 @@
+/* Dwell — landing.
+ *
+ * Yalnizca `/` sayfasi. Paneller (`/app`, `/advertisers/app`) ortak
+ * `style.css`'i kullanmaya devam ediyor; burada onun uzerine yaziyoruz,
+ * degistirmiyoruz. Referans: Cursor CLI sayfasi — sicak koyu zemin, sade
+ * grotesk baslik, tek turuncu vurgu, urunun kendisi sahnenin ortasinda. */
+
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap');
+
+body.landing {
+  --bg:      #12110f;
+  --bg-2:    #181714;
+  --bg-3:    #1e1c19;
+  --panel:   #0e0d0c;
+  --ink:     #efeae3;
+  --ink-2:   #a39c92;
+  --muted:   #8a847b;
+  --faint:   #6a655e;
+  --dim:     #4f4b45;
+  --line:    rgba(239, 234, 227, 0.07);
+  --line-2:  rgba(239, 234, 227, 0.12);
+  --sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  background: var(--bg);
+  background-image: none;
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.5;
+  letter-spacing: -0.005em;
+}
+
+.landing .wrap { max-width: 1240px; padding: 0 clamp(16px, 4vw, 48px); }
+.landing section { border-top: 0; padding: 0; }
+.landing a:hover { color: inherit; }
+
+/* ── ust cubuk ── */
+.landing .top {
+  padding: 12px clamp(16px, 4vw, 48px);
+  background: rgba(18, 17, 15, 0.8);
+  backdrop-filter: blur(12px);
+  border-bottom-color: transparent;
+  transition: border-color 200ms;
+}
+.landing .top.scrolled { border-bottom-color: var(--line); }
+.landing .top-in { width: 100%; max-width: 1240px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.landing .brand { font-family: var(--sans); font-weight: 600; font-size: 16px; letter-spacing: -0.02em; align-items: center; gap: 8px; }
+.landing .brand .star { font-size: 17px; }
+.landing .nav { font-family: var(--sans); font-size: 14px; gap: clamp(14px, 2.2vw, 28px); }
+.landing .nav a { color: var(--ink-2); transition: color 150ms; }
+.landing .nav a:hover { color: var(--ink); }
+.pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 32px; padding: 0 14px; border-radius: 999px;
+  border: 1px solid var(--line-2); color: var(--ink); font-size: 14px;
+  white-space: nowrap; transition: background 150ms, border-color 150ms;
+}
+.pill:hover { border-color: rgba(239, 234, 227, 0.28); }
+.pill-solid { background: var(--ink); border-color: var(--ink); color: var(--bg) !important; font-weight: 500; }
+.pill-solid:hover { background: #fff; border-color: #fff; }
+.landing .chip { font-family: var(--mono); border-radius: 999px; border-color: var(--line-2); font-size: 12px; height: 26px; }
+.landing .chip .dot { box-shadow: 0 0 0 3px oklch(0.74 0.16 52 / 0.18); }
+
+/* ── tipografi ── */
+.kicker { font-family: var(--mono); font-size: 13px; color: var(--muted); margin: 0 0 14px; display: flex; align-items: center; gap: 10px; }
+.kicker .star { color: var(--accent); }
+.display {
+  font-family: var(--sans); font-weight: 500;
+  font-size: clamp(34px, 5.2vw, 64px); line-height: 1.04; letter-spacing: -0.035em;
+  margin: 0; max-width: 18ch; text-wrap: balance;
+}
+.display .soft { color: var(--faint); }
+.h2 { font-family: var(--sans); font-weight: 500; font-size: clamp(26px, 3.2vw, 40px); line-height: 1.1; letter-spacing: -0.03em; margin: 0; text-wrap: balance; }
+.h2 .soft { color: var(--faint); }
+.h3 { font-family: var(--sans); font-weight: 500; font-size: 17px; letter-spacing: -0.015em; margin: 0; }
+.p { font-size: 16px; line-height: 1.55; color: var(--ink-2); margin: 0; text-wrap: pretty; }
+.p-sm { font-size: 14.5px; line-height: 1.55; color: var(--muted); margin: 0; text-wrap: pretty; }
+
+/* ── hero ── */
+.landing .hero { padding: clamp(48px, 7vw, 88px) 0 clamp(28px, 3.5vw, 40px); }
+.hero-row > div:first-child { flex: 1 1 560px; }
+.hero-row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 28px 48px; }
+.hero-side { flex: 0 1 360px; display: grid; gap: 18px; padding-bottom: 6px; }
+
+/* Sahne: solda metin + komut, sagda ASCII manzara ve onunde terminal. */
+.stage {
+  display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.9fr);
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px; gap: 10px; min-height: 560px;
+}
+.stage-copy { padding: clamp(20px, 2.4vw, 32px); display: flex; flex-direction: column; justify-content: flex-end; gap: 22px; }
+.stage-copy .h3 { font-size: 20px; line-height: 1.3; }
+.stage-copy .h3 .soft { color: var(--faint); display: block; }
+
+.scene {
+  position: relative; overflow: hidden; border-radius: 6px;
+  background: #0b0a09; min-height: 520px;
+  display: grid; place-items: end center; padding: clamp(18px, 4vw, 56px) clamp(18px, 4vw, 56px) clamp(18px, 3.4vw, 44px);
+  isolation: isolate; grid-template-columns: minmax(0, 1fr);
+}
+/* ASCII manzara — JS doldurur. Renk metnin kendisinden degil, uzerine
+   klip edilmis bir isiktan geliyor: gunes turuncu, ufuk sicak gri. */
+.ascii {
+  position: absolute; inset: 0; margin: 0; z-index: -1;
+  font-family: var(--mono); font-size: 11px; line-height: 13px; letter-spacing: 0;
+  white-space: pre; overflow: hidden; user-select: none; pointer-events: none;
+  color: transparent;
+  /* Ustteki katman fare isigi (index.html); --ga 0 iken gorunmez. */
+  --mx: 50%; --my: 50%; --ga: 0;
+  background:
+    radial-gradient(circle 110px at var(--mx) var(--my), oklch(0.84 0.14 66 / var(--ga)) 0%, oklch(0.72 0.15 50 / calc(var(--ga) * 0.6)) 45%, transparent 100%),
+    radial-gradient(ellipse 30% 44% at 50% 17%, oklch(0.86 0.13 70) 0%, oklch(0.74 0.16 52) 22%, oklch(0.58 0.12 40) 48%, #6b6259 72%, #4a453f 100%);
+  -webkit-background-clip: text; background-clip: text;
+  opacity: 1;
+}
+.scene::after {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(180deg, rgba(11, 10, 9, 0.2), rgba(11, 10, 9, 0) 30%, rgba(11, 10, 9, 0) 70%, rgba(11, 10, 9, 0.55));
+}
+
+/* ── terminal penceresi ── */
+.win {
+  width: min(620px, 100%);
+  background: rgba(20, 19, 17, 0.94); backdrop-filter: blur(6px);
+  border: 1px solid rgba(239, 234, 227, 0.1); border-radius: 10px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 40px 80px -24px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(0, 0, 0, 0.4);
+  overflow: hidden; font-family: var(--mono);
+}
+.win-bar { position: relative; display: flex; align-items: center; height: 36px; padding: 0 14px; border-bottom: 1px solid var(--line); }
+.win-bar .dots { display: flex; gap: 7px; }
+.win-bar .dots i { width: 10px; height: 10px; border-radius: 50%; background: #34312d; }
+.win-bar .title { position: absolute; left: 50%; transform: translateX(-50%); font-size: 12px; color: var(--faint); white-space: nowrap; }
+.win-body { padding: 18px 18px 6px; font-size: clamp(12px, 1.2vw, 13.5px); line-height: 1.8; min-height: 216px; }
+.win-body .dim { color: var(--faint); }
+.win-body .mut { color: var(--muted); }
+.prompt-box { margin: 10px 0 12px; border: 1px solid var(--line-2); border-radius: 4px; padding: 7px 12px; color: var(--ink); }
+.act { display: flex; gap: 10px; color: var(--muted); }
+.act .bullet { color: var(--accent); }
+.act.done .bullet { color: var(--good); }
+.win .term-status {
+  margin-top: 14px; border-top: 1px solid var(--line); background: rgba(8, 7, 6, 0.6);
+  font-family: var(--mono); min-height: 44px; padding: 11px 18px;
+}
+.win .ad { transition: opacity 280ms ease; }
+.win .ad-right { color: var(--dim); }
+
+/* ── kopyalanabilir komut ── */
+.cmd {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 0 6px 0 14px; height: 44px;
+  background: var(--bg-3); border: 1px solid var(--line); border-radius: 6px;
+  font-family: var(--mono); font-size: 13px; color: var(--ink); cursor: pointer; text-align: left;
+  transition: border-color 150ms;
+}
+.cmd:hover { border-color: var(--line-2); }
+.cmd .dollar { color: var(--faint); }
+.cmd .txt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); }
+.cmd .tag {
+  flex: none; display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 4px;
+  color: var(--muted); font-size: 0; min-width: 0; background: transparent; transition: background 150ms, color 150ms;
+}
+.cmd .tag::before { content: ''; width: 14px; height: 14px; background: currentColor;
+  -webkit-mask: var(--copy-icon) center / contain no-repeat; mask: var(--copy-icon) center / contain no-repeat; }
+.cmd .tag.done::before { display: none; }
+.cmd .tag.done { color: var(--accent); }
+.cmd:hover .tag { background: rgba(239, 234, 227, 0.06); color: var(--ink); }
+:root { --copy-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='9' width='12' height='12' rx='2'/%3E%3Cpath d='M5 15V5a2 2 0 0 1 2-2h10'/%3E%3C/svg%3E"); }
+
+/* ── bolumler ── */
+.landing .block { padding: clamp(72px, 10vw, 128px) 0 0; }
+.block-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 18px 40px; margin-bottom: clamp(24px, 3vw, 36px); }
+.block-head .p { max-width: 420px; }
+
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.card-l { background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; }
+.card-l .head { padding: 12px 12px 20px; display: grid; gap: 4px; }
+.card-l .head .no { font-family: var(--mono); font-size: 12px; color: var(--accent); margin-bottom: 6px; }
+.card-l .head .p-sm { color: var(--faint); }
+.card-l .demo { margin-top: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 18px; min-height: 236px;
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.85; color: var(--muted); overflow: hidden; }
+.demo .ok { color: var(--good); }
+.demo .ink { color: var(--ink); }
+.demo .acc { color: var(--accent); }
+.demo .dim { color: var(--faint); }
+
+/* Cuzdan imza penceresi — islem DEGIL, mesaj. */
+.sign { border: 1px solid var(--line-2); border-radius: 8px; background: var(--bg-2); overflow: hidden; }
+.sign .row { display: flex; justify-content: space-between; gap: 12px; padding: 9px 14px; border-top: 1px solid var(--line); }
+.sign .row:first-child { border-top: 0; }
+.sign .msg { padding: 12px 14px; border-top: 1px solid var(--line); color: var(--ink); white-space: pre-wrap; line-height: 1.65; }
+.sign .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px 14px 12px; border-top: 1px solid var(--line); }
+.sign .btns span { text-align: center; padding: 6px 0; border-radius: 4px; border: 1px solid var(--line-2); font-size: 12px; }
+.sign .btns span.go { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+/* 10 saniye esigi — zaman cizgisi */
+.meter { margin: 16px 0 6px; position: relative; height: 6px; border-radius: 3px; background: rgba(239, 234, 227, 0.07); overflow: hidden; }
+.meter i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--accent); border-radius: 3px; }
+.card-l.in .meter i { animation: fill 4.2s cubic-bezier(.3,.1,.3,1) infinite; }
+@keyframes fill { 0% { width: 0 } 70% { width: 100% } 100% { width: 100% } }
+.ticks { display: flex; justify-content: space-between; font-size: 11px; color: var(--faint); }
+
+/* ── gizlilik ── */
+.privacy { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 10px; }
+.code-card { background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.code-card .cap { display: flex; justify-content: space-between; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: 12px; color: var(--faint); }
+.code-card pre { margin: 0; padding: 18px; font-family: var(--mono); font-size: 13px; line-height: 1.8; color: var(--ink-2); overflow-x: auto; }
+.code-card pre .k { color: var(--ink); }
+.code-card pre .s { color: oklch(0.8 0.08 70); }
+.code-card pre .n { color: oklch(0.78 0.1 52); }
+.code-card pre .c { color: var(--faint); }
+.never { background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 22px; display: flex; flex-direction: column; gap: 18px; }
+.never ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.never li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 13.5px; color: var(--muted); }
+.never li:first-child { border-top: 0; }
+.never li .x { color: var(--faint); font-size: 12px; }
+
+/* ── durum seridi ── */
+.status { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 10px; background: var(--bg-2); overflow: hidden; }
+.status > div { padding: 20px 22px; border-left: 1px solid var(--line); display: grid; gap: 6px; }
+.status > div:first-child { border-left: 0; }
+.status .k { font-family: var(--mono); font-size: 12px; color: var(--faint); }
+.status .v { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; }
+.status .v.acc { color: var(--accent); }
+
+/* ── daha fazlasi ── */
+.links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.link-card { display: grid; gap: 4px; padding: 18px 20px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; transition: background 150ms, border-color 150ms; }
+.link-card:hover { background: var(--bg-3); border-color: var(--line-2); }
+.link-card .h3 { font-size: 16px; }
+.link-card .go { margin-top: 14px; color: var(--accent); font-size: 14.5px; }
+.link-card:hover .go { color: var(--accent-hi); }
+
+/* ── kapanis ── */
+.landing .finale { padding: clamp(96px, 12vw, 160px) 0 clamp(80px, 10vw, 128px); display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; gap: 28px; }
+.finale .ascii-star {
+  margin: 0; font-family: var(--mono); font-size: 10px; line-height: 10px; white-space: pre; user-select: none;
+  color: transparent;
+  background: radial-gradient(circle at 50% 50%, oklch(0.8 0.15 55), oklch(0.6 0.13 45) 45%, #4a453f 80%);
+  -webkit-background-clip: text; background-clip: text;
+}
+.finale .display { font-size: clamp(44px, 7.5vw, 96px); max-width: none; }
+.finale .cmd { width: min(440px, 100%); }
+.finale .sub { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 24px; font-size: 14px; color: var(--muted); }
+.finale .sub a { color: var(--ink-2); border-bottom: 1px solid var(--line-2); padding-bottom: 1px; }
+.finale .sub a:hover { color: var(--ink); }
+
+.landing footer { border-top-color: var(--line); }
+.landing footer .wrap { font-family: var(--sans); font-size: 13.5px; padding-top: 28px; padding-bottom: 28px; }
+
+/* Girerken hafif yukselme — bir kez, abartmadan. */
+.reveal { opacity: 0; transform: translateY(14px); transition: opacity 600ms ease, transform 600ms cubic-bezier(.2,.7,.2,1); }
+.reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; } }
+
+/* ── dar ekran ── */
+@media (max-width: 420px) { .landing .nav .hide-xs { display: none; } }
+@media (max-width: 960px) {
+  .stage { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  .stage-copy { order: 2; padding: 18px 12px 12px; }
+  .scene { min-height: 420px; }
+  .cards { grid-template-columns: 1fr; }
+  .privacy { grid-template-columns: 1fr; }
+  .status { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .status > div:nth-child(3) { border-left: 0; }
+  .status > div:nth-child(n+3) { border-top: 1px solid var(--line); }
+}
+@media (max-width: 640px) {
+  .landing .nav .hide-sm { display: none; }
+  .landing .nav { gap: 10px; }
+  .pill { padding: 0 12px; font-size: 13px; }
+  .links { grid-template-columns: 1fr; }
+  .scene { padding: 14px; min-height: 380px; }
+  .win-bar .title { display: none; }
+  .win-body { padding: 14px 14px 4px; }
+  .win .term-status { padding: 10px 14px; }
+  .win .ad-right { display: none; }
+}

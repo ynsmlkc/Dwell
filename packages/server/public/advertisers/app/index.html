@@ -5,8 +5,82 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Your campaigns — Dwell</title>
 <meta name="robots" content="noindex">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28' fill='%23f97335'>✶</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text x='16' y='16' font-size='28' text-anchor='middle' dominant-baseline='central' transform='rotate(90 16 16)' fill='%23f97335'>✶</text></svg>">
 <link rel="stylesheet" href="/style.css">
+<style>
+  /* ── calisma alani ── */
+  .ws { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: clamp(24px, 4vw, 52px); align-items: start; }
+  .ws-nav { position: sticky; top: 84px; display: flex; flex-direction: column; gap: 2px; }
+  .ws-nav > a { font-family: var(--sans); font-size: 14px; color: var(--ink-2); text-decoration: none; padding: 8px 12px; border-radius: 8px; display: flex; justify-content: space-between; transition: background 150ms, color 150ms; }
+  .ws-nav > a:hover { color: var(--ink); background: rgba(239, 234, 227, 0.04); }
+  .ws-nav > a.on { color: var(--ink); background: var(--bg-3); box-shadow: inset 0 0 0 1px var(--line-2); }
+  .ws-count { color: var(--faint); font-family: var(--mono); font-size: 12.5px; }
+  .ws-nav-bal { margin-top: 22px; padding: 16px 10px 0; border-top: 1px solid var(--line); }
+  .ws-k { display: block; font-family: var(--mono); font-size: 12px; letter-spacing: 0; text-transform: lowercase; color: var(--faint); }
+  .ws-main { min-width: 0; }
+  .ws-sec { padding: 0 0 clamp(40px, 6vw, 64px); scroll-margin-top: 84px; }
+  .ws-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
+  .ws-title { font-size: clamp(28px, 3.4vw, 40px); }
+  .ws-h2 { font-size: clamp(21px, 2.4vw, 27px); }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .kpi { background: var(--bg-2); padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .kpi-v { font-family: var(--sans); font-weight: 500; font-size: clamp(24px, 2.6vw, 32px); letter-spacing: -0.035em; color: var(--ink); line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kpi-sub { font-family: var(--sans); font-size: 13px; color: var(--faint); line-height: 1.5; }
+
+  .seg { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--line-2); border-radius: 999px; }
+  .seg-btn { font-family: var(--sans); font-size: 13px; background: transparent; color: var(--muted); border: 0; border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+  
+  .seg-btn:hover { color: var(--ink); }
+  .seg-btn.on { background: var(--bg-3); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line-2); }
+  .seg-btn span { color: var(--faint); }
+
+  .chart-card { position: relative; border: 1px solid var(--line); border-radius: 10px; padding: 18px 18px 12px; background: var(--bg-2); }
+  .chart-top { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-bottom: 14px; }
+  .chart-total { display: block; margin-top: 6px; font-family: var(--sans); font-weight: 500; font-size: 26px; color: var(--ink); letter-spacing: -0.02em; }
+  .chart { height: 180px; display: flex; align-items: flex-end; gap: 3px; border-bottom: 1px solid var(--line-2); }
+  .chart .bar { flex: 1; min-width: 2px; background: oklch(0.74 0.16 52 / 0.55); border-radius: 2px 2px 0 0; transition: height 0.35s ease, background 0.15s; }
+  .chart .bar.zero { background: var(--line); height: 2px !important; }
+  .chart .col { flex: 1; height: 100%; display: flex; align-items: flex-end; cursor: default; }
+  .chart .col:hover .bar { background: var(--accent); }
+  .chart-x { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); margin-top: 8px; }
+  .chart-tip { position: absolute; pointer-events: none; transform: translate(-50%, -100%); background: var(--bg-deep); border: 1px solid var(--line-3); border-radius: 6px; padding: 6px 10px; font-size: 12px; color: var(--ink); white-space: nowrap; }
+  .chart-empty { position: absolute; left: 18px; right: 18px; top: 50%; text-align: center; margin: 0; font-family: var(--sans); font-size: 14px; color: var(--faint); }
+
+  .tbl-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+  .tbl-bar input[type=search] { flex: 1; min-width: 220px; font-family: var(--sans); font-size: 14px; color: var(--ink); background: var(--bg-deep); border: 1px solid var(--line-2); border-radius: 999px; padding: 8px 16px; outline: none; }
+  .tbl-bar input[type=search]:focus { border-color: var(--line-3); }
+  .tbl-wrap { border: 1px solid var(--line); border-radius: 10px; background: var(--bg-2); overflow-x: auto; }
+  .tbl { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12.5px; }
+  .tbl th { text-align: left; font-weight: 400; font-size: 12px; letter-spacing: 0; text-transform: lowercase; color: var(--faint); padding: 11px 10px; border-bottom: 1px solid var(--line-2); white-space: nowrap; }
+  .tbl td { padding: 12px 10px; border-bottom: 1px solid var(--line); color: var(--ink-soft); vertical-align: middle; white-space: nowrap; }
+  .tbl tr:last-child td { border-bottom: 0; }
+  .tbl .num { text-align: right; }
+  .tbl .line { white-space: normal; min-width: 200px; width: 100%; padding-left: 14px; font-family: var(--sans); font-size: 14px; }
+  .tbl td:last-child, .tbl th:last-child { padding-right: 14px; }
+  .tbl .line b { color: var(--ink); font-weight: 500; }
+  .tbl .line .cta { color: var(--accent); }
+  .tbl .sub { display: block; color: var(--faint); font-size: 11px; margin-top: 3px; }
+  .pill { font-size: 12px; letter-spacing: 0; text-transform: lowercase; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border: 1px solid var(--line-2); border-radius: 999px; }
+  .pill i { width: 6px; height: 6px; border-radius: 50%; background: var(--dim); }
+  .pill.live { color: var(--accent); border-color: oklch(0.74 0.16 52 / 0.35); } .pill.live i { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+  .pill.paused { color: var(--faint); }
+  .prog { display: block; height: 4px; max-width: 220px; margin-top: 8px; border-radius: 2px; background: var(--line-2); overflow: hidden; }
+  .prog i { display: block; height: 100%; background: var(--accent); }
+  .tbl-empty { margin: 0; padding: 26px 18px; font-family: var(--sans); font-size: 14px; color: var(--faint); text-align: center; }
+
+  .estimate { margin-top: 22px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .estimate > div { background: var(--bg-2); padding: 12px 14px; }
+  .estimate .v { display: block; font-family: var(--sans); font-weight: 500; font-size: 18px; color: var(--ink); margin-top: 6px; }
+
+  @media (max-width: 860px) {
+    .ws { grid-template-columns: minmax(0, 1fr); }
+    .ws-nav { position: static; flex-direction: row; flex-wrap: wrap; gap: 4px; }
+    .ws-nav > .ws-k, .ws-nav-bal { display: none; }
+    .ws-nav > a { border-left: 0; border-bottom: 2px solid transparent; }
+    .ws-nav > a.on { border-bottom-color: var(--accent); }
+  }
+</style>
 </head>
 <body>
 
@@ -26,7 +100,7 @@
     <h1 style="font-size: clamp(24px, 3vw, 32px); margin-bottom: 12px">Connect the wallet you will pay from</h1>
     <p class="body" style="margin: 0 0 20px">This one matters. Deposits are matched by <strong style="color: var(--ink-soft)">who sent them</strong>, so the wallet you connect now is the only wallet whose money we can credit to you.</p>
 
-    <div class="note note-accent hidden" id="no-freighter" style="margin-bottom: 18px">
+    <div class="note note-accent hidden" id="no-wallet" style="margin-bottom: 18px">
       Freighter is not installed. <a href="https://freighter.app" target="_blank" rel="noopener" style="color: var(--accent)">Install it</a>, then reload.
     </div>
 
@@ -41,8 +115,8 @@
   </div>
 
   <div id="v-loading" class="hidden" style="display: grid; gap: 18px; max-width: 640px">
-    <div style="height: 64px; border-radius: 4px; background: rgba(236,231,225,0.045)"></div>
-    <div style="height: 40px; border-radius: 4px; background: rgba(236,231,225,0.045)"></div>
+    <div style="height: 64px; border-radius: 10px; background: rgba(239,234,227,0.045)"></div>
+    <div style="height: 40px; border-radius: 10px; background: rgba(239,234,227,0.045)"></div>
   </div>
 
   <div id="v-neterr" class="note note-warn hidden" style="max-width: 520px; padding: 22px 24px">
@@ -83,7 +157,7 @@
           <p class="body" style="margin: 12px 0 0; color: var(--ink-soft); font-size: 12.5px">We work out whose money it is by looking at who sent it. That is why there is no memo to remember — and also why money sent from an exchange arrives but cannot be credited to you.</p>
         </div>
 
-        <div style="margin-top: 18px; border: 1px solid rgba(236,231,225,0.11); border-radius: 5px; padding: 16px 18px; display: flex; align-items: center; gap: 12px">
+        <div style="margin-top: 18px; border: 1px solid var(--line); background: var(--bg-2); border-radius: 10px; padding: 16px 18px; display: flex; align-items: center; gap: 12px">
           <span class="pulse" style="width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none"></span>
           <p class="body" style="margin: 0; font-size: 13px">Watching the chain. A deposit usually shows up here within 20 seconds.</p>
         </div>
@@ -92,22 +166,48 @@
     </div>
   </div>
 
-  <!-- ═══ fonlanmis ═══ -->
-  <div id="v-funded" class="hidden">
-    <div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: clamp(24px, 4vw, 36px)">
-      <div>
-        <p class="figure-label">Balance</p>
-        <p class="figure" id="balance">$0</p>
-        <p class="small hidden" id="reserved-note" style="margin: 12px 0 0; max-width: 54ch"></p>
+  <!-- ═══ fonlanmis: calisma alani ═══ -->
+  <div id="v-funded" class="ws hidden">
+    <aside class="ws-nav" aria-label="Workspace">
+      <p class="ws-k" style="margin: 0 0 14px 10px">Advertiser workspace</p>
+      <a href="#overview" class="on">Overview</a>
+      <a href="#performance">Performance</a>
+      <a href="#campaigns-sec">Campaigns <span class="ws-count" id="nav-count"></span></a>
+      <a href="#new">New campaign</a>
+      <a href="#pools-sec">Sponsor pools</a>
+      <div class="ws-nav-bal">
+        <p class="ws-k">Spendable</p>
+        <p class="mono" style="margin: 4px 0 12px; font-size: 18px; color: var(--ink)" id="nav-bal">—</p>
+        <button class="btn btn-sm btn-quiet" id="add-funds" style="width: 100%">Add funds</button>
       </div>
-      <div style="display: flex; gap: 10px; flex-wrap: wrap">
-        <button class="btn btn-quiet" id="add-funds">Add funds</button>
-        <button class="btn btn-quiet hidden" id="withdraw">Withdraw</button>
-      </div>
-    </div>
+    </aside>
+
+    <div class="ws-main">
+      <!-- ── ozet ── -->
+      <section id="overview" class="ws-sec">
+        <div class="ws-head">
+          <h1 class="ws-title">Overview</h1>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap">
+            <button class="btn btn-sm btn-quiet hidden" id="withdraw">Withdraw</button>
+            <a class="btn btn-sm btn-primary" href="#new">New campaign</a>
+          </div>
+        </div>
+
+        <div class="note note-accent hidden" id="fund-banner" style="margin-bottom: 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px">
+          <span>No balance yet. You can set up campaigns now; they run once you add USDC.</span>
+          <button class="btn btn-sm btn-primary" id="fund-banner-btn">Add funds</button>
+        </div>
+        <div class="kpis">
+          <div class="kpi"><span class="ws-k">Balance</span><span class="kpi-v" id="balance">$0</span><span class="kpi-sub" id="balance-sub"></span></div>
+          <div class="kpi"><span class="ws-k">Serving now</span><span class="kpi-v" id="k-live">0</span><span class="kpi-sub" id="k-live-sub"></span></div>
+          <div class="kpi"><span class="ws-k">Verified impressions</span><span class="kpi-v" id="k-imp">0</span><span class="kpi-sub" id="k-imp-sub"></span></div>
+          <div class="kpi"><span class="ws-k">Developers reached</span><span class="kpi-v" id="k-reach">0</span><span class="kpi-sub">unique developers</span></div>
+          <div class="kpi"><span class="ws-k">Spent</span><span class="kpi-v" id="k-spent">$0</span><span class="kpi-sub" id="k-spent-sub"></span></div>
+        </div>
+        <p class="small hidden" id="reserved-note" style="margin: 14px 0 0; max-width: 70ch"></p>
 
     <!-- Cekme kutusu — yalnizca acikca istendiginde -->
-    <div class="card hidden" id="withdraw-box" style="margin-bottom: clamp(24px, 4vw, 36px)">
+    <div class="card hidden" id="withdraw-box" style="margin-top: 22px">
       <h3 style="margin-bottom: 6px">Withdraw unspent budget</h3>
       <p class="small" style="margin: 0 0 20px; max-width: 62ch">Goes back to <span id="w-addr" style="color: var(--muted)"></span> — the wallet you funded from. There is no other destination; your address is your identity here.</p>
 
@@ -124,11 +224,65 @@
       <div class="note hidden" id="w-done" style="margin-top: 16px; border-left-color: var(--accent)"></div>
     </div>
 
-    <section style="padding-bottom: 0">
-      <h2 style="font-size: clamp(22px, 2.6vw, 30px); margin-bottom: 18px">Campaigns</h2>
-      <p class="small hidden" id="no-campaigns" style="margin: 0 0 26px">None yet. Write your line below.</p>
-      <div class="grid-1px hidden" id="campaigns" style="margin-bottom: clamp(28px, 4vw, 44px)"></div>
+      </section>
 
+      <!-- ── performans ── -->
+      <section id="performance" class="ws-sec">
+        <div class="ws-head">
+          <h2 class="ws-h2">Performance</h2>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap">
+            <div class="seg" role="group" aria-label="Metric" id="metric">
+              <button class="seg-btn on" data-metric="impressions" aria-pressed="true">Impressions</button>
+              <button class="seg-btn" data-metric="spend" aria-pressed="false">Spend</button>
+            </div>
+            <div class="seg" role="group" aria-label="Period" id="range">
+              <button class="seg-btn" data-days="7" aria-pressed="false">7D</button>
+              <button class="seg-btn on" data-days="30" aria-pressed="true">30D</button>
+              <button class="seg-btn" data-days="90" aria-pressed="false">90D</button>
+            </div>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-top">
+            <div><span class="ws-k" id="chart-label">Impressions</span><span class="chart-total mono" id="chart-total">0</span></div>
+            <span class="small" id="chart-avg"></span>
+          </div>
+          <div class="chart" id="chart" role="img" aria-label="Daily chart"></div>
+          <div class="chart-x mono" id="chart-x"></div>
+          <div class="chart-tip mono hidden" id="chart-tip"></div>
+          <p class="chart-empty hidden" id="chart-empty">No impressions in this period yet. Start a campaign and this fills in as developers see it.</p>
+        </div>
+        <p class="small" style="margin: 10px 0 0">Verified impressions are paid; pending ones are counted here but charged only after verification. Impression records are kept for 90 days.</p>
+      </section>
+
+      <!-- ── kampanyalar ── -->
+      <section id="campaigns-sec" class="ws-sec">
+        <div class="ws-head">
+          <h2 class="ws-h2">Campaigns</h2>
+          <span class="small" id="c-synced"></span>
+        </div>
+        <div class="tbl-bar">
+          <input type="search" id="c-search" placeholder="Search line, brand or domain" spellcheck="false" autocomplete="off">
+          <div class="seg" role="group" aria-label="Status" id="c-filter">
+            <button class="seg-btn on" data-f="all" aria-pressed="true">All <span id="f-all"></span></button>
+            <button class="seg-btn" data-f="active" aria-pressed="false">Live <span id="f-active"></span></button>
+            <button class="seg-btn" data-f="paused" aria-pressed="false">Paused <span id="f-paused"></span></button>
+            <button class="seg-btn" data-f="ended" aria-pressed="false">Ended <span id="f-ended"></span></button>
+          </div>
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Line</th><th>Status</th><th class="num">Bid / block</th><th class="num">Paid / block</th><th class="num">Impressions</th><th class="num">Reach</th><th class="num">Spent</th><th></th></tr></thead>
+            <tbody id="campaigns"></tbody>
+          </table>
+          <p class="tbl-empty hidden" id="no-campaigns">You have no campaigns yet. <a href="#new" style="color: var(--accent)">Write your first line →</a></p>
+          <p class="tbl-empty hidden" id="no-match">Nothing matches.</p>
+        </div>
+      </section>
+
+      <!-- ── yeni kampanya ── -->
+      <section id="new" class="ws-sec">
+        <h2 class="ws-h2" style="margin-bottom: 16px">New campaign</h2>
       <!-- ── yeni kampanya ── -->
       <div class="card">
         <h3 style="margin-bottom: 6px">Write a line</h3>
@@ -155,14 +309,29 @@
         <label class="field" style="margin-top: 18px">Message<input type="text" id="f-text" placeholder="what it does, in a few words"></label>
         <p class="err hidden" id="e-text"></p>
 
-        <div style="margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 18px; align-items: end">
-          <label class="field">CPM in USD<input type="text" id="f-cpm" placeholder="40" value="40"></label>
-          <div class="mono" style="font-size: 12.5px; line-height: 1.9; color: var(--faint)">
-            <div>per impression <span style="color: var(--ink)" id="f-perimp">—</span></div>
-            <div>publisher gets <span style="color: var(--ink)">50%</span>, fixed</div>
-          </div>
+        <!-- Satin alma: blok basina teklif x blok sayisi. 1 blok = 1.000 gosterim. -->
+        <div style="margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 18px; align-items: end">
+          <label class="field">Bid per block, USD (min $0.10)<input type="text" id="f-cpm" placeholder="2.00" value="2"></label>
+          <label class="field">Number of blocks (1,000 impressions each)<input type="text" id="f-blocks" inputmode="numeric" value="1"></label>
         </div>
         <p class="err hidden" id="e-cpm"></p>
+        <p class="err hidden" id="e-blocks"></p>
+        <p class="small" style="margin: 10px 0 0; max-width: 66ch">The highest bid is shown first. You pay one cent more than the next bid, never more than your own; with no one bidding against you, you pay the $0.10 floor. Half of every impression goes to the developer who saw it, and an impression counts after 10 seconds on screen.</p>
+
+        <!-- Teslimat hizi = gunluk tavan. Fiyati degistirmez, gunlere yayar. -->
+        <div style="margin-top: 22px">
+          <p class="ws-k" style="margin-bottom: 10px">Delivery speed</p>
+          <div class="seg" role="group" aria-label="Delivery speed" id="pace">
+            <button class="seg-btn" data-pace="slow" aria-pressed="false">Slow</button>
+            <button class="seg-btn on" data-pace="medium" aria-pressed="true">Medium</button>
+            <button class="seg-btn" data-pace="fast" aria-pressed="false">Fast</button>
+          </div>
+          <p class="small" style="margin: 10px 0 0; max-width: 62ch" id="pace-hint"></p>
+        </div>
+
+        <!-- Tahmini toplam -->
+        <div class="estimate" id="estimate"></div>
+        <p class="err hidden" id="e-funds"></p>
 
         <div style="margin-top: 26px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px">
           <button class="btn btn-primary" id="create" disabled>
@@ -172,12 +341,12 @@
         </div>
         <p class="err hidden" id="e-create"></p>
       </div>
-    </section>
+      </section>
 
     <!-- NEXT.md §10 — sponsor havuzlari. Para ayni bakiye; havuz projeleri
          bu hesaba faturalaniyor, takimlar hicbir sey odemiyor. -->
-    <section style="margin-top: clamp(38px, 6vw, 64px); padding-bottom: 0">
-      <h2 style="font-size: clamp(22px, 2.6vw, 30px); margin-bottom: 8px">Sponsor pools</h2>
+    <section id="pools-sec" class="ws-sec">
+      <h2 class="ws-h2" style="margin-bottom: 8px">Sponsor pools</h2>
       <p class="small" style="margin: 0 0 22px; max-width: 64ch">Fund a closed pool for a hackathon or your ecosystem. Participants join with a code and submit their own project as one line. People in the pool only see each other's projects, and every impression is paid from this balance. When you close the pool, whatever is left stays here and can be withdrawn.</p>
 
       <div class="grid-1px hidden" id="pools" style="margin-bottom: clamp(24px, 4vw, 36px)"></div>
@@ -197,6 +366,7 @@
         <p class="err hidden" id="pool-error"></p>
       </div>
     </section>
+    </div>
   </div>
 </main>
 
@@ -211,18 +381,20 @@
 </footer>
 
 <script type="module">
-import { $, show, usd, toStroops, short, api, ApiError, session, login, freighterReady, copyButton } from '/app.js';
+import { $, show, usd, toStroops, short, api, ApiError, session, login, freighterReady, copyButton, explorer } from '/app.js';
 
 const MAX_LINE = 80;
-const MIN_CPM = 1000000n;          // $0.10 / 1000
+const MIN_CPM = 1000000n;          // $0.10 / 1000 (stroop = 1e-7 USDC)
 const views = ['v-connect', 'v-loading', 'v-neterr', 'v-expired', 'v-deposit', 'v-funded'];
 const view = (id) => views.forEach((v) => show($('#' + v), v === id));
 
 let me = null;
 let forceDeposit = false;
+let stats = null;
+let days = 30, metric = 'impressions', cFilter = 'all';
 
 // Eklenti tespiti ASENKRON: `postMessage` el sikismasi gerekiyor.
-freighterReady().then((ok) => show($('#no-freighter'), !ok));
+freighterReady().then((ok) => show($('#no-wallet'), !ok));
 copyButton($('#copy-deposit'), () => me?.deposit?.address || '');
 
 /* ─────────── giris ─────────── */
@@ -249,6 +421,7 @@ $('#reconnect').onclick = () => { session.clear(); view('v-connect'); };
 $('#signout').onclick = () => { session.clear(); location.reload(); };
 $('#retry-load').onclick = () => load();
 $('#add-funds').onclick = () => { forceDeposit = true; render(); };
+$('#fund-banner-btn').onclick = () => { forceDeposit = true; render(); };
 
 /* ─────────── para cekme ─────────── */
 
@@ -290,7 +463,7 @@ $('#w-send').onclick = async () => {
     });
     $('#w-done').innerHTML =
       `Sent ${usd(r.amountStroops)}. `
-      + `<a href="https://stellar.expert/explorer/testnet/tx/${r.txHash}" target="_blank" rel="noopener" style="color: var(--accent)">View on the chain ↗</a>`;
+      + `<a href="${explorer.tx(r.txHash)}" target="_blank" rel="noopener" style="color: var(--accent)">View on the chain ↗</a>`;
     show($('#w-done'), true);
     $('#w-amount').value = '';
     await load();
@@ -327,16 +500,20 @@ function render() {
   const spendable = BigInt(me.spendableStroops);
   const zero = balance === 0n;
 
-  if (zero || forceDeposit) {
+  // Bakiye sifirken de calisma alani acik: kampanya once kurulur, para
+  // sonra yatirilir. Yatirma ekrani yalnizca istendiginde.
+  if (forceDeposit) {
     $('#deposit-addr').textContent = me.deposit?.address || '(payouts are off on this server)';
     $('#asset-issuer').textContent = me.deposit?.assetIssuer || '—';
     $('#asset-code').textContent = me.deposit?.assetCode || 'USDC';
     $('#own-addr').textContent = me.advertiserId;
-    show($('#back-to-campaigns'), !zero);
+    show($('#back-to-campaigns'), true);
     view('v-deposit');
     if (zero) pollDeposit();
     return;
   }
+  show($('#fund-banner'), zero);
+  if (zero) pollDeposit();
 
   $('#balance').textContent = usd(me.balanceStroops);
   const reserved = balance - spendable;
@@ -350,42 +527,160 @@ function render() {
   // olmayan dugmeden kotu.
   show($('#withdraw'), BigInt(me.withdrawableStroops || '0') > 0n);
 
-  // Havuz projeleri asagida kendi havuzlarinin altinda; burada yalnizca
-  // reklamverenin kendi yazdigi satirlar.
-  const cs = (me.campaigns || []).filter((c) => !c.poolId);
-  show($('#no-campaigns'), cs.length === 0);
-  show($('#campaigns'), cs.length > 0);
-  $('#campaigns').innerHTML = cs.map((c) => {
-    const active = c.status === 'active';
-    const rate = usd((BigInt(c.bidCpmStroops) / 1000n).toString());
-    return `
-      <div style="padding: 18px 20px; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 16px 20px; align-items: center">
-        <div style="min-width: 0">
-          <div class="term-status" style="border: 1px solid var(--line); border-radius: 4px; padding: 11px 14px; min-height: 0">
-            <span class="ad" style="opacity:${active ? 1 : 0.45}">
-              <span style="color: var(--accent)">✶</span>
-              <span class="ad-text"><span class="brand-name">${esc(c.brand)}</span><span class="sep"> — ${esc(c.text)} · </span><span class="cta">${esc(c.cta)}</span></span>
-            </span>
-            <span class="ad-right">Edit · 2.8s</span>
-          </div>
-          <p class="small" style="margin: 9px 0 0">${usd(c.bidCpmStroops)} CPM · ${rate} per impression</p>
-        </div>
-        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 9px">
-          <span class="mono" style="font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: ${active ? 'var(--accent)' : 'var(--faint)'}">${c.status}</span>
-          <button class="btn btn-sm btn-quiet" data-toggle="${c.id}" data-to="${active ? 'paused' : 'active'}">${active ? 'Pause' : 'Start'}</button>
-        </div>
-        <div class="err hidden" data-err="${c.id}" style="grid-column: 1 / -1"></div>
-      </div>`;
-  }).join('');
-
-  document.querySelectorAll('[data-toggle]').forEach((b) => {
-    b.onclick = () => toggle(b.dataset.toggle, b.dataset.to);
-  });
+  $('#nav-bal').textContent = usd(me.spendableStroops);
+  renderOverview();
+  renderCampaigns();
 
   view('v-funded');
   validate();
   void loadPools();
+  void loadStats();
 }
+
+/* ─────────── istatistik ─────────── */
+
+const fmt = (n) => Number(n).toLocaleString('en-US');
+const ownCampaigns = () => (me?.campaigns || []).filter((c) => !c.poolId);
+const statOf = (id) => stats?.campaigns.find((x) => x.campaignId === id) || null;
+
+async function loadStats() {
+  try { stats = await api(`/v1/advertiser/stats?days=${days}`); }
+  catch { stats = null; }
+  $('#c-synced').textContent = 'Synced ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  renderOverview(); renderCampaigns(); renderChart();
+}
+
+function renderOverview() {
+  const cs = ownCampaigns();
+  const live = cs.filter((c) => c.status === 'active' && !isDone(c)).length;
+  $('#k-live').textContent = String(live);
+  $('#k-live-sub').textContent = `of ${cs.length} ${cs.length === 1 ? 'campaign' : 'campaigns'}`;
+  $('#balance-sub').textContent = `${usd(me.spendableStroops)} spendable`;
+  const t = stats?.totals;
+  $('#k-imp').textContent = fmt(t?.verified ?? 0);
+  $('#k-imp-sub').textContent = t?.pending ? `+${fmt(t.pending)} pending verification` : 'paid only after verification';
+  $('#k-reach').textContent = fmt(t?.reach ?? 0);
+  $('#k-spent').textContent = usd(t?.spentStroops ?? '0');
+  $('#k-spent-sub').textContent = t && BigInt(t.pendingStroops) > 0n ? `+${usd(t.pendingStroops)} pending` : 'last 90 days';
+}
+
+function renderCampaigns() {
+  // Havuz projeleri asagida kendi havuzlarinin altinda; burada yalnizca
+  // reklamverenin kendi yazdigi satirlar.
+  const cs = ownCampaigns();
+  const q = $('#c-search').value.trim().toLowerCase();
+  // "Live" = aktif ve satin alinan bloklari henuz dolmamis; dolan "ended".
+  const stateOf = (c) => isDone(c) ? 'ended' : c.status === 'active' ? 'active' : 'paused';
+  const counts = { all: cs.length, active: 0, paused: 0, ended: 0 };
+  cs.forEach((c) => counts[stateOf(c)]++);
+  $('#f-all').textContent = counts.all; $('#f-active').textContent = counts.active;
+  $('#f-paused').textContent = counts.paused; $('#f-ended').textContent = counts.ended;
+  $('#nav-count').textContent = cs.length || '';
+
+  const rows = cs.filter((c) => (cFilter === 'all' || stateOf(c) === cFilter)
+    && (!q || `${c.brand} ${c.text} ${c.cta}`.toLowerCase().includes(q)));
+  show($('#no-campaigns'), cs.length === 0);
+  show($('#no-match'), cs.length > 0 && rows.length === 0);
+
+  $('#campaigns').innerHTML = rows.map((c) => {
+    const active = c.status === 'active';
+    const state = stateOf(c);
+    const st = statOf(c.id);
+    const last = st?.lastImpressionAt ? ago(st.lastImpressionAt) : '—';
+    const pace = c.dailyBudgetStroops ? `paced · max ${usd(c.dailyBudgetStroops)}/day` : 'fast';
+    const bought = c.blocks ? c.blocks * 1000 : null;
+    const pct = bought ? Math.min(100, Math.round(((c.delivered ?? 0) / bought) * 100)) : 0;
+    const progress = bought
+      ? `<span class="prog"><i style="width:${pct}%"></i></span><span class="sub">${fmt(c.delivered ?? 0)} / ${fmt(bought)} · ${c.blocks} ${c.blocks === 1 ? 'block' : 'blocks'}</span>`
+      : `<span class="sub">no block limit</span>`;
+    return `
+      <tr>
+        <td class="line"><span style="color: var(--accent)">✶</span> <b>${esc(c.brand)}</b> — ${esc(c.text)} · <span class="cta">${esc(c.cta)}</span>
+          <span class="sub">${pace}${st?.lastImpressionAt ? ` · last seen ${last}` : ''}</span>
+          ${progress}
+          <span class="err hidden" data-err="${c.id}"></span></td>
+        <td><span class="pill ${state === 'active' ? 'live' : 'paused'}"><i></i>${state === 'active' ? 'live' : state}</span></td>
+        <td class="num">${usd(c.bidCpmStroops)}</td>
+        <td class="num">${st?.verified ? usd(((BigInt(st.spentStroops) * 1000n) / BigInt(st.verified)).toString()) : '—'}</td>
+        <td class="num">${fmt(st?.verified ?? 0)}${st?.pending ? `<span class="sub">+${fmt(st.pending)} pending</span>` : ''}</td>
+        <td class="num">${fmt(st?.reach ?? 0)}</td>
+        <td class="num">${usd(st?.spentStroops ?? '0')}</td>
+        <td class="num">${state === 'ended' ? '' : `<button class="btn btn-sm btn-quiet" data-toggle="${c.id}" data-to="${active ? 'paused' : 'active'}">${active ? 'Pause' : 'Start'}</button>`}</td>
+      </tr>`;
+  }).join('');
+
+  document.querySelectorAll('#campaigns [data-toggle]').forEach((b) => {
+    b.onclick = () => toggle(b.dataset.toggle, b.dataset.to);
+  });
+}
+
+/** Satin alinan bloklarin hepsi teslim edildi mi. */
+const isDone = (c) => !!c.blocks && (c.delivered ?? 0) >= c.blocks * 1000;
+
+function ago(ts) {
+  const m = Math.round((Date.now() - ts) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  return h < 48 ? `${h}h ago` : `${Math.round(h / 24)}d ago`;
+}
+
+function renderChart() {
+  const pts = stats?.daily || [];
+  const isSpend = metric === 'spend';
+  const val = (p) => isSpend ? Number(BigInt(p.spentStroops)) : p.impressions;
+  const max = Math.max(0, ...pts.map(val));
+  const total = pts.reduce((a, p) => a + (isSpend ? BigInt(p.spentStroops) : BigInt(p.impressions)), 0n);
+  $('#chart-label').textContent = isSpend ? `Spend · last ${days} days` : `Impressions · last ${days} days`;
+  $('#chart-total').textContent = isSpend ? usd(total.toString()) : fmt(total);
+  $('#chart-avg').textContent = pts.length
+    ? (isSpend ? `${usd((total / BigInt(pts.length)).toString())} / day avg` : `${fmt(Math.round(Number(total) / pts.length))} / day avg`)
+    : '';
+  show($('#chart-empty'), max === 0);
+
+  const day = (ms) => new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  $('#chart').innerHTML = pts.map((p, i) => {
+    const v = val(p);
+    const h = max > 0 ? Math.max(2, Math.round((v / max) * 100)) : 0;
+    return `<div class="col" data-i="${i}"><div class="bar${v === 0 ? ' zero' : ''}" style="height:${h}%"></div></div>`;
+  }).join('');
+  $('#chart-x').innerHTML = pts.length ? `<span>${day(pts[0].day)}</span><span>${day(pts[pts.length - 1].day)}</span>` : '';
+
+  const tip = $('#chart-tip'), card = $('#chart').parentElement;
+  $('#chart').querySelectorAll('.col').forEach((col) => {
+    col.onmouseenter = () => {
+      const p = pts[Number(col.dataset.i)];
+      tip.textContent = `${day(p.day)} · ${fmt(p.impressions)} impressions · ${usd(p.spentStroops)}`;
+      const r = col.getBoundingClientRect(), c = card.getBoundingClientRect();
+      tip.style.left = `${r.left - c.left + r.width / 2}px`;
+      tip.style.top = `${$('#chart').offsetTop - 6}px`;
+      show(tip, true);
+    };
+    col.onmouseleave = () => show(tip, false);
+  });
+}
+
+function segment(group, attr, onPick) {
+  group.querySelectorAll('.seg-btn').forEach((b) => {
+    b.onclick = () => {
+      group.querySelectorAll('.seg-btn').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); });
+      onPick(b.dataset[attr]);
+    };
+  });
+}
+segment($('#metric'), 'metric', (v) => { metric = v; renderChart(); });
+segment($('#range'), 'days', (v) => { days = Number(v); void loadStats(); });
+segment($('#c-filter'), 'f', (v) => { cFilter = v; renderCampaigns(); });
+$('#c-search').addEventListener('input', () => renderCampaigns());
+
+// Sol menu: ekranda olan bolumu isaretle.
+const navLinks = [...document.querySelectorAll('.ws-nav > a')];
+const secIo = new IntersectionObserver((es) => {
+  for (const e of es) if (e.isIntersecting) {
+    navLinks.forEach((a) => a.classList.toggle('on', a.getAttribute('href') === '#' + e.target.id));
+  }
+}, { rootMargin: '-30% 0px -60% 0px' });
+document.querySelectorAll('.ws-sec').forEach((sec) => secIo.observe(sec));
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
 
@@ -415,7 +710,7 @@ async function loadPools() {
       const active = c.status === 'active';
       return `
         <div style="display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; align-items: center; margin-top: 10px">
-          <div class="term-status" style="border: 1px solid var(--line); border-radius: 4px; padding: 9px 12px; min-height: 0">
+          <div class="term-status" style="border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; min-height: 0">
             <span class="ad" style="opacity:${active ? 1 : 0.45}">
               <span style="color: var(--accent)">✶</span>
               <span class="ad-text"><span class="brand-name">${esc(c.brand)}</span><span class="sep"> — ${esc(c.text)} · </span><span class="cta">${esc(c.cta)}</span></span>
@@ -434,7 +729,7 @@ async function loadPools() {
             ${budgetBar(p)}
           </div>
           <div style="display: flex; gap: 10px; align-items: center">
-            <span class="mono" style="font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: ${open ? 'var(--accent)' : 'var(--faint)'}">${p.status}</span>
+            <span class="mono" style="font-size: 12px; color: ${open ? 'var(--accent)' : 'var(--faint)'}">${p.status}</span>
             ${open ? `<button class="btn btn-sm btn-quiet" data-close-pool="${p.id}">Close pool</button>` : ''}
           </div>
         </div>
@@ -543,7 +838,22 @@ function pollDeposit() {
 
 /* ─────────── form ─────────── */
 
-const f = { brand: $('#f-brand'), text: $('#f-text'), cta: $('#f-cta'), cpm: $('#f-cpm') };
+const f = { brand: $('#f-brand'), text: $('#f-text'), cta: $('#f-cta'), cpm: $('#f-cpm'), blocks: $('#f-blocks') };
+let pace = 'medium';
+segment($('#pace'), 'pace', (v) => { pace = v; validate(); });
+
+/** Teslimat hizi → kac gune yayilir. Fast = kisma yok. Fiyat degismez. */
+const PACE_DAYS = { slow: 7n, medium: 3n, fast: null };
+const MAX_BLOCKS = 10000;
+/** Secilen hizin gunluk tavani; fast'te `null`. Tek gosterimin altina inmez. */
+function dailyCap(total, perImp) {
+  const d = PACE_DAYS[pace];
+  if (!d || total <= 0n) return null;
+  // Tam kuruşa yukari yuvarla: "$1.428572/gun" okunmaz.
+  const CENT = 100000n;
+  const cap = (((total + d - 1n) / d + CENT - 1n) / CENT) * CENT;
+  return cap < perImp ? perImp : cap;
+}
 Object.values(f).forEach((el) => el.addEventListener('input', validate));
 
 function validate() {
@@ -569,15 +879,44 @@ function validate() {
     : null;
 
   const cpmS = toStroops(f.cpm.value);
-  const cpmBad = cpmS === null ? 'Enter a number, e.g. 40'
-    : cpmS < MIN_CPM ? 'Minimum is $0.10 per 1000 impressions.' : null;
-  $('#f-perimp').textContent = cpmS && cpmS > 0n ? usd((cpmS / 1000n).toString()) : '—';
+  const cpmBad = cpmS === null ? 'Enter a bid, e.g. 2.00'
+    : cpmS < MIN_CPM ? 'The minimum bid is $0.10 per block.' : null;
+  const nBlocks = Number(f.blocks.value.trim());
+  const blocksBad = !Number.isInteger(nBlocks) || nBlocks < 1 ? 'Enter a whole number of blocks, at least 1.'
+    : nBlocks > MAX_BLOCKS ? `At most ${fmt(MAX_BLOCKS)} blocks per campaign.` : null;
+
+  // Tahmini toplam: blok basina teklif x blok sayisi.
+  const ok = !cpmBad && !blocksBad;
+  const perImp = ok ? cpmS / 1000n : 0n;
+  const total = ok ? cpmS * BigInt(nBlocks) : 0n;
+  const imps = ok ? nBlocks * 1000 : 0;
+  const cap = ok ? dailyCap(total, perImp) : null;
+
+  $('#pace-hint').textContent = pace === 'fast'
+    ? 'Fast — no throttle. Delivered as soon as developers are waiting. Does not change the price.'
+    : `${pace === 'slow' ? 'Slow' : 'Medium'} — spread over about ${PACE_DAYS[pace]} days${cap ? `, at most ${usd(cap.toString())} a day` : ''}. Does not change the price.`;
+
+  $('#estimate').innerHTML = `
+    <div><span class="ws-k">At most</span><span class="v">${ok ? usd(total.toString()) : '—'}</span></div>
+    <div><span class="ws-k">Impressions</span><span class="v">${ok ? fmt(imps) : '—'}</span></div>
+    <div><span class="ws-k">Max per impression</span><span class="v">${ok ? usd(perImp.toString()) : '—'}</span></div>
+    <div><span class="ws-k">Delivery</span><span class="v">${pace === 'fast' ? 'as fast as possible' : `~${PACE_DAYS[pace]} days`}</span></div>`;
+
+  // On odemeli: bakiye toplamdan azsa kampanya yine kurulur ama yalnizca
+  // bakiyenin yettigi kadar yayinlanir. Bunu once soylemek gerek.
+  const spendable = me ? BigInt(me.spendableStroops) : 0n;
+  const short_ = ok && me && total > spendable ? total - spendable : 0n;
+  show($('#e-funds'), short_ > 0n);
+  if (short_ > 0n) {
+    $('#e-funds').textContent = `Your spendable balance is ${usd(spendable.toString())}. Add ${usd(short_.toString())} to cover every block; until then it only runs as far as your balance goes.`;
+  }
 
   setErr('#e-text', tooLong, f.text);
   setErr('#e-cta', ctaBad, f.cta);
   setErr('#e-cpm', cpmBad, f.cpm);
+  setErr('#e-blocks', blocksBad, f.blocks);
 
-  const ready = !tooLong && !ctaBad && !cpmBad && f.brand.value.trim() && f.text.value.trim() && f.cta.value.trim();
+  const ready = !tooLong && !ctaBad && !cpmBad && !blocksBad && f.brand.value.trim() && f.text.value.trim() && f.cta.value.trim();
   $('#create').disabled = !ready;
   return ready;
 }
@@ -600,16 +939,25 @@ $('#create').onclick = async () => {
         text: f.text.value.trim(),
         cta: f.cta.value.trim().toLowerCase(),
         bidCpmStroops: toStroops(f.cpm.value).toString(),
+        blocks: Number(f.blocks.value.trim()),
+        ...(() => {
+          const bid = toStroops(f.cpm.value);
+          const cap = dailyCap(bid * BigInt(Number(f.blocks.value.trim())), bid / 1000n);
+          return cap ? { dailyBudgetStroops: cap.toString() } : {};
+        })(),
       },
     });
-    f.brand.value = ''; f.text.value = ''; f.cta.value = '';
+    f.brand.value = ''; f.text.value = ''; f.cta.value = ''; f.blocks.value = '1';
     await load();
+    $('#campaigns-sec').scrollIntoView({ behavior: 'smooth' });
   } catch (e) {
     // Sunucu hangi alanin bozuk oldugunu soyluyor — o kutuyu isaretle.
     const field = e.body?.field;
     if (field === 'text') setErr('#e-text', e.message, f.text);
     else if (field === 'cta') setErr('#e-cta', e.message, f.cta);
     else if (field === 'bidCpm') setErr('#e-cpm', e.message, f.cpm);
+    else if (field === 'blocks') setErr('#e-blocks', e.message, f.blocks);
+    else if (field === 'dailyBudget') { $('#e-create').textContent = e.message; show($('#e-create'), true); }
     else { $('#e-create').textContent = e.message; show($('#e-create'), true); }
   } finally {
     show($('#create-spin'), false);

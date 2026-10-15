@@ -5,137 +5,205 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dwell — one sponsored line while your agent thinks</title>
 <meta name="description" content="Developers get paid in USDC for one line of text that shows in the terminal only while an AI coding assistant is working.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28' fill='%23f97335'>✶</text></svg>">
+<meta name="theme-color" content="#12110f">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text x='16' y='16' font-size='28' text-anchor='middle' dominant-baseline='central' transform='rotate(90 16 16)' fill='%23f97335'>✶</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/landing.css">
 </head>
-<body>
+<body class="landing">
 
-<header class="top">
-  <a class="brand" href="/"><span class="star">✶</span>dwell</a>
-  <nav class="nav">
-    <a href="#how">how it works</a>
-    <a href="#data">what we send</a>
-    <a href="/advertisers">advertisers</a>
-    <a class="cta" href="/app">your earnings</a>
-    <span class="chip"><span class="dot"></span>testnet</span>
-  </nav>
+<header class="top" id="top">
+  <div class="top-in">
+    <a class="brand" href="/"><span class="star">✶</span>dwell</a>
+    <nav class="nav">
+      <a class="hide-sm" href="#how">How it works</a>
+      <a class="hide-sm" href="#privacy">Privacy</a>
+      <a class="hide-xs" href="/advertisers">Advertisers</a>
+      <span class="chip"><span class="dot"></span>testnet</span>
+      <a class="pill pill-solid" href="/app">Your earnings</a>
+    </nav>
+  </div>
 </header>
 
 <main class="wrap">
 
-  <section style="padding-top: clamp(56px, 9vw, 104px)">
-    <p class="eyebrow" id="eyebrow">Terminal-native ad marketplace</p>
-    <h1 class="h-hero">One sponsored line while your <em class="hl">agent</em> thinks. You get paid in USDC.</h1>
-    <p class="lead" style="margin: 26px 0 40px">Install a small CLI. While Claude Code is working, a single line of text sits in your status line. When the answer lands, it is gone.</p>
-
-    <!-- Urunun kendisi. Anlatmak yerine GOSTERIYORUZ: satir bekleme
-         basladiginda beliriyor, cevap gelince kayboluyor. -->
-    <figure class="term" style="box-shadow: 0 24px 70px -30px rgba(0,0,0,0.9)">
-      <figcaption class="term-bar">
-        <span>~/projects/api — claude · example ad</span>
-        <span id="phase">waiting — the line is shown</span>
-      </figcaption>
-      <div class="term-body">
-        <div style="color: var(--faint)">❯ claude</div>
-        <div style="margin-top: 6px">&gt; add rate limiting to the auth middleware</div>
-        <div style="display: flex; gap: 10px; margin-top: 10px; color: var(--muted)">
-          <span style="color: var(--accent)">●</span><span id="activity">Editing src/auth/middleware.ts</span>
-        </div>
-        <div id="output" style="color: var(--faint); white-space: pre; margin-top: 4px"></div>
+  <!-- ── hero ── -->
+  <section class="hero">
+    <div class="hero-row">
+      <div>
+        <p class="kicker"><span class="star">✶</span><span id="eyebrow">Terminal-native ad marketplace</span></p>
+        <h1 class="display">One sponsored line while your agent thinks. <span class="soft">Paid in USDC, on Stellar.</span></h1>
       </div>
-      <div class="term-status" style="margin-top: 22px">
-        <span class="ad" id="ad">
-          <span style="color: var(--accent)">✶</span>
-          <span class="ad-text">
-            <span class="brand-name" id="ad-brand">Your product</span><span class="sep"> — <span id="ad-text">what it does, in a few words</span> · </span><span class="cta" id="ad-cta">yourdomain.com</span>
+      <div class="hero-side">
+        <p class="p">Install a small CLI. While Claude Code is working, a single line of text sits in your status line. When the answer lands, it is gone.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Urunun kendisi. Anlatmak yerine GOSTERIYORUZ: satir bekleme
+       sirasinda duruyor, cevap gelince kayboluyor. -->
+  <section class="stage">
+    <div class="stage-copy">
+      <p class="h3">Shown only while you wait. <span class="soft">Gone when the answer lands.</span></p>
+      <button class="cmd" id="copy-install" aria-label="Copy install command">
+        <span class="dollar">$</span><span class="txt">npm i -g dwellsh &amp;&amp; dwell init --spinner</span><span class="tag">copy</span>
+      </button>
+    </div>
+
+    <div class="scene" id="scene">
+      <pre class="ascii" id="ascii" aria-hidden="true"></pre>
+
+      <figure class="win" style="margin: 0">
+        <figcaption class="win-bar">
+          <span class="dots"><i></i><i></i><i></i></span>
+          <span class="title">~/projects/api — claude</span>
+        </figcaption>
+        <div class="win-body">
+          <div class="dim">❯ claude</div>
+          <div class="prompt-box">&gt; <span id="prompt">add rate limiting to the auth middleware</span></div>
+          <div class="act" id="act-row"><span class="bullet">●</span><span id="activity">Editing src/auth/middleware.ts</span></div>
+          <div class="act mut" style="opacity: 0.55"><span class="bullet" style="color: var(--faint)">⎿</span><span>Read 3 files · 1 search</span></div>
+        </div>
+        <div class="term-status">
+          <span class="ad" id="ad">
+            <span style="color: var(--accent)">✶</span>
+            <span class="ad-text">
+              <span class="brand-name" id="ad-brand">Your product</span><span class="sep"> — <span id="ad-text">what it does, in a few words</span> · </span><span class="cta" id="ad-cta">yourdomain.com</span>
+            </span>
           </span>
-        </span>
-        <span class="ad-right" id="ad-right">Edit · 2.8s</span>
-      </div>
-    </figure>
-
-    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 32px">
-      <button class="btn" id="copy-install"><span style="color: var(--faint)">$</span>npm i -g dwellsh &amp;&amp; dwell init --spinner<span class="tag">copy</span></button>
-      <a class="link-under" href="#how" style="font-size: 14px">How it works ↓</a>
+          <span class="ad-right" id="ad-right">Edit · 2.8s</span>
+        </div>
+      </figure>
     </div>
   </section>
 
-  <section>
-    <p class="statement">It only appears while you are waiting. It disappears when the answer arrives. It never interrupts a command, never opens a window, and when you are idle there is nothing there at all.</p>
+  <!-- ── nasil calisir ── -->
+  <section class="block" id="how">
+    <div class="block-head">
+      <h2 class="h2">Three steps. <span class="soft">Then you forget it is there.</span></h2>
+      <p class="p">No account, no email, no password. A command, a wallet signature, and a line that only exists while you are waiting anyway.</p>
+    </div>
+
+    <div class="cards">
+      <article class="card-l reveal">
+        <div class="head">
+          <span class="no">01</span>
+          <h3 class="h3">Install</h3>
+          <p class="p-sm">It edits your Claude Code settings and nothing else on the machine.</p>
+        </div>
+        <div class="demo">
+          <div><span class="dim">$</span> <span class="ink">npm i -g dwellsh</span></div>
+          <div><span class="dim">$</span> <span class="ink">dwell init --spinner</span></div>
+          <div><span class="ok">✓</span> statusLine installed</div>
+          <div><span class="ok">✓</span> spinnerVerbs installed</div>
+          <div><span class="ok">✓</span> hooks.UserPromptSubmit installed</div>
+          <div><span class="ok">✓</span> hooks.Stop installed</div>
+          <div><span class="ok">✓</span> daemon running</div>
+          <div class="dim" style="margin-top: 6px">To undo: dwell uninstall</div>
+        </div>
+      </article>
+
+      <article class="card-l reveal">
+        <div class="head">
+          <span class="no">02</span>
+          <h3 class="h3">Connect your wallet</h3>
+          <p class="p-sm">Freighter. You sign a login challenge that can never be submitted. We never see a key.</p>
+        </div>
+        <div class="demo" style="display: grid; align-content: center">
+          <div class="sign">
+            <div class="row"><span class="ink">Sign challenge</span><span class="dim">no fee</span></div>
+            <div class="msg">Sign in to Dwell<span class="dim">
+publisher login · expires in 5 min</span></div>
+            <div class="btns"><span>Cancel</span><span class="go">Sign</span></div>
+          </div>
+          <div class="dim" style="margin-top: 12px">$ dwell login</div>
+        </div>
+      </article>
+
+      <article class="card-l reveal" id="meter-card">
+        <div class="head">
+          <span class="no">03</span>
+          <h3 class="h3">Get paid</h3>
+          <p class="p-sm">An impression counts only after ten seconds on screen. Half of what the advertiser pays is yours.</p>
+        </div>
+        <div class="demo">
+          <div><span class="acc">✶</span> <span class="ink">Your product</span> — one line</div>
+          <div class="meter"><i></i></div>
+          <div class="ticks"><span>0s</span><span>shown</span><span class="acc">10s · counted</span></div>
+          <div style="margin-top: 18px; display: grid; gap: 2px">
+            <div style="display: flex; justify-content: space-between"><span>publisher share</span><span class="ink">50%</span></div>
+            <div style="display: flex; justify-content: space-between"><span>payout asset</span><span class="ink">USDC</span></div>
+            <div style="display: flex; justify-content: space-between"><span>minimum payout</span><span class="ink">none</span></div>
+          </div>
+        </div>
+      </article>
+    </div>
   </section>
 
-  <section id="how">
-    <h2 style="margin-bottom: 40px">How it works</h2>
-    <ol style="margin: 0; padding: 0; list-style: none">
-      <li class="step">
-        <span class="no">01</span>
-        <h3>Install</h3>
-        <div>
-          <p class="body" style="margin: 0 0 10px">One command. It edits your Claude Code settings and nothing else on the machine.</p>
-          <span class="mono" style="font-size: 13px; color: var(--faint)">npm i -g dwellsh &amp;&amp; dwell init --spinner</span>
-        </div>
-      </li>
-      <li class="step">
-        <span class="no">02</span>
-        <h3>Connect your wallet</h3>
-        <div>
-          <p class="body" style="margin: 0 0 10px">USDC lands in the Stellar wallet you connect. You sign with Freighter; we never see a private key.</p>
-          <span class="mono" style="font-size: 13px; color: var(--faint)">dwell login</span>
-        </div>
-      </li>
-      <li class="step">
-        <span class="no">03</span>
-        <h3>Get paid</h3>
-        <div>
-          <p class="body" style="margin: 0 0 10px">While the model is working, one line sits in your status line next to what the assistant is doing. Idle means empty.</p>
-          <span class="mono" style="font-size: 13px; color: var(--faint)">counts only after 10 seconds on screen</span>
-        </div>
-      </li>
-    </ol>
-  </section>
+  <!-- ── gizlilik ── -->
+  <section class="block" id="privacy">
+    <div class="block-head">
+      <h2 class="h2">What leaves your machine. <span class="soft">All of it.</span></h2>
+      <p class="p">This is the entire impression report, field for field. If it is not in this object, it is not sent.</p>
+    </div>
 
-  <section id="data">
-    <h2 style="margin-bottom: 8px">What we send</h2>
-    <p class="body" style="margin: 0 0 36px">Every field, in both directions. Nothing else leaves the machine.</p>
-    <div class="grid-1px" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr))">
-      <div style="padding: 22px 24px">
-        <p class="eyebrow" style="margin-bottom: 18px; letter-spacing: 0.12em">We send</p>
-        <ul class="mono" style="margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; font-size: 14px; color: var(--ink-soft)">
-          <li>impression id, campaign id, duration</li>
-          <li>session id, client version</li>
-          <li>OS and architecture</li>
+    <div class="privacy">
+      <div class="code-card reveal">
+        <div class="cap"><span>impression report</span><span>POST /v1/impressions</span></div>
+<pre><span class="c">{</span>
+  <span class="k">id</span>:            <span class="s">"01J9Z…"</span>,        <span class="c">// random, per impression</span>
+  <span class="k">campaignId</span>:    <span class="s">"cmp_…"</span>,
+  <span class="k">nonce</span>:         <span class="s">"…"</span>,
+  <span class="k">sessionId</span>:     <span class="s">"…"</span>,             <span class="c">// random, not you</span>
+  <span class="k">surface</span>:       <span class="s">"statusline"</span>,
+  <span class="k">durationMs</span>:    <span class="n">12400</span>,
+  <span class="k">clientTs</span>:      <span class="n">1790000000000</span>,
+  <span class="k">projectKey</span>:    <span class="s">"9f2c…"</span>,         <span class="c">// salted HMAC, never the path</span>
+  <span class="k">clientVersion</span>: <span class="s">"0.1.13"</span>,
+  <span class="k">os</span>:            <span class="s">"darwin"</span>,
+  <span class="k">arch</span>:          <span class="s">"arm64"</span>
+<span class="c">}</span></pre>
+      </div>
+
+      <div class="never reveal">
+        <div>
+          <h3 class="h3">Never sent</h3>
+          <p class="p-sm" style="margin-top: 4px">Not hashed, not sampled, not "anonymised". Not sent.</p>
+        </div>
+        <ul>
+          <li>your directory path <span class="x">✕</span></li>
+          <li>your file names <span class="x">✕</span></li>
+          <li>your prompts <span class="x">✕</span></li>
+          <li>your code <span class="x">✕</span></li>
         </ul>
+        <a class="link-under" href="/privacy" style="margin-top: auto; align-self: start">The full privacy detail →</a>
       </div>
-      <div style="padding: 22px 24px">
-        <p class="eyebrow" style="margin-bottom: 18px; letter-spacing: 0.12em; color: var(--faint)">We never send</p>
-        <ul class="mono" style="margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; font-size: 14px; color: var(--muted)">
-          <li style="text-decoration: line-through; text-decoration-color: rgba(157,150,141,0.45)">your directory path</li>
-          <li style="text-decoration: line-through; text-decoration-color: rgba(157,150,141,0.45)">your file names</li>
-          <li style="text-decoration: line-through; text-decoration-color: rgba(157,150,141,0.45)">your prompts, your code</li>
-        </ul>
-      </div>
-    </div>
-    <a class="link-under" href="/privacy" style="display: inline-block; margin-top: 18px">The full privacy detail →</a>
-  </section>
-
-  <section>
-    <h2 style="margin-bottom: 8px">Where this actually stands</h2>
-    <p class="body" style="margin: 0 0 30px; max-width: 60ch">Stellar testnet. Advertisers deposit, publishers get paid on-chain, the pipeline runs end to end — with test money. No projections here, only the ledger.</p>
-    <div style="border: 1px solid rgba(236,231,225,0.11); background: rgba(236,231,225,0.02); padding: 20px 22px; display: grid; gap: 14px" class="mono">
-      <div style="display: flex; flex-wrap: wrap; gap: 8px 24px; color: var(--faint); font-size: 13px">
-        <span>network <span style="color: var(--ink)">testnet</span></span>
-        <span>asset <span style="color: var(--ink)">USDC</span></span>
-        <span>publisher share <span style="color: var(--ink)">50%</span></span>
-      </div>
-      <a href="https://stellar.expert/explorer/testnet/tx/9cbb1a573c4a3eeacefde360280c93d08df1cc0b7522d82e3b411898aae6ad86" style="color: var(--accent); word-break: break-all; line-height: 1.6; font-size: 13px" target="_blank" rel="noopener">9cbb1a573c4a3eeacefde360280c93d08df1cc0b7522d82e3b411898aae6ad86 ↗</a>
-      <span style="color: var(--faint); font-size: 13px">A real payout transaction. Open it and check.</span>
     </div>
   </section>
 
-  <section id="board">
-    <p class="eyebrow" style="margin-bottom: 12px">Leaderboard</p>
-    <h2 style="margin-bottom: 8px">Who gets paid, and where</h2>
-    <p class="body" style="margin: 0 0 8px; max-width: 62ch">Developers who chose to be listed. A nickname and a country — never a wallet address. Their own ads don't count.</p>
+  <!-- ── durum ── -->
+  <section class="block">
+    <div class="block-head">
+      <h2 class="h2">Where this actually stands.</h2>
+      <p class="p">Advertisers deposit, publishers get paid on-chain, the pipeline runs end to end — with test money. No projections here, only the ledger.</p>
+    </div>
+    <div class="status reveal">
+      <div><span class="k">network</span><span class="v acc">testnet</span></div>
+      <div><span class="k">asset</span><span class="v">USDC</span></div>
+      <div><span class="k">publisher share</span><span class="v">50%</span></div>
+      <div><span class="k">counts after</span><span class="v">10s</span></div>
+    </div>
+    <p class="p-sm" style="margin-top: 14px; font-family: var(--mono); font-size: 12.5px; color: var(--faint)">A real payout transaction: <a href="https://stellar.expert/explorer/testnet/tx/9cbb1a573c4a3eeacefde360280c93d08df1cc0b7522d82e3b411898aae6ad86" style="color: var(--accent); word-break: break-all" target="_blank" rel="noopener">9cbb1a573c4a3eeacefde360280c93d08df1cc0b7522d82e3b411898aae6ad86 ↗</a> Open it and check.</p>
+  </section>
+
+  <!-- ── siralama ── -->
+  <section class="block" id="board">
+    <div class="block-head">
+      <h2 class="h2">Who gets paid, and where.</h2>
+      <p class="p">Developers who chose to be listed. A nickname and a country — never a wallet address. Their own ads don't count.</p>
+    </div>
 
     <div class="globe-wrap">
       <canvas id="globe" aria-label="Globe of countries with listed developers. Drag or use the arrow keys to rotate."></canvas>
@@ -188,17 +256,45 @@
     </div>
   </section>
 
-  <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: clamp(20px, 4vw, 56px); align-items: start">
-    <div>
-      <h2 style="font-size: clamp(24px, 2.8vw, 32px); margin-bottom: 14px">Leaving takes one command</h2>
-      <p class="body" style="margin: 0">Uninstall removes only the entries we added to your Claude Code settings. Anything you configured yourself is left exactly as it was.</p>
+
+  <!-- ── daha fazlasi ── -->
+  <section class="block">
+    <h2 class="h2" style="margin-bottom: 28px">Learn more</h2>
+    <div class="links">
+      <a class="link-card" href="/app">
+        <span class="h3">Your earnings</span>
+        <span class="p-sm">Connect the wallet you logged in with and see what has been counted.</span>
+        <span class="go">Open the dashboard →</span>
+      </a>
+      <a class="link-card" href="/advertisers">
+        <span class="h3">Selling a dev tool?</span>
+        <span class="p-sm">Buy the line — 80 characters, plain text, in front of developers who are waiting.</span>
+        <span class="go">For advertisers →</span>
+      </a>
+      <a class="link-card" href="/privacy">
+        <span class="h3">Privacy, in full</span>
+        <span class="p-sm">Every field in both directions, and what the CLI does on your machine.</span>
+        <span class="go">Read the detail →</span>
+      </a>
+      <a class="link-card" href="https://github.com/ynsmlkc/Dwell" target="_blank" rel="noopener">
+        <span class="h3">Read the source</span>
+        <span class="p-sm">The CLI, the server and the on-chain vault. Read it before you run it.</span>
+        <span class="go">GitHub →</span>
+      </a>
     </div>
-    <button class="btn btn-quiet" id="copy-uninstall" style="justify-self: start"><span style="color: var(--faint)">$</span>dwell uninstall<span class="tag">copy</span></button>
   </section>
 
-  <section style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px">
-    <p style="margin: 0; max-width: 52ch; font-size: clamp(18px, 2.1vw, 24px); line-height: 1.45; letter-spacing: -0.01em">Selling a dev tool? Buy the line — 80 characters, plain text, in front of developers who are waiting.</p>
-    <a class="btn btn-primary" href="/advertisers">For advertisers →</a>
+  <!-- ── kapanis ── -->
+  <section class="finale">
+    <pre class="ascii-star" id="ascii-star" aria-hidden="true"></pre>
+    <h2 class="display">Try Dwell</h2>
+    <button class="cmd" id="copy-install-2" aria-label="Copy install command">
+      <span class="dollar">$</span><span class="txt">npm i -g dwellsh &amp;&amp; dwell init --spinner</span><span class="tag">copy</span>
+    </button>
+    <div class="sub">
+      <span>Leaving takes one command:</span>
+      <a href="#" id="copy-uninstall">dwell uninstall</a>
+    </div>
   </section>
 </main>
 
@@ -206,21 +302,189 @@
   <div class="wrap">
     <span>✶ dwell — testnet</span>
     <div style="display: flex; gap: 24px">
-      <a href="https://github.com/ynsmlkc/Dwell" target="_blank" rel="noopener">GitHub</a>
+      <a href="/advertisers">Advertisers</a>
       <a href="/privacy">Privacy</a>
+      <a href="https://github.com/ynsmlkc/Dwell" target="_blank" rel="noopener">GitHub</a>
     </div>
   </div>
 </footer>
 
-<style>
-  .step {
-    display: grid; grid-template-columns: minmax(44px, 56px) minmax(0, 1fr) minmax(0, 1.15fr);
-    gap: clamp(14px, 3vw, 40px); align-items: start;
-    padding: 26px 0; border-top: 1px solid var(--line);
-  }
-  .step .no { font-family: var(--mono); font-size: 12px; color: var(--accent); padding-top: 6px; }
-  @media (max-width: 720px) { .step { grid-template-columns: 40px 1fr; } .step > div { grid-column: 2; } }
+<script type="module">
+  import { copyButton, $ } from '/app.js';
 
+  const INSTALL = 'npm i -g dwellsh && dwell init --spinner';
+  copyButton($('#copy-install'), () => INSTALL);
+  copyButton($('#copy-install-2'), () => INSTALL);
+  $('#copy-uninstall').addEventListener('click', async (e) => {
+    e.preventDefault();
+    const a = e.currentTarget;
+    try { await navigator.clipboard.writeText('dwell uninstall'); } catch { /* izin yok */ }
+    if (a.dataset.busy) return;
+    a.dataset.busy = '1';
+    a.textContent = 'copied';
+    setTimeout(() => { a.textContent = 'dwell uninstall'; delete a.dataset.busy; }, 1400);
+  });
+
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* Ust cubuk: sayfa kayinca alt cizgi belirsin. */
+  const top = $('#top');
+  const onScroll = () => top.classList.toggle('scrolled', scrollY > 8);
+  addEventListener('scroll', onScroll, { passive: true }); onScroll();
+
+  /* Bolumler gorunur olunca bir kez yukselsin. */
+  const io = new IntersectionObserver((es) => {
+    for (const e of es) if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+  }, { threshold: 0.15 });
+  document.querySelectorAll('.reveal, #meter-card').forEach((n) => io.observe(n));
+
+  /* ── ASCII manzara ──
+     Resim yok: terminalin kendi malzemesiyle — karakter yogunlugu —
+     bir ufuk, bir gunes ve iki tepe sirasi. Yavasca kayiyor. */
+  const RAMP = ' .·:-=+*#%@';
+  const ascii = $('#ascii'), scene = $('#scene');
+  let cols = 0, rows = 0, t = 0, W = 1, H = 1;
+
+  /* Fare isigi: imlecin cevresi biraz yogunlasip isinir. Gunes yerinde
+     kalir. Isik imleci yumusakca izler, sahneden cikinca soner. Dokunmatik
+     ekranda ve "hareketi azalt" acikken hic yok. */
+  const glowOn = !still && matchMedia('(hover: hover) and (pointer: fine)').matches;
+  const glow = { x: 0.5, y: 0.5, tx: 0.5, ty: 0.5, a: 0, ta: 0 };
+  const GLOW_PX = 90;
+
+  function measure() {
+    const r = scene.getBoundingClientRect();
+    W = r.width || 1; H = r.height || 1;
+    cols = Math.ceil(r.width / 6.6) + 1;
+    rows = Math.ceil(r.height / 13) + 1;
+  }
+
+  function field(x, y, t) {
+    // x, y: 0..1 — gunes pencerenin ustunde, altinda iki tepe sirasi.
+    const n = Math.sin(x * 91.3 + y * 57.1) * 43758.5453, grain = n - Math.floor(n);
+    const dx = (x - 0.5) * 1.7, dy = y - 0.17;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    let v = d < 0.13 ? 0.98 : Math.max(0, 0.55 - (d - 0.13) * 2.2);  // gunes + hale
+    if (d > 0.13) v *= 0.55 + 0.45 * Math.cos((d - 0.13) * 60 - t);   // yavas halkalar
+    v += grain < 0.035 ? 0.25 : 0;                                    // seyrek yildiz
+    const h1 = 0.62 + 0.05 * Math.sin(x * 6 + t * 0.3) + 0.025 * Math.sin(x * 19 - t * 0.2);
+    const h2 = 0.78 + 0.05 * Math.sin(x * 4 - t * 0.2 + 1.3) + 0.02 * Math.sin(x * 27 + t * 0.35);
+    if (y > h1) v = 0.3 + (y - h1) * 0.9 + (grain - 0.5) * 0.12;
+    if (y > h2) v = 0.55 + (y - h2) * 1.4 + (grain - 0.5) * 0.12;
+    if (glow.a > 0.01) {
+      const gx = (x - glow.x) * W, gy = (y - glow.y) * H;
+      const g = Math.max(0, 1 - Math.sqrt(gx * gx + gy * gy) / GLOW_PX);
+      v += g * g * 0.32 * glow.a;
+    }
+    return Math.min(0.999, Math.max(0, v));
+  }
+
+  function draw() {
+    let s = '';
+    for (let j = 0; j < rows; j++) {
+      const y = j / rows;
+      for (let i = 0; i < cols; i++) s += RAMP[Math.floor(field(i / cols, y, t) * RAMP.length)];
+      s += '\n';
+    }
+    ascii.textContent = s;
+  }
+
+  measure(); draw();
+  new ResizeObserver(() => { measure(); draw(); }).observe(scene);
+  if (glowOn) {
+    scene.addEventListener('pointermove', (e) => {
+      const r = scene.getBoundingClientRect();
+      glow.tx = (e.clientX - r.left) / r.width;
+      glow.ty = (e.clientY - r.top) / r.height;
+      if (glow.a < 0.01) { glow.x = glow.tx; glow.y = glow.ty; }   // ilk giriste sicramasin
+      glow.ta = 1;
+    });
+    scene.addEventListener('pointerleave', () => { glow.ta = 0; });
+  }
+
+  if (!still) {
+    let last = 0;
+    const loop = (now) => {
+      if (glowOn) {
+        glow.x += (glow.tx - glow.x) * 0.14;
+        glow.y += (glow.ty - glow.y) * 0.14;
+        glow.a += (glow.ta - glow.a) * (glow.ta > glow.a ? 0.12 : 0.05);
+        ascii.style.setProperty('--mx', (glow.x * 100).toFixed(2) + '%');
+        ascii.style.setProperty('--my', (glow.y * 100).toFixed(2) + '%');
+        ascii.style.setProperty('--ga', glow.a.toFixed(3));
+      }
+      if (now - last > 110) { t += 0.11; draw(); last = now; }
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+
+  /* ── ASCII yildiz (kapanis) ── ✶ alti kollu. */
+  (() => {
+    const W = 44, H = 24, out = [];
+    for (let j = 0; j < H; j++) {
+      let line = '';
+      for (let i = 0; i < W; i++) {
+        const x = (i - W / 2 + 0.5) / (W / 2), y = (j - H / 2 + 0.5) / (H / 2);
+        const r = Math.hypot(x, y), a = Math.atan2(y, x);
+        const arm = Math.pow(Math.abs(Math.cos(3 * a)), 3);
+        let v = Math.max(0, 1 - r / (0.28 + 0.72 * arm)) * 1.25;
+        v += Math.max(0, 0.22 - r) * 2;
+        line += RAMP[Math.min(RAMP.length - 1, Math.floor(v * RAMP.length))];
+      }
+      out.push(line);
+    }
+    $('#ascii-star').textContent = out.join('\n');
+  })();
+
+  /* ── Hero terminali ──
+     Terminal SABIT durur; satir sayisi degismez. Degisen tek sey status
+     line'daki reklam ve sagdaki "ne yapiyor" sayaci. */
+  /* Ornek satirlar — GERCEK marka DEGIL. Gercek bir reklamveren
+     geldiginde, IZNIYLE, adi buraya gelir. */
+  const ADS = [
+    { brand: 'Your product', text: 'what it does, in a few words', cta: 'yourdomain.com' },
+    { brand: 'Your API', text: 'one line, plain text, no images', cta: 'yourdomain.com' },
+    { brand: 'Your tool', text: '80 characters including the domain', cta: 'yourdomain.com' },
+  ];
+  const ACTS = [
+    { label: 'Edit', verb: 'Editing src/auth/middleware.ts' },
+    { label: 'Search', verb: 'Searching for rate limit helpers' },
+    { label: 'Thinking', verb: 'Thinking about token bucket vs. sliding window' },
+  ];
+  const EYEBROWS = [
+    'Terminal-native ad marketplace',
+    'Paid in USDC — no minimum',
+    'Disclosed — every line starts with ✶',
+    'Shown only while you wait',
+  ];
+
+  const el = {
+    ad: $('#ad'), brand: $('#ad-brand'), text: $('#ad-text'), cta: $('#ad-cta'),
+    right: $('#ad-right'), activity: $('#activity'), eyebrow: $('#eyebrow'),
+  };
+  let i = 0, secs = 2.8;
+
+  function paint() {
+    const ad = ADS[i], act = ACTS[i % ACTS.length];
+    el.brand.textContent = ad.brand;
+    el.text.textContent = ad.text;
+    el.cta.textContent = ad.cta;
+    el.eyebrow.textContent = EYEBROWS[i % EYEBROWS.length];
+    el.activity.textContent = act.verb;
+    el.right.textContent = `${act.label} · ${secs.toFixed(1)}s`;
+  }
+  paint();
+
+  if (!still) {
+    setInterval(() => { secs += 0.4; paint(); }, 400);
+    setInterval(() => {
+      el.ad.style.opacity = '0';
+      setTimeout(() => { i = (i + 1) % ADS.length; secs = 0.4; paint(); el.ad.style.opacity = '1'; }, 280);
+    }, 4200);
+  }
+</script>
+<style>
   /* ── siralama ── */
   .globe-wrap { position: relative; max-width: 620px; margin: 0 auto; }
   #globe { display: block; width: 100%; aspect-ratio: 1; cursor: grab; touch-action: pan-y; outline: none; }
@@ -285,71 +549,6 @@
   .pc-history { border: 1px solid var(--line-2); border-radius: 4px; padding: 10px; display: grid; gap: 8px; }
   #pc-spark { width: 100%; height: 64px; display: block; }
 </style>
-
-<script type="module">
-  import { copyButton, $ } from '/app.js';
-
-  copyButton($('#copy-install'), () => 'npm i -g dwellsh && dwell init --spinner');
-  copyButton($('#copy-uninstall'), () => 'dwell uninstall');
-
-  /* Hero animasyonu — terminal SABIT durur, hicbir satir eklenip
-     cikarilmiyor (yukseklik degismiyor). Degisen tek sey status line'daki
-     reklam — capraz gecisle bir sonrakine geciyor. */
-  /* Ornek satirlar — GERCEK marka DEGIL.
-     Onceden burada Firecrawl, Resend, Neon yaziyordu. Hicbiri musterimiz
-     degil ve izin vermediler; siteye koymak "bunlar bize para veriyor"
-     demekti. Yerlerine bicimi ogreten yer tutucular kondu. Gercek bir
-     reklamveren geldiginde, IZNIYLE, adi buraya gelir. */
-  const ADS = [
-    { brand: 'Your product', text: 'what it does, in a few words', cta: 'yourdomain.com' },
-    { brand: 'Your API', text: 'one line, plain text, no images', cta: 'yourdomain.com' },
-    { brand: 'Your tool', text: '80 characters including the domain', cta: 'yourdomain.com' },
-  ];
-  const ACTS = [
-    { label: 'Edit', verb: 'Editing src/auth/middleware.ts' },
-    { label: 'Search', verb: 'Searching for rate limit helpers' },
-    { label: 'Thinking', verb: 'Thinking about token bucket vs. sliding window' },
-  ];
-
-  /* Ust satir (eyebrow) reklamla birlikte doner — sabit durup sikici
-     kalmasin diye. Ayni durust ton: sitenin baska yerinde zaten yazan
-     gercek iddialar, yeni pazarlama laf kalabaligi degil. */
-  const EYEBROWS = [
-    'Terminal-native ad marketplace',
-    'Paid in USDC — no minimum',
-    'Disclosed — every line starts with ✶',
-    'Shown only while you wait',
-  ];
-
-  const el = {
-    ad: $('#ad'), brand: $('#ad-brand'), text: $('#ad-text'), cta: $('#ad-cta'),
-    right: $('#ad-right'), activity: $('#activity'), eyebrow: $('#eyebrow'),
-  };
-
-  let i = 0, secs = 2.8;
-
-  function paint() {
-    const ad = ADS[i], act = ACTS[i % ACTS.length];
-    el.brand.textContent = ad.brand;
-    el.text.textContent = ad.text;
-    el.cta.textContent = ad.cta;
-    el.eyebrow.textContent = EYEBROWS[i % EYEBROWS.length];
-    el.activity.textContent = act.verb;
-    el.right.textContent = `${act.label} · ${secs.toFixed(1)}s`;
-  }
-  paint();
-
-  // Hareket istemeyene tek kare: yine de urunu gosterir.
-  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    setInterval(() => { secs += 0.4; paint(); }, 400);
-    setInterval(() => {
-      // Yalnizca reklam satiri soluyor — govde (satir sayisi, terminalin
-      // boyu) hic kimildamiyor, cunku output/activity buraya hic dokunmuyor.
-      el.ad.style.opacity = '0';
-      setTimeout(() => { i = (i + 1) % ADS.length; secs = 0.4; paint(); el.ad.style.opacity = '1'; }, 260);
-    }, 4000);
-  }
-</script>
 
 <script type="module">
   import { api, $, $$, show } from '/app.js';

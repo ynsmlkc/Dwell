@@ -31,187 +31,211 @@ export function loginPage(opts: LoginPageOpts): string {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Dwell — connect your wallet</title>
 <style>
+  /* Sitenin (landing) dili: sicak koyu zemin, Geist, tek turuncu vurgu,
+     urunun kendisi — terminal penceresi — sahnenin ortasinda. CSP disariya
+     izin vermedigi icin font yuklenmiyor; Geist kuruluysa o, yoksa sistem. */
   *, *::before, *::after { box-sizing: border-box }
   :root {
-    --bg:#0c0b0a; --deep:#080706; --ink:#ece7e1; --soft:#d6d0c8;
-    --muted:#9d968d; --faint:#6f6a63; --line:rgba(236,231,225,0.09);
-    --line2:rgba(236,231,225,0.14); --accent:#f97335; --err:#b8574a; --ok:#8fae7f;
-    --serif:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;
-    --mono:ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
+    --bg:#12110f; --bg2:#181714; --bg3:#1e1c19; --panel:#0e0d0c;
+    --ink:#efeae3; --ink2:#a39c92; --muted:#8a847b; --faint:#6a655e; --dim:#4f4b45;
+    --line:rgba(239,234,227,0.07); --line2:rgba(239,234,227,0.12);
+    --accent:oklch(0.74 0.16 52); --accent-hi:oklch(0.8 0.14 52);
+    --err:#c9695a; --ok:#8fae7f;
+    --sans:'Geist',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+    --mono:'Geist Mono',ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
   }
+  html { color-scheme: dark }
   body {
     margin:0; min-height:100vh; display:grid; grid-template-rows:auto 1fr auto;
-    font-family:var(--serif); background:var(--bg); color:var(--ink);
+    font-family:var(--sans); font-size:16px; line-height:1.5; letter-spacing:-0.005em;
+    background:var(--bg); color:var(--ink);
     -webkit-font-smoothing:antialiased; font-variant-numeric:tabular-nums;
-    background-image:
-      linear-gradient(rgba(236,231,225,0.032) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(236,231,225,0.032) 1px, transparent 1px);
-    background-size:64px 64px;
   }
   a { color:var(--ink); text-decoration:none }
   a:hover { color:var(--accent) }
   :focus-visible { outline:2px solid var(--accent); outline-offset:3px }
-  ::selection { background:rgba(249,115,53,0.3) }
+  ::selection { background:oklch(0.74 0.16 52 / 0.3) }
 
   header, footer {
-    display:flex; align-items:center; justify-content:space-between;
-    gap:10px 24px; flex-wrap:wrap; padding:14px clamp(16px,4vw,40px);
-    font-family:var(--mono); font-size:12.5px; color:var(--faint);
+    display:flex; align-items:center; justify-content:space-between; gap:10px 24px; flex-wrap:wrap;
+    padding:12px clamp(16px,4vw,48px);
   }
   header { border-bottom:1px solid var(--line) }
-  footer { border-top:1px solid var(--line) }
-  .brand { display:flex; align-items:baseline; gap:9px; font-size:14px; color:var(--ink) }
-  .brand i { color:var(--accent); font-size:15px; font-style:normal }
+  footer { border-top:1px solid var(--line); font-family:var(--mono); font-size:12px; color:var(--faint) }
+  .brand { display:flex; align-items:center; gap:8px; font-weight:600; font-size:16px; letter-spacing:-0.02em }
+  .brand i { color:var(--accent); font-style:normal; font-size:17px }
   .chip {
-    display:inline-flex; align-items:center; gap:8px; padding:5px 11px;
-    border:1px solid rgba(236,231,225,0.16); border-radius:3px;
-    font-size:12px; color:var(--muted); white-space:nowrap;
+    display:inline-flex; align-items:center; gap:8px; height:28px; padding:0 12px; border-radius:999px;
+    border:1px solid var(--line2); font-family:var(--mono); font-size:12px; color:var(--ink2); white-space:nowrap;
   }
-  .chip i { width:5px; height:5px; border-radius:50%; background:var(--accent); display:block }
+  .chip i { width:6px; height:6px; border-radius:50%; background:var(--accent); display:block;
+    box-shadow:0 0 0 3px oklch(0.74 0.16 52 / 0.18) }
 
-  main { display:grid; place-items:center; padding:clamp(28px,6vw,72px) clamp(16px,4vw,40px) }
-  .card { width:100%; max-width:620px; display:grid; gap:22px }
-
-  .eyebrow { margin:0; font-family:var(--mono); font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent) }
-  h1 { margin:0; font-weight:400; font-size:clamp(30px,4.4vw,44px); line-height:1.08; letter-spacing:-.02em; text-wrap:pretty }
-  .lede { margin:0; max-width:52ch; font-family:var(--mono); font-size:14px; line-height:1.7; color:var(--muted); text-wrap:pretty }
-  .lede b { color:var(--soft); font-weight:400 }
-
-  .term { border:1px solid var(--line2); border-radius:6px; background:var(--deep); overflow:hidden }
-  .term-bar {
-    display:flex; align-items:center; justify-content:space-between; gap:12px;
-    padding:10px 14px; border-bottom:1px solid rgba(236,231,225,0.1);
-    font-family:var(--mono); font-size:12px; color:var(--faint);
+  main { display:grid; place-items:center; padding:clamp(28px,5vw,64px) clamp(16px,4vw,48px) }
+  .stage {
+    width:100%; max-width:1080px; display:grid; grid-template-columns:minmax(0,0.85fr) minmax(0,1.15fr);
+    gap:10px; padding:10px; background:var(--bg2); border:1px solid var(--line); border-radius:10px;
   }
-  .log { padding:18px 16px; font-family:var(--mono); font-size:13.5px; line-height:1.9; display:grid; gap:2px }
+  .copy { padding:clamp(20px,2.6vw,36px); display:flex; flex-direction:column; gap:22px }
+  .kicker { margin:0; font-family:var(--mono); font-size:13px; color:var(--muted); display:flex; align-items:center; gap:10px }
+  .kicker i { color:var(--accent); font-style:normal }
+  h1 { margin:0; font-weight:500; font-size:clamp(30px,3.6vw,44px); line-height:1.06; letter-spacing:-0.035em; text-wrap:balance }
+  h1 .soft { color:var(--faint) }
+  .lede { margin:0; max-width:46ch; font-size:15px; line-height:1.6; color:var(--ink2); text-wrap:pretty }
+  .lede b { color:var(--ink); font-weight:500 }
+
+  .facts-l { margin:auto 0 0; padding:0; list-style:none; display:grid; gap:12px; border-top:1px solid var(--line); padding-top:20px }
+  .facts-l li { display:grid; grid-template-columns:18px 1fr; gap:10px; font-size:14px; line-height:1.5; color:var(--muted) }
+  .facts-l li i { color:var(--accent); font-style:normal; font-family:var(--mono) }
+  .facts-l li b { color:var(--ink); font-weight:500 }
+
+  /* Sahne: gunes isigi + terminal penceresi */
+  .scene {
+    position:relative; overflow:hidden; border-radius:6px; background:#0b0a09; isolation:isolate;
+    display:grid; align-content:end; gap:14px; padding:clamp(18px,3.4vw,44px); min-height:520px;
+  }
+  .scene::before {
+    content:''; position:absolute; inset:0; z-index:-1; pointer-events:none;
+    background:
+      radial-gradient(ellipse 36% 30% at 50% 0%, oklch(0.86 0.13 70 / 0.55) 0%, oklch(0.74 0.16 52 / 0.32) 34%, oklch(0.58 0.12 40 / 0.12) 62%, transparent 100%),
+      repeating-linear-gradient(0deg, rgba(239,234,227,0.025) 0 1px, transparent 1px 13px);
+  }
+  .scene.on::before { animation:breathe 6s ease-in-out infinite }
+  @keyframes breathe { 50% { opacity:.72 } }
+
+  .win {
+    width:100%; background:rgba(20,19,17,0.94); backdrop-filter:blur(6px);
+    border:1px solid rgba(239,234,227,0.1); border-radius:10px; overflow:hidden; font-family:var(--mono);
+    box-shadow:0 1px 0 rgba(255,255,255,0.04) inset, 0 40px 80px -24px rgba(0,0,0,0.75), 0 0 0 1px rgba(0,0,0,0.4);
+  }
+  .win-bar { position:relative; display:flex; align-items:center; justify-content:space-between; height:36px; padding:0 14px; border-bottom:1px solid var(--line) }
+  .dots { display:flex; gap:7px }
+  .dots i { width:10px; height:10px; border-radius:50%; background:#34312d; display:block }
+  .win-bar .title { position:absolute; left:50%; transform:translateX(-50%); font-size:12px; color:var(--faint); white-space:nowrap }
+  #status { font-size:12px; color:var(--faint) }
+  .log { padding:18px; font-size:13px; line-height:1.85; min-height:200px; display:grid; align-content:start; gap:1px }
   .log div { white-space:pre-wrap; word-break:break-all }
   @keyframes blink { 0%,49%{opacity:1} 50%,100%{opacity:.15} }
   .caret { animation:blink 1.1s steps(1) infinite }
 
-  .addr {
-    border-top:1px solid rgba(236,231,225,0.1); background:rgba(249,115,53,0.05);
-    padding:16px; display:grid; gap:10px; font-family:var(--mono); font-size:13px;
-  }
-  .addr .k { color:var(--faint); font-size:12px; letter-spacing:.1em; text-transform:uppercase }
+  .addr { border-top:1px solid var(--line); background:rgba(8,7,6,0.6); padding:14px 18px; display:grid; gap:8px; font-size:12.5px }
+  .addr .k { color:var(--faint); font-size:11.5px; letter-spacing:.08em; text-transform:uppercase }
   .addr .v { color:var(--ink); word-break:break-all; line-height:1.6 }
-  .facts { display:flex; flex-wrap:wrap; gap:8px 22px; color:var(--faint) }
+  .facts { display:flex; flex-wrap:wrap; gap:6px 20px; color:var(--faint) }
   .facts span { white-space:nowrap }
-  .facts em { font-style:normal; color:var(--ink) }
+  .facts em { font-style:normal; color:var(--ink2) }
 
-  button {
-    font-family:var(--mono); cursor:pointer;
-    border:1px solid rgba(236,231,225,0.2); border-radius:4px;
-    background:transparent; color:var(--ink);
-  }
+  button { -webkit-appearance:none; appearance:none; background-image:none; font-family:var(--sans); cursor:pointer; border:1px solid var(--line2); background:transparent; color:var(--ink) }
   button:disabled { cursor:default }
   .primary {
-    width:100%; display:flex; align-items:center; justify-content:center; gap:12px;
-    padding:15px 20px; font-size:14.5px; background:var(--accent);
-    border-color:var(--accent); color:var(--bg);
+    position:relative; z-index:1; width:100%; display:flex; align-items:center; justify-content:center; gap:10px;
+    height:46px; padding:0 20px; border-radius:999px; font-size:15px; font-weight:500;
+    background:var(--ink); border-color:var(--ink); color:var(--bg); transition:background 150ms, border-color 150ms;
   }
-  .primary:hover:not(:disabled) { filter:brightness(1.08) }
-  .primary:disabled { cursor:progress }
-  .primary.quiet { background:transparent; border-color:rgba(236,231,225,0.2); color:var(--ink) }
-  .linkish {
-    padding:0; border:0; background:none; color:var(--muted);
-    font-size:13px; border-bottom:1px solid rgba(236,231,225,0.2);
-  }
+  .primary:hover:not(:disabled) { background:#fff; border-color:#fff }
+  .primary:disabled { cursor:progress; opacity:.85 }
+  .primary.quiet { background:transparent; border-color:var(--line2); color:var(--ink2) }
+  .linkish { padding:0; border:0; background:none; color:var(--muted); font-size:13.5px; border-bottom:1px solid var(--line2) }
   .linkish:hover { color:var(--ink) }
+  #nowallet { font-size:13.5px; color:var(--ink2) }
+  #nowallet a { border-bottom:1px solid var(--line2) }
 
-  .manual { border:1px solid var(--line2); border-radius:6px; padding:16px; display:grid; gap:12px; background:rgba(236,231,225,0.02) }
-  .manual p { margin:0; font-family:var(--mono); font-size:13px; line-height:1.7; color:var(--muted) }
-  .manual code { font-family:var(--mono); font-size:12px; color:var(--faint); word-break:break-all; line-height:1.6 }
-  .manual input, .manual textarea {
-    width:100%; padding:11px 12px; border:1px solid rgba(236,231,225,0.18); border-radius:4px;
-    background:var(--deep); color:var(--ink); font-family:var(--mono); font-size:13px; line-height:1.6; resize:vertical;
+  .manual { border:1px solid var(--line); border-radius:10px; padding:16px; display:grid; gap:12px; background:rgba(20,19,17,0.94) }
+  .manual p { margin:0; font-size:14px; line-height:1.6; color:var(--muted) }
+  .manual .kicker { font-size:12px }
+  .manual input, .manual select {
+    width:100%; height:40px; padding:0 12px; border:1px solid var(--line2); border-radius:6px;
+    background:var(--panel); color:var(--ink); font-family:var(--mono); font-size:13px;
   }
-
-  ul.notes { margin:0; padding:14px 0 0; border-top:1px solid var(--line); list-style:none; display:grid; gap:9px; font-family:var(--mono); font-size:12.5px; color:var(--faint) }
-  ul.notes li { display:grid; grid-template-columns:14px 1fr; gap:10px }
-  ul.notes li i { color:var(--accent); font-style:normal }
-  ul.notes li span { line-height:1.6; text-wrap:pretty }
-
-  .manual select {
-    width:100%; padding:11px 12px; border:1px solid rgba(236,231,225,0.18); border-radius:4px;
-    background:var(--deep); color:var(--ink); font-family:var(--mono); font-size:13px;
-  }
-  .manual label.check { display:flex; align-items:center; gap:10px; font-family:var(--mono); font-size:13px; color:var(--soft); cursor:pointer }
-  .manual label.check input { width:auto; accent-color:var(--accent) }
+  .manual code { display:block; font-family:var(--mono); font-size:11.5px; line-height:1.6; color:var(--ink2);
+    word-break:break-all; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:10px 12px; max-height:140px; overflow:auto }
+  .manual textarea { width:100%; padding:10px 12px; border:1px solid var(--line2); border-radius:6px; resize:vertical;
+    background:var(--panel); color:var(--ink); font-family:var(--mono); font-size:12px }
+  .manual .primary { width:auto; height:38px; padding:0 18px; font-size:14px; justify-self:start }
+  .manual label.check { display:flex; align-items:center; gap:10px; font-size:14px; color:var(--ink2); cursor:pointer }
+  .manual label.check input { width:auto; height:auto; accent-color:var(--accent) }
   .pbtns { display:flex; flex-wrap:wrap; gap:12px 18px; align-items:center }
-  .pbtns .primary { width:auto; padding:11px 18px; font-size:13.5px }
+  .pbtns .primary { width:auto; height:38px; padding:0 18px; font-size:14px }
 
   .hide { display:none !important }
-  @media (prefers-reduced-motion: reduce) { .caret { animation:none } }
+  @media (max-width: 860px) {
+    .stage { grid-template-columns:minmax(0,1fr) }
+    .scene { min-height:0 }
+  }
+  @media (prefers-reduced-motion: reduce) { .caret, .scene.on::before { animation:none } }
 </style></head>
 <body>
 
 <header>
   <span class="brand"><i>✶</i>dwell</span>
-  <span class="chip"><i></i>127.0.0.1:${opts.port} — local</span>
+  <span class="chip"><i></i>local · 127.0.0.1:${opts.port}</span>
 </header>
 
 <main>
-  <div class="card">
-    <div style="display:grid; gap:14px">
-      <p class="eyebrow">Step 2 / 3 — identity</p>
-      <h1>Connect your wallet</h1>
-      <p class="lede">Your earnings go to this address. The signature is only proof of identity — <b>nothing is submitted to the network</b>, the sequence number is 0. Your private key never leaves the browser.</p>
+  <div class="stage">
+    <div class="copy">
+      <p class="kicker"><i>✶</i>step 2 of 3 · identity</p>
+      <h1>Connect your wallet. <span class="soft">Then get back to work.</span></h1>
+      <p class="lede">Your earnings go to this address. You sign a <b>challenge that can never be submitted</b> — sequence number 0, nothing reaches the network and it costs nothing.</p>
+
+      <ul class="facts-l">
+        <li><i>·</i><span><b>Your key stays in your wallet.</b> It never enters this page or the CLI.</span></li>
+        <li><i>·</i><span><b>This page runs on your machine.</b> The address goes straight to the CLI.</span></li>
+        <li><i>·</i><span>Your wallet has to accept USDC (a trustline) before payouts can go out. We check it below.</span></li>
+      </ul>
     </div>
 
-    <div class="term">
-      <div class="term-bar"><span>dwell login</span><span id="status">ready</span></div>
-      <div class="log" id="log"></div>
+    <div class="scene" id="scene">
+      <div class="win">
+        <div class="win-bar">
+          <span class="dots"><i></i><i></i><i></i></span>
+          <span class="title">dwell login</span>
+          <span id="status">ready</span>
+        </div>
+        <div class="log" id="log"></div>
 
-      <div class="addr hide" id="addrbox">
-        <span class="k">Connected address</span>
-        <span class="v" id="addr"></span>
-        <div class="facts">
-          <span>network <em>testnet</em></span>
-          <span>asset <em>USDC</em></span>
-          <span>trustline <em id="trust">—</em></span>
+        <div class="addr hide" id="addrbox">
+          <span class="k">Connected address</span>
+          <span class="v" id="addr"></span>
+          <div class="facts">
+            <span>network <em>testnet</em></span>
+            <span>asset <em>USDC</em></span>
+            <span>trustline <em id="trust">—</em></span>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="manual hide" id="manualbox">
-      <p>No Freighter? Enter your address, sign the resulting XDR in your wallet or Stellar Laboratory, and paste the result back here.</p>
-      <input id="m-addr" placeholder="your address, starting with G…" autocomplete="off" spellcheck="false">
-      <button id="m-get" class="linkish" style="justify-self:start; border-bottom-color:rgba(236,231,225,0.35)">Generate XDR</button>
-      <code id="m-xdr" class="hide"></code>
-      <textarea id="m-signed" rows="3" placeholder="signed XDR" class="hide" spellcheck="false"></textarea>
-      <button id="m-send" class="hide" style="justify-self:start; padding:11px 18px; font-size:13.5px">Verify signature</button>
-    </div>
-
-    <div style="display:grid; gap:10px">
       <button id="primary" class="primary">Connect with Freighter</button>
-      <div style="display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; justify-content:space-between">
-        <button id="toggle-manual" class="linkish">No Freighter? Sign the XDR manually</button>
+      <p class="hide" id="nowallet" style="margin:0">Freighter not detected. <a href="https://freighter.app" target="_blank" rel="noreferrer">Install it</a> and reload this page, or sign manually below.</p>
+      <button id="toggle-manual" class="linkish" style="justify-self:start">No Freighter? Sign the XDR manually</button>
+
+      <div class="manual hide" id="manualbox">
+        <p>Enter your address, sign the resulting XDR in your wallet or Stellar Laboratory, and paste the result back here.</p>
+        <input id="m-addr" placeholder="your address, starting with G…" autocomplete="off" spellcheck="false">
+        <button id="m-get" class="linkish" style="justify-self:start">Generate XDR</button>
+        <code id="m-xdr" class="hide"></code>
+        <textarea id="m-signed" rows="3" placeholder="signed XDR" class="hide" spellcheck="false"></textarea>
+        <button id="m-send" class="primary hide">Verify signature</button>
+      </div>
+
+      <!-- Istege bagli siralama adimi: yalnizca giristen SONRA gorunur.
+           Kutu varsayilan ISARETSIZ — kazanci herkese acmak kullanicinin
+           bilerek verdigi bir karar olmali. -->
+      <div class="manual hide" id="profilebox">
+        <p class="kicker"><i>✶</i>step 3 of 3 · optional</p>
+        <p style="color:var(--ink)">Join the public leaderboard and the world map?</p>
+        <p>Only a nickname and a country are shown, never your wallet address. Earnings from your own campaigns don't count. Change or leave any time with <b>dwell profile</b>.</p>
+        <input id="p-nick" maxlength="20" placeholder="nickname — 3–20 letters, digits, _ . -" autocomplete="off" spellcheck="false">
+        <select id="p-country"><option value="">Don't show a country</option></select>
+        <p id="p-guess" class="hide" style="font-size:12.5px"></p>
+        <label class="check"><input type="checkbox" id="p-listed"> Show me on the leaderboard</label>
+        <div class="pbtns">
+          <button id="p-save" class="primary">Save</button>
+          <button id="p-skip" class="linkish">Skip for now</button>
+        </div>
+        <p id="p-msg" class="hide"></p>
       </div>
     </div>
-
-    <!-- Istege bagli siralama adimi: yalnizca giristen SONRA gorunur.
-         Kutu varsayilan ISARETSIZ — kazanci herkese acmak kullanicinin
-         bilerek verdigi bir karar olmali. -->
-    <div class="manual hide" id="profilebox">
-      <p class="eyebrow" style="font-size:11.5px">Step 3 / 3 — optional</p>
-      <p style="color:var(--ink)">Join the public leaderboard and the world map?</p>
-      <p>Only a nickname and a country are shown, never your wallet address. Earnings from your own campaigns don't count. You can change or leave it any time with <b>dwell profile</b>.</p>
-      <input id="p-nick" maxlength="20" placeholder="nickname — 3–20 letters, digits, _ . -" autocomplete="off" spellcheck="false">
-      <select id="p-country"><option value="">Don't show a country</option></select>
-      <p id="p-guess" class="hide" style="font-size:12px"></p>
-      <label class="check"><input type="checkbox" id="p-listed"> Show me on the leaderboard</label>
-      <div class="pbtns">
-        <button id="p-save" class="primary">Save</button>
-        <button id="p-skip" class="linkish">Skip for now</button>
-      </div>
-      <p id="p-msg" class="hide"></p>
-    </div>
-
-    <ul class="notes">
-      <li><i>·</i><span>This page only runs on your own computer; the address reaches the CLI locally.</span></li>
-      <li><i>·</i><span>The signed transaction can never be submitted to the network — sequence number 0, proof of identity only.</span></li>
-      <li><i>·</i><span>Your private key never enters this page or the CLI.</span></li>
-    </ul>
   </div>
 </main>
 
@@ -326,6 +350,7 @@ async function connect() {
 
   try {
     if (!(await freighterReady())) {
+      $('nowallet').classList.remove('hide')
       throw new Error('Freighter not found — install it and reload the page, or sign manually below')
     }
 
@@ -370,11 +395,12 @@ async function finish(address, signedXdr) {
   log('✓ verified — earnings will go to this address', ACC)
   log('✓ session saved to ~/.dwell/credentials.json', DIM)
   status('connected', ACC)
-
+  $('scene').classList.add('on')
   $('addr').textContent = res.publisherId
   $('addrbox').classList.remove('hide')
   $('manualbox').classList.add('hide')
   $('toggle-manual').classList.add('hide')
+  $('nowallet').classList.add('hide')
   setPrimary('Connected ✓ — one optional step below', { quiet: true, frozen: true })
 
   openProfile()
@@ -491,6 +517,7 @@ $('p-skip').onclick = async () => {
   log('  leaderboard skipped — join later with: dwell profile', DIM)
   status('done — you can close this page', ACC)
 }
+
 
 /* ─────────────────────────── elle imza ─────────────────────────── */
 
