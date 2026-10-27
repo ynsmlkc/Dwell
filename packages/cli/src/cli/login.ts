@@ -36,14 +36,17 @@ export const PROFILE_WINDOW_MS = 3 * 60_000
 /**
  * Sunucu adresi.
  *
- * Kendi alan adimiz yok; barindiran platformun verdigi adres bu. Yayina
- * cikmadan once `api.dwell.dev` yaziyordu ve o adres HIC VAR OLMADI —
- * paket boyle yayinlansaydi `dwell login` herkeste "sunucuya ulasilamadi"
- * derdi ve kimse sebebini bulamazdi.
+ * Kendi alan adimiz: Railway'deki ayni sunucuya bakar. Yayina cikmadan
+ * once `api.dwell.dev` yaziyordu ve o adres HIC VAR OLMADI — paket boyle
+ * yayinlansaydi `dwell login` herkeste "sunucuya ulasilamadi" derdi.
  *
- * Alan adi alindiginda burasi degisir; `--server` ile de ezilebiliyor.
+ * Eski adres (`dwellserver-production.up.railway.app`) KAPATILMAMALI: daha
+ * once giris yapanlarin kimlik dosyasinda o yazili ve daemon oraya gidiyor.
+ * SEP-10 imzasi sunucunun kendi `DWELL_HOME_DOMAIN`'i ile kuruluyor, istemcinin
+ * hangi adresten geldigine bakilmiyor; iki adres de ayni sekilde calisir.
+ * `--server` ile de ezilebiliyor.
  */
-const DEFAULT_SERVER = 'https://dwellserver-production.up.railway.app'
+const DEFAULT_SERVER = 'https://dwellsh.dev'
 
 /** Trustline kontrolu icin. Odeme rayiyla ayni varlik. */
 const HORIZON = process.env['DWELL_HORIZON'] ?? 'https://horizon-testnet.stellar.org'
