@@ -9,7 +9,8 @@
 import { resolve, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { existsSync, realpathSync } from 'node:fs'
-import { install, uninstall, diagnose, readSettings, detectConflicts, shellCommand, SETTINGS_PATH } from '../settings.js'
+import { install, uninstall, diagnose, readSettings, detectConflicts, SETTINGS_PATH, MARKER } from '../settings.js'
+import { buildNodeCommand, currentCommandEnv, probeCommand, type BuiltCommand } from '../command-line.js'
 import { DWELL_HOME, SOCKET_PATH, isNamedPipe } from '../ipc.js'
 import * as daemon from './daemon-control.js'
 import { out, ok, warn, info, fail, rows, dim, bold, green, yellow, red, orange, banner, usdc } from './output.js'
@@ -48,7 +49,33 @@ const shimPath = (): string => {
 const hookPath = (): string => join(PKG_ROOT, 'dist', 'hook.mjs')
 const daemonEntry = (): string => join(PKG_ROOT, 'dist', 'daemon.mjs')
 
-const statusLineCommand = (): string => shellCommand([process.execPath, shimPath()])
+/**
+ * `settings.json`'a yazilan komutlar. Bir kez hesaplanir: Windows'ta 8.3
+ * kisa adi icin `cmd` calistirmak gerekebiliyor (bkz. `command-line.ts`).
+ */
+let built: { readonly statusLine: BuiltCommand; readonly hook: BuiltCommand } | null = null
+function commands(): { readonly statusLine: BuiltCommand; readonly hook: BuiltCommand } {
+  if (!built) {
+    const env = currentCommandEnv()
+    built = {
+      statusLine: buildNodeCommand(shimPath(), [], env),
+      hook: buildNodeCommand(hookPath(), [], env),
+    }
+  }
+  return built
+}
+const statusLineCommand = (): string => commands().statusLine.command
+
+/** Bizim ayarlarimiz — init ve `doctor --fix` ayni sekilde yazar. */
+function installOurs(opts: { spinnerVerbs?: readonly string[]; force?: boolean }) {
+  return install({
+    statusLineCommand: statusLineCommand(),
+    hookCommand: commands().hook.command,
+    refreshIntervalSec: 1,
+    ...(opts.spinnerVerbs ? { spinnerVerbs: opts.spinnerVerbs } : {}),
+    force: opts.force ?? false,
+  })
+}
 
 /* ─────────────────────────── komutlar ─────────────────────────── */
 
@@ -110,16 +137,12 @@ async function cmdInit(argv: string[]): Promise<void> {
   }
 
   // 2. settings.json
-  const result = install({
-    statusLineCommand: statusLineCommand(),
-    hookCommand: shellCommand([process.execPath, hookPath()]),
-    refreshIntervalSec: 1,
-    ...(withSpinner ? { spinnerVerbs: ['✶ Dwell'] } : {}),
-    force,
-  })
+  const result = installOurs({ ...(withSpinner ? { spinnerVerbs: ['✶ Dwell'] } : {}), force })
 
   for (const f of result.changed) ok(`${f} installed`)
   if (result.backupPath) info(dim(`backup: ${result.backupPath}`))
+  const cmdWarning = commands().statusLine.warning ?? commands().hook.warning
+  if (cmdWarning) warn(cmdWarning)
 
   // 3. Daemon
   out()
@@ -156,10 +179,30 @@ async function cmdInit(argv: string[]): Promise<void> {
   out()
 }
 
-async function cmdDoctor(): Promise<void> {
+async function cmdDoctor(argv: readonly string[] = []): Promise<void> {
   banner()
+
+  // `--fix`: yalnizca BIZIM girdilerimizi bugunun bicimiyle yeniden yazar.
+  // Eski surumlerin tirnakli komutlari (PowerShell'de calismayan) boyle
+  // tasinir. Baskasinin ayarina dokunmaz — `--force` yok.
+  if (argv.includes('--fix')) {
+    let current
+    try { current = readSettings() } catch {
+      fail('DWL-1003', 'Could not read the Claude Code settings file', `${SETTINGS_PATH} may contain broken JSON.`)
+    }
+    const sv = current.spinnerVerbs
+    const r = installOurs(sv?.[MARKER] === true ? { spinnerVerbs: sv.verbs ?? ['✶ Dwell'] } : {})
+    for (const f of r.changed) ok(`${f} rewritten`)
+    for (const c of r.skipped) warn(`${c.field} belongs to another tool — left alone`)
+    if (!(await daemon.isAlive())) {
+      const started = await daemon.start({ entry: daemonEntry() })
+      if ('error' in started && !started.error.includes('already')) warn(`daemon: ${started.error}`)
+    }
+    out()
+  }
+
   const expected = statusLineCommand()
-  const d = diagnose(expected)
+  const d = diagnose(expected, SETTINGS_PATH, commands().hook.command)
   const alive = await daemon.isAlive()
   const health = alive ? await daemon.ask({ t: 'health' }) : null
 
@@ -186,6 +229,27 @@ async function cmdDoctor(): Promise<void> {
     info('`--force` wouldn\'t stick. Remove that tool first, then run `dwell init --spinner`.')
   }
 
+  // Komutlari GERCEKTEN calistir. "Kuruldu" yesili yetmiyor: komut
+  // PowerShell'de ParserError verirken daemon, soket ve reklam onbellegi
+  // kusursuz gorunuyordu ve kullanici hicbir reklam gormuyordu.
+  const probeFailed = probeOurCommands()
+
+  const cmdWarning = commands().statusLine.warning ?? commands().hook.warning
+  if (cmdWarning) {
+    out()
+    warn(cmdWarning)
+  }
+
+  if (probeFailed) {
+    out()
+    out(`  ${red('✗')} ${bold('Claude Code cannot run the Dwell commands on this machine.')}`)
+    info('No ads will show and no impressions will be counted until this is fixed.')
+    info(`Fix: ${bold('dwell doctor --fix')}  ${dim('(rewrites our settings.json entries)')}`)
+    if (process.platform === 'win32') {
+      info(dim('Still failing? Make sure `node` runs in PowerShell, or install Git for Windows.'))
+    }
+  }
+
   if (d.hijacked) {
     out()
     warn('Your statusLine setting has been changed by ANOTHER TOOL.')
@@ -206,7 +270,45 @@ async function cmdDoctor(): Promise<void> {
       ...(i.lastError ? [['last error', i.lastError] as const] : []),
     ])
   }
+
+  // Faturalandirma YALNIZCA statusLine'a dayaniyor. Claude Code'un
+  // dokumantasyonu VS Code/JetBrains eklentisinin grafik panelinde ya da
+  // masaustu uygulamasinda ozel statusLine'in gosterildigini SOYLEMIYOR;
+  // orada calisiyorsan reklam gorunmez ve hicbir sey sayilmaz.
   out()
+  info(dim('Ads show only in Claude Code running in a terminal (including an IDE\'s'))
+  info(dim('integrated terminal). The VS Code / JetBrains panels and the desktop app'))
+  info(dim('are not documented to render statusLine, so nothing is shown or counted there.'))
+  out()
+}
+
+/**
+ * Bizim settings.json girdilerimizi Claude Code'un kullanabilecegi
+ * kabuklarda calistirir ve sonucu yazar. Claude Code'un GERCEKTEN
+ * kullandigi kabukta basarisizsa `true` doner.
+ */
+function probeOurCommands(): boolean {
+  let s
+  try { s = readSettings() } catch { return false }
+  const targets: [string, string | undefined][] = [
+    ['statusLine', s.statusLine?.[MARKER] ? s.statusLine.command : undefined],
+    // SessionStart tur makinesinde hicbir sey degistirmiyor; denemek zararsiz.
+    ['SessionStart hook', s.hooks?.['SessionStart']?.find((h) => h[MARKER] === true)?.hooks[0]?.command],
+  ]
+  const stdin = JSON.stringify({ session_id: 'dwell-doctor', hook_event_name: 'SessionStart' })
+  let failed = false
+  out()
+  out(`  ${bold('Commands, run the way Claude Code runs them')}`)
+  for (const [name, command] of targets) {
+    if (!command) continue
+    for (const p of probeCommand(command, stdin)) {
+      const mark = p.ok ? green('✓') : p.usedByClaude ? red('✗') : yellow('!')
+      const who = p.usedByClaude ? 'used by Claude Code' : 'not used by Claude Code here'
+      out(`  ${mark} ${bold(name.padEnd(18))} ${p.shell.padEnd(11)} ${dim(`${p.detail} · ${who}`)}`)
+      if (!p.ok && p.usedByClaude) failed = true
+    }
+  }
+  return failed
 }
 
 async function cmdUninstall(): Promise<void> {
@@ -335,7 +437,7 @@ export async function main(argv: readonly string[]): Promise<void> {
 
   switch (cmd) {
     case 'init': return cmdInit(rest)
-    case 'doctor': return cmdDoctor()
+    case 'doctor': return cmdDoctor(rest)
     case 'uninstall': return cmdUninstall()
     case 'status': return cmdStatus()
     case 'restart': return cmdRestart()

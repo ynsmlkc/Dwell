@@ -18,6 +18,7 @@ import {
 } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, dirname } from 'node:path'
+import { sameShimCommand } from './command-line.js'
 
 export const CLAUDE_DIR = process.env['CLAUDE_CONFIG_DIR'] ?? join(homedir(), '.claude')
 export const SETTINGS_PATH = join(CLAUDE_DIR, 'settings.json')
@@ -25,22 +26,6 @@ export const SETTINGS_PATH = join(CLAUDE_DIR, 'settings.json')
 /** Bizim yazdigimiz her seye bu iz konur — kaldirirken bunu arariz. */
 export const MARKER = '__dwell'
 
-/**
- * `settings.json`'a yazilacak komut satiri.
- *
- * Claude Code Windows'ta komutlari Git Bash ile calistirir: orada ters bolu
- * kacis karakteridir ("C:\Users\a" → "C:Usersa") ve
- * "C:\Program Files\nodejs\node.exe" bosluktan ikiye bolunur. Ileri bolu
- * Windows'ta Node icin de gecerli; bosluk iceren parca tirnaklanir. Bosluk
- * yoksa komut eskisiyle BIREBIR ayni kalir — mevcut kurulumlar "baskasinin"
- * gorunmesin.
- */
-export function shellCommand(parts: readonly string[], platform: NodeJS.Platform = process.platform): string {
-  return parts
-    .map((p) => (platform === 'win32' ? p.replace(/\\/g, '/') : p))
-    .map((p) => (/\s/.test(p) ? `"${p}"` : p))
-    .join(' ')
-}
 
 export interface StatusLineSetting {
   type: 'command'
@@ -233,10 +218,17 @@ export interface Diagnosis {
    */
   spinnerOwner: 'bizim' | 'baskasinin' | 'yok'
   spinnerDetail: string | null
+  /** Bizim hook'larimizdan beklenen komutla ESDEGER olmayanlar. */
+  staleHooks: string[]
 }
 
-export function diagnose(expectedCommand: string, path = SETTINGS_PATH): Diagnosis {
-  const none = { spinnerOwner: 'yok' as const, spinnerDetail: null }
+export function diagnose(
+  expectedCommand: string,
+  path = SETTINGS_PATH,
+  /** Hook komutunun olay adi OLMADAN hali; verilirse hook'lar da denetlenir. */
+  expectedHookCommand?: string,
+): Diagnosis {
+  const none = { spinnerOwner: 'yok' as const, spinnerDetail: null, staleHooks: [] as string[] }
   if (!existsSync(path)) return { installed: false, hijacked: false, detail: 'settings.json does not exist', ...none }
 
   let settings: ClaudeSettings
@@ -250,21 +242,38 @@ export function diagnose(expectedCommand: string, path = SETTINGS_PATH): Diagnos
       ? { spinnerOwner: 'bizim' as const, spinnerDetail: (sv.verbs ?? []).join(', ') || 'list is empty' }
       : { spinnerOwner: 'baskasinin' as const,
           spinnerDetail: `belongs to another tool, sync is off: ${(sv.verbs ?? []).join(', ').slice(0, 40)}` }
-    : none
+    : { spinnerOwner: 'yok' as const, spinnerDetail: null }
+
+  // Birebir metin DEGIL, esdegerlik: elle `node ...` diye duzeltilmis
+  // calisan bir kurulum "eski surum kalintisi" sayilmamali.
+  const staleHooks: string[] = []
+  if (expectedHookCommand) {
+    for (const event of TURN_HOOKS) {
+      const mine = settings.hooks?.[event]?.find((h) => h[MARKER] === true)
+      const cmd = mine?.hooks[0]?.command
+      if (cmd !== undefined && !sameShimCommand(cmd, `${expectedHookCommand} ${event}`)) staleHooks.push(event)
+    }
+  }
+  const rest = { ...spinner, staleHooks }
 
   const sl = settings.statusLine
-  if (!sl) return { installed: false, hijacked: false, detail: 'statusLine is not configured', ...spinner }
+  if (!sl) return { installed: false, hijacked: false, detail: 'statusLine is not configured', ...rest }
 
-  if (sl[MARKER] && sl.command === expectedCommand) {
-    return { installed: true, hijacked: false, detail: 'setup is sound', ...spinner }
+  if (sl[MARKER] && sameShimCommand(sl.command, expectedCommand)) {
+    if (staleHooks.length > 0) {
+      return { installed: false, hijacked: false,
+        detail: `hook commands are outdated (${staleHooks.join(', ')}) — run \`dwell doctor --fix\``, ...rest }
+    }
+    return { installed: true, hijacked: false, detail: 'setup is sound', ...rest }
   }
-  if (sl[MARKER] && sl.command !== expectedCommand) {
-    return { installed: false, hijacked: false, detail: 'leftover install from an old version — run `dwell init` again', ...spinner }
+  if (sl[MARKER]) {
+    return { installed: false, hijacked: false,
+      detail: 'leftover install from an old version — run `dwell doctor --fix`', ...rest }
   }
   return {
     installed: false, hijacked: true,
     detail: `statusLine belongs to another tool: ${sl.command.slice(0, 60)}`,
-    ...spinner,
+    ...rest,
   }
 }
 

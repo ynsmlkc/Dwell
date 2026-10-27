@@ -1,8 +1,9 @@
 name: CI
 
 on:
+  # Every branch: a fix can be proven on Windows before it reaches main,
+  # which Railway deploys.
   push:
-    branches: [main]
   pull_request:
 
 jobs:
@@ -40,7 +41,7 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter dwellsh exec vitest run test/windows.test.ts test/shell-command.test.ts
+      - run: pnpm --filter dwellsh exec vitest run test/windows.test.ts test/windows-shell.test.ts test/shell-command.test.ts
       - run: pnpm --filter dwellsh build
       # Paketlenmis CLI ile uctan uca: daemon pipe uzerinde ayaga kalkmali.
       - shell: pwsh
@@ -53,4 +54,12 @@ jobs:
           $status = node packages/cli/dist/dwell.mjs status | Out-String
           Write-Output $status
           if ($status -notmatch 'uptime') { Write-Error 'daemon is not answering on the pipe'; exit 1 }
+          # doctor runs the installed commands in Git Bash, PowerShell, pwsh
+          # and cmd. Every one of them must succeed, not just the one Claude
+          # Code happens to pick on this runner.
+          $doctor = node packages/cli/dist/dwell.mjs doctor | Out-String
+          Write-Output $doctor
+          if ($doctor -match 'cannot run the Dwell commands') { Write-Error 'Claude Code could not run the installed commands'; exit 1 }
+          if ($doctor -match 'exit [^\r\n]*not used by Claude Code') { Write-Error 'a shell could not run the installed commands'; exit 1 }
+          if ($doctor -notmatch 'runs') { Write-Error 'doctor did not run the installed commands'; exit 1 }
           node packages/cli/dist/dwell.mjs uninstall

@@ -294,3 +294,78 @@ describe('dosya guvenligi — sembolik baglanti, izin, atomiklik', () => {
     expect(JSON.parse(readFileSync(gercek, 'utf8')).spinnerVerbs.verbs).toEqual(['✶ Marka'])
   })
 })
+
+/**
+ * Eski surumlerin (<= 0.1.16) Windows komutu: tirnakla basliyor ve Git Bash
+ * olmayan makinede PowerShell onu calistiramiyor. Tasima: `dwell init` ya da
+ * `dwell doctor --fix` ayni `install()`'i cagirir ve BIZIM girdilerimizi
+ * bugunun bicimiyle yeniden yazar.
+ */
+describe('eski Windows bicimindan tasima', () => {
+  const ESKI_NODE = '"C:/Program Files/nodejs/node.exe"'
+  const DIST = 'C:/Users/u/AppData/Roaming/npm/node_modules/dwellsh/dist'
+  const YENI = {
+    statusLineCommand: `node ${DIST}/statusline.mjs`,
+    hookCommand: `node ${DIST}/hook.mjs`,
+    refreshIntervalSec: 1,
+    now,
+  }
+
+  const eskiKurulum = () => install({
+    ...YENI,
+    statusLineCommand: `${ESKI_NODE} ${DIST}/statusline.mjs`,
+    hookCommand: `${ESKI_NODE} ${DIST}/hook.mjs`,
+  }, path)
+
+  it('statusLine ve uc hook yeni bicime yazilir, tirnakla baslayan komut KALMAZ', () => {
+    eskiKurulum()
+    const r = install(YENI, path)
+
+    const s = read()
+    expect(s.statusLine?.command).toBe(YENI.statusLineCommand)
+    for (const e of TURN_HOOKS) {
+      const mine = s.hooks?.[e]?.filter((h) => h[MARKER] === true) ?? []
+      expect(mine).toHaveLength(1)                          // kopya birakmaz
+      expect(mine[0]!.hooks[0]!.command).toBe(`${YENI.hookCommand} ${e}`)
+      expect(r.changed).toContain(`hooks.${e} (guncellendi)`)
+    }
+    expect(JSON.stringify(s)).not.toContain('\\"C:/Program Files')
+  })
+
+  it('kullanicinin kendi hook\'lari tasimada KORUNUR', () => {
+    eskiKurulum()
+    const s = read()
+    s.hooks!['Stop']!.unshift({ matcher: '', hooks: [{ type: 'command', command: 'echo benim' }] })
+    write(s)
+
+    install(YENI, path)
+    expect(read().hooks!['Stop']!.some((h) => h.hooks[0]?.command === 'echo benim')).toBe(true)
+  })
+
+  it('eski bicim diagnose\'da SAGLAM GORUNMEZ — hook\'lar da denetlenir', () => {
+    eskiKurulum()
+    const d = diagnose(YENI.statusLineCommand, path, YENI.hookCommand)
+    // statusLine programi farkli yazilmis ama ikisi de node + ayni script:
+    // esdeger. Hook'lar da esdeger. Bozuk olan BICIM — onu doctor'un
+    // kabuk denemesi yakalar (bkz. command-line.ts `probeCommand`).
+    expect(d.installed).toBe(true)
+    expect(d.staleHooks).toEqual([])
+  })
+
+  /** Kullanici bozuk komutu elle `node ...` diye duzeltti: calisan bir kurulum. */
+  it('elle `node ...` diye duzeltilmis kurulum "eski surum kalintisi" SAYILMAZ', () => {
+    install({ ...YENI, statusLineCommand: `node ${DIST.replace(/\//g, '\\')}\\statusline.mjs` }, path)
+    const beklenen = `"C:/Program Files/nodejs/node.exe" ${DIST}/statusline.mjs`
+    const d = diagnose(beklenen, path, YENI.hookCommand)
+    expect(d.installed).toBe(true)
+    expect(d.detail).toBe('setup is sound')
+  })
+
+  it('baska bir paketin script\'ini gosteren hook "outdated" sayilir', () => {
+    install({ ...YENI, hookCommand: 'node C:/eski/surum/dist/hook.mjs' }, path)
+    const d = diagnose(YENI.statusLineCommand, path, YENI.hookCommand)
+    expect(d.installed).toBe(false)
+    expect(d.staleHooks).toEqual([...TURN_HOOKS])
+    expect(d.detail).toMatch(/doctor --fix/)
+  })
+})

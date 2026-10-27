@@ -8,6 +8,12 @@ While Claude Code is thinking, a single clearly-disclosed sponsored line appears
 
 ---
 
+## Where it works
+
+Ads are shown, and impressions counted, **only in Claude Code running in a terminal** — including the integrated terminal of VS Code, Cursor or JetBrains. Billing rests entirely on the `statusLine`, and Claude Code's documentation does not say that the VS Code / JetBrains extension panels or the desktop app render a custom `statusLine`, so Dwell shows nothing and counts nothing there. `dwell doctor` says this too.
+
+On Windows, Claude Code runs the `statusLine` and hook commands through Git Bash, or through PowerShell when Git for Windows is not installed. Dwell writes commands that work in both (and in `cmd`): the program is never quoted, and paths use forward slashes. `dwell doctor` runs the installed commands in every available shell and shows which one Claude Code uses; `dwell doctor --fix` rewrites installs made by older versions.
+
 ## Why Stellar
 
 Per-impression amounts are tiny — a fraction of a cent. On traditional rails the fixed cost of a payout (transfer fee, FX spread, compliance overhead) routinely exceeds the payout itself, which forces platforms into high thresholds, monthly batches, and a short list of supported countries. Developers in Turkey, Latin America, South Asia and Africa generate value they cannot collect.
