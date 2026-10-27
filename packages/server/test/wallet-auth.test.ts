@@ -118,6 +118,58 @@ describe('WalletAuth', () => {
     expect(issued).toHaveLength(1)
   })
 
+  /**
+   * Eski imza YENI challenge'la kullanilamaz. Giris bitince ayni adres icin
+   * yeni bir challenge acilirsa, ele gecirilmis eski imza kendi zaman
+   * siniri icinde gecerli bir SEP-10 islemiydi ve yeni token aliyordu.
+   */
+  it('eski imza yeni acilan challenge ile token ALAMAZ', async () => {
+    const { auth, issued } = setup()
+    const c1 = auth.challenge(user.publicKey())
+    if (!c1.ok) return
+    const eski = sign(c1.xdr, user)
+    expect((await auth.verify(user.publicKey(), eski)).ok).toBe(true)
+
+    const c2 = auth.challenge(user.publicKey())    // saldirgan acar
+    expect(c2.ok).toBe(true)
+    const r = await auth.verify(user.publicKey(), eski)
+    expect(r.ok).toBe(false)
+    expect(issued).toHaveLength(1)
+  })
+
+  /**
+   * Baskasi kurbanin adresine yeni challenge'lar acsa bile kurbanin
+   * imzaladigi challenge gecerli kalir — girisi engellenemez.
+   */
+  it('baskasinin actigi challenge\'lar kurbanin girisini ENGELLEMEZ', async () => {
+    const { auth } = setup()
+    const kurban = auth.challenge(user.publicKey())
+    if (!kurban.ok) return
+    for (let i = 0; i < 5; i++) auth.challenge(user.publicKey())   // saldirgan
+
+    expect((await auth.verify(user.publicKey(), sign(kurban.xdr, user))).ok).toBe(true)
+  })
+
+  it('bekleyen challenge toplami sinirli — dolunca "busy"', () => {
+    const issued: any[] = []
+    const auth = new WalletAuth({ ...makeDeps({ issued }), maxTotal: 3 })
+    for (let i = 0; i < 3; i++) expect(auth.challenge(Keypair.random().publicKey()).ok).toBe(true)
+    const r = auth.challenge(Keypair.random().publicKey())
+    expect(r.ok).toBe(false)
+    expect(!r.ok && r.busy).toBe(true)
+  })
+
+  it('adres basina pencere dolunca en eski challenge duser', async () => {
+    const issued: any[] = []
+    const auth = new WalletAuth({ ...makeDeps({ issued }), maxPerAddress: 2 })
+    const eski = auth.challenge(user.publicKey())
+    auth.challenge(user.publicKey())
+    auth.challenge(user.publicKey())
+    if (!eski.ok) return
+    expect((await auth.verify(user.publicKey(), sign(eski.xdr, user))).ok).toBe(false)
+    expect(auth.pendingCount()).toBe(2)
+  })
+
   it('challenge alinmadan verify cagrilamaz', async () => {
     const { auth } = setup()
     const other = setup()

@@ -80,6 +80,7 @@ export class Pipeline {
       findDelivery: (n) => this.#deliveries.get(n) ?? null,
       seen: (p, id) => this.#impressions.get(this.#key(p, id)) ?? null,
       save: (i) => { this.#update(i) },
+      consume: (d) => { this.opts.persist?.saveDelivery(d) },
       minImpressionMs: opts.minImpressionMs,
       minClientVersion: opts.minClientVersion,
     })

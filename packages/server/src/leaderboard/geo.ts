@@ -13,6 +13,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { Reader, type CountryResponse } from 'maxmind'
 import { COUNTRY_CODES } from './countries.js'
+import { clientIp } from '../http/client-ip.js'
 
 export type CountryLookup = (ip: string) => string | null
 
@@ -38,8 +39,8 @@ export function countryFromRequest(
     if (c) return c
   }
   if (!lookup) return null
-  // Ilk adres istemcinin kendisi; arkadakiler araya giren vekiller.
-  const ip = header('x-forwarded-for')?.split(',')[0]?.trim() ?? header('x-real-ip')?.trim()
+  // Ilk adresi istemci kendisi yazabilir; guvenilen vekilin ekledigini al.
+  const ip = clientIp(header)
   if (!ip) return null
   try {
     return valid(lookup(ip))

@@ -6,8 +6,10 @@
  * kapsamsiz olur ve "kapsami olmayan token her seyi yapabilir" varsayimina
  * dusmek zorunda kalirsin.
  *
- * Somut sonucu: daemon yalnizca `report:impressions` + `read:balance` tasir.
- * Calinmis bir daemon token'i cuzdan degistiremez.
+ * Somut sonucu: daemon `report:impressions` + `read:balance` +
+ * `withdraw:balance` tasir. Calinmis bir daemon token'i cuzdan degistiremez
+ * ve kampanya acamaz. Bakiyeyi CEKEBILIR — ama para yalnizca hesabin kendi
+ * adresine (publisherId) gider; baska bir hedef secilemez.
  */
 
 import { createHash, timingSafeEqual } from 'node:crypto'

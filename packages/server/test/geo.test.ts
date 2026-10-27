@@ -31,10 +31,16 @@ describe('countryFromRequest', () => {
     expect(countryFromRequest(headers({ 'cf-ipcountry': 'T1' }), null)).toBe(null)
   })
 
-  it('baslik yoksa yerel veritabanina ilk x-forwarded-for adresiyle bakar', () => {
+  it('baslik yoksa yerel veritabanina vekilin ekledigi adresle bakar', () => {
     const db = fakeDb({ '85.105.0.1': 'TR', '10.0.0.1': 'US' })
-    expect(countryFromRequest(headers({ 'x-forwarded-for': '85.105.0.1, 10.0.0.1' }), db)).toBe('TR')
+    expect(countryFromRequest(headers({ 'x-forwarded-for': '85.105.0.1' }), db)).toBe('TR')
     expect(countryFromRequest(headers({ 'x-real-ip': '85.105.0.1' }), db)).toBe('TR')
+  })
+
+  /** Ilk degeri istemci yazar; vekil gercek adresi SONA ekler. */
+  it('istemcinin yazdigi x-forwarded-for ulkeyi TAKLIT EDEMEZ', () => {
+    const db = fakeDb({ '85.105.0.1': 'TR', '8.8.8.8': 'US' })
+    expect(countryFromRequest(headers({ 'x-forwarded-for': '85.105.0.1, 8.8.8.8' }), db)).toBe('US')
   })
 
   it('veritabani yoksa ya da adres bozuksa susar', () => {

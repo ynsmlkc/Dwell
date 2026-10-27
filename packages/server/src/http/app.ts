@@ -20,7 +20,7 @@ import type { Clock, IdGenerator } from '@dwell/protocol'
 import type { Pipeline } from '../pipeline.js'
 import type { Ledger } from '../ledger/ledger.js'
 import { accountId, PLATFORM_REVENUE } from '../ledger/accounts.js'
-import { bearerToken, type AuthContext, type TokenLookup } from './auth.js'
+import { bearerToken, safeEqual, type AuthContext, type TokenLookup } from './auth.js'
 import type { WalletAuth } from './wallet-auth.js'
 import type { PayoutStore } from '../payouts/store.js'
 import type { CampaignStore } from '../ads/campaign-store.js'
@@ -32,6 +32,7 @@ import { countryFromRequest, type CountryLookup } from '../leaderboard/geo.js'
 import { poolReserve, poolSpent } from '../pools/reserve.js'
 import { COUNTRY_CODES } from '../leaderboard/countries.js'
 import { RateLimiter } from './rate-limit.js'
+import { clientIp } from './client-ip.js'
 import { advertiserStats } from '../advertisers/stats.js'
 
 export interface AppDeps {
@@ -87,6 +88,8 @@ export interface AppDeps {
   readonly pools?: PoolStore
   /** `/v1/ads/next` hiz siniri. Verilmezse varsayilan kova (bkz. rate-limit.ts). */
   readonly adRateLimit?: RateLimiter
+  /** `/v1/auth/*` icin IP basina hiz siniri. Verilmezse 5'lik kova, 30 sn'de bir dolum. */
+  readonly authRateLimit?: RateLimiter
 }
 
 type Vars = { auth: AuthContext }
@@ -193,11 +196,30 @@ export function createApp(deps: AppDeps) {
   if (deps.walletAuth) {
     const wa = deps.walletAuth
 
+    // IP basina. Adres basina DEGIL: o zaman baskasinin adresine istek atan
+    // biri o kisinin kovasini bosaltip girisini engellerdi. Normal bir giris
+    // 1-2 challenge harcar; kova bir kaynagin `MAX_PER_ADDRESS` penceresini
+    // challenge omru icinde dolduramayacagi kadar yavas doluyor.
+    const authLimit = deps.authRateLimit
+      ?? new RateLimiter({ now: () => deps.clock.now(), capacity: 5, refillMs: 30_000 })
+    app.use('/v1/auth/*', async (c, next) => {
+      const bekle = authLimit.take(clientIp((n) => c.req.header(n)) ?? 'bilinmiyor')
+      if (bekle > 0) {
+        c.header('retry-after', String(Math.ceil(bekle / 1000)))
+        return c.json(err('DWL_9002', 'giris denemesi hizi siniri'), 429)
+      }
+      await next()
+    })
+
     app.post('/v1/auth/challenge', async (c) => {
       const body = await c.req.json().catch(() => null)
       const address = typeof body?.address === 'string' ? body.address.trim() : ''
 
       const r = wa.challenge(address)
+      if (!r.ok && r.busy) {
+        c.header('retry-after', '30')
+        return c.json(err('DWL_9002', r.reason), 503)
+      }
       if (!r.ok) return c.json(err('DWL_4001', r.reason), 400)
 
       return c.json({
@@ -288,10 +310,7 @@ export function createApp(deps: AppDeps) {
       return c.json(err('DWL_9001', parsed.error.issues[0]?.message ?? 'gecersiz govde'), 400)
     }
 
-    const ipHash = hashIp(
-      c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? c.req.header('x-real-ip'),
-      deps.ipSalt,
-    )
+    const ipHash = hashIp(clientIp((n) => c.req.header(n)), deps.ipSalt)
 
     const result = deps.pipeline.ingest.ingest(publisherId, parsed.data.events, { ipHash })
 
@@ -714,10 +733,9 @@ export function createApp(deps: AppDeps) {
   if (deps.adminSecret) {
     const requireAdmin = async (c: any, next: any) => {
       const raw = bearerToken(c.req.header('authorization'))
-      // Sabit-zamanli olmayan karsilastirma burada kabul edilebilir: bu
-      // sir zaten yalnizca bir kisi (platform operatoru) tarafindan
-      // kullaniliyor, kamuya acik bir giris denemesi yuzeyi degil.
-      if (!raw || raw !== deps.adminSecret) {
+      // Uc internete acik; sabit zamanli karsilastirma, geri kalan token
+      // dogrulamasiyla ayni (bkz. `safeEqual`).
+      if (!raw || !safeEqual(raw, deps.adminSecret!)) {
         return c.json(err('DWL_2002', 'gecersiz admin sirri'), 401)
       }
       await next()

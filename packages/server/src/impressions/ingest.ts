@@ -55,6 +55,12 @@ export interface IngestDeps {
   /** `(publisherId, impressionId)` daha once gorulmus mu? */
   readonly seen: (publisherId: string, impressionId: string) => StoredImpression | null
   readonly save: (imp: StoredImpression) => void
+  /**
+   * Kullanilan teslimati KALICI olarak isaretler. Yalnizca bellekte kalsaydi
+   * deploy'dan sonra ayni nonce yeni bir gosterim kimligiyle tekrar kabul
+   * edilir ve reklamveren iki kez oderdi.
+   */
+  readonly consume?: (delivery: DeliveredAd) => void
   readonly minImpressionMs: number
   /** ADR-016 — bu surumun altindaki istemciler reddedilir. */
   readonly minClientVersion: string
@@ -122,6 +128,7 @@ export class ImpressionIngest {
 
       const delivery = this.deps.findDelivery(ev.nonce)!
       delivery.consumed = true                       // replay'i keser
+      this.deps.consume?.(delivery)                  // ...yeniden baslatmadan sonra da
       this.deps.save(this.#build(publisherId, ev, delivery, meta, 'pending', null))
       accepted.push(ev.id)
     }

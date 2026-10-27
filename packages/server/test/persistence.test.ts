@@ -324,6 +324,34 @@ describe('gosterimler ve sunumlar', () => {
     expect(r.accepted).toHaveLength(1)
   })
 
+  /**
+   * Cift faturalama. Nonce'un `consumed` isareti yalnizca bellekteydi:
+   * deploy'dan sonra ayni nonce YENI bir gosterim kimligiyle tekrar
+   * gonderilince kabul ediliyor ve reklamveren iki kez oduyordu.
+   */
+  it('kullanilmis nonce yeniden baslatmadan sonra da KULLANILMIS', () => {
+    const l1 = new Ledger(new SqliteLedgerStore(db, clock, ids), clock, ids)
+    l1.deposit({ advertiserId: 'adv', amount: stroops(10_000_000_000n), topupId: 't1' })
+    const p1 = kurPipeline(db, l1)
+    const sel = p1.serveAd('alice')!
+    clock.advance(15_000)
+    const olay = (id: string) => ({
+      id, campaignId: 'c1', nonce: sel.nonce, sessionId: 's1',
+      surface: 'statusline', durationMs: 15_000, clientTs: clock.now(),
+      projectKey: 'a'.repeat(64), clientVersion: '0.1.0', os: 'darwin', arch: 'arm64',
+    })
+    expect(p1.ingest.ingest('alice', [olay('01M0' + 'C'.repeat(22))] as any, { ipHash: null }).accepted)
+      .toHaveLength(1)
+
+    const yeni = yenidenBaslat()
+    const l2 = new Ledger(new SqliteLedgerStore(yeni, clock, ids), clock, ids)
+    const p2 = kurPipeline(yeni, l2)
+    const r = p2.ingest.ingest('alice', [olay('01M0' + 'D'.repeat(22))] as any, { ipHash: null })
+
+    expect(r.accepted).toEqual([])
+    expect(r.rejected[0]?.reason).toBe('nonce zaten kullanilmis')
+  })
+
   it('bekleyen gosterim yeniden baslatmadan sonra dogrulanabilir', () => {
     const l1 = new Ledger(new SqliteLedgerStore(db, clock, ids), clock, ids)
     l1.deposit({ advertiserId: 'adv', amount: stroops(10_000_000_000n), topupId: 't1' })
