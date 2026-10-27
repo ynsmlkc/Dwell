@@ -2,9 +2,9 @@
 
 > Terminal-native ad marketplace that turns AI coding wait states into revenue — paid out in USDC on Stellar.
 
-While Claude Code is thinking, a single clearly-disclosed sponsored line appears. Verified impressions accrue to the developer's balance and settle automatically in USDC on Stellar. No bank account, no country restrictions, no minimum threshold.
+While Claude Code is thinking, a single clearly-disclosed sponsored line appears. Verified impressions accrue to the developer's balance, which they can withdraw in USDC on Stellar at any time, in any amount. No bank account, no country restrictions, no minimum threshold.
 
-**Status: pre-alpha.** The design is worked out in detail, the risky assumptions have been measured, and the client-side spine is being built. Nothing is deployed and no real money has moved outside of Stellar testnet.
+**Status: live on Stellar testnet.** The CLI is on npm ([`dwellsh`](https://www.npmjs.com/package/dwellsh)), the server runs at [dwellsh.dev](https://dwellsh.dev), wallet login (SEP-10 via Freighter) and the advertiser panel work, and real USDC payouts have settled on testnet. Mainnet is not live: no real money moves yet. Runs on macOS and Linux; Windows support is new in 0.1.16 and still being verified.
 
 ---
 
@@ -12,7 +12,7 @@ While Claude Code is thinking, a single clearly-disclosed sponsored line appears
 
 Per-impression amounts are tiny — a fraction of a cent. On traditional rails the fixed cost of a payout (transfer fee, FX spread, compliance overhead) routinely exceeds the payout itself, which forces platforms into high thresholds, monthly batches, and a short list of supported countries. Developers in Turkey, Latin America, South Asia and Africa generate value they cannot collect.
 
-Stellar's per-operation fee is around 0.00001 XLM, which makes a $1 payout threshold economically sane. That is the whole reason this product can exist for developers outside a handful of countries.
+Stellar's per-operation fee is around 0.00001 XLM, which makes even a few-cent payout economically sane — so there is no threshold at all: a developer withdraws whatever they have earned, whenever they want. That is the whole reason this product can exist for developers outside a handful of countries.
 
 ## What has been measured
 
@@ -63,9 +63,12 @@ The daemon holds the ad in memory so the shim never touches the network. If the 
 ## Repo layout
 
 ```
-PROJECT.md              living design document — 23 ADRs, measurements, open questions
-packages/protocol/      shared types, money, sanitizer, schemas   (82 tests)
-packages/cli/           daemon, unix socket, shim, disk queue     (44 tests)
+PROJECT.md              living design document — ADRs, measurements, open questions
+packages/protocol/      shared types, money, sanitizer, schemas
+packages/cli/           the `dwellsh` npm package: daemon, IPC (unix socket / Windows named pipe), shim, disk queue
+packages/server/        ad serving, impression ingest and verification, ledger, wallet login, payouts, the site
+packages/payments/      Stellar rail: SEP-10, payouts, trustlines
+contracts/vault/        Soroban escrow for advertiser balances (not yet used by the server)
 spikes/                 throwaway probes — deleted once folded into the doc
 ```
 
@@ -75,7 +78,7 @@ spikes/                 throwaway probes — deleted once folded into the doc
 
 ```bash
 pnpm install
-pnpm test        # 126 tests
+pnpm test        # ~740 tests across the packages
 pnpm typecheck
 ```
 
@@ -91,9 +94,11 @@ cd spikes/stellar-payout && npm install && npm run spike
 
 - [x] Assumptions measured — ad surface and payment rail both viable
 - [x] `protocol` — money, sanitizer, schemas, injectable clock
-- [x] Daemon — turn state machine, unix socket, shim, disk queue
-- [ ] Backend — ad serving, impression ingest, ledger
-- [ ] Wallet linking — SEP-10 via Freighter / LOBSTR
-- [ ] Payouts — Stellar testnet
+- [x] Daemon — turn state machine, IPC, shim, disk queue (macOS, Linux; Windows in progress)
+- [x] Backend — ad serving, impression ingest, ledger (live at dwellsh.dev)
+- [x] Wallet linking — SEP-10 via Freighter
+- [x] Payouts — on-demand USDC withdrawals on Stellar testnet
+- [x] Advertiser panel — self-serve campaigns and budgets
+- [ ] Mainnet
 
-Mainnet, click attribution, an advertiser dashboard, and adapters beyond Claude Code are explicitly out of scope for now.
+Click attribution and adapters beyond Claude Code are explicitly out of scope for now.

@@ -242,8 +242,9 @@ body.landing {
 .finale .display { font-size: clamp(44px, 7.5vw, 96px); max-width: none; }
 .finale .cmd { width: min(440px, 100%); }
 .finale .sub { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 24px; font-size: 14px; color: var(--muted); }
-.finale .sub a { color: var(--ink-2); border-bottom: 1px solid var(--line-2); padding-bottom: 1px; }
-.finale .sub a:hover { color: var(--ink); }
+.finale .sub a, .finale .sub button { color: var(--ink-2); border-bottom: 1px solid var(--line-2); padding-bottom: 1px; }
+.finale .sub button { font: inherit; background: none; border-width: 0 0 1px; padding: 0 0 1px; cursor: pointer; }
+.finale .sub a:hover, .finale .sub button:hover { color: var(--ink); }
 
 .landing footer { border-top-color: var(--line); }
 .landing footer .wrap { font-family: var(--sans); font-size: 13.5px; padding-top: 28px; padding-bottom: 28px; }

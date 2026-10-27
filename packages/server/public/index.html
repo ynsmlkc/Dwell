@@ -126,7 +126,7 @@
           <div class="sign">
             <div class="row"><span class="ink">Sign challenge</span><span class="dim">no fee</span></div>
             <div class="msg">Sign in to Dwell<span class="dim">
-publisher login · expires in 5 min</span></div>
+as a publisher · expires in 5 min</span></div>
             <div class="btns"><span>Cancel</span><span class="go">Sign</span></div>
           </div>
           <div class="dim" style="margin-top: 12px">$ dwell login</div>
@@ -172,7 +172,7 @@ publisher login · expires in 5 min</span></div>
   <span class="k">durationMs</span>:    <span class="n">12400</span>,
   <span class="k">clientTs</span>:      <span class="n">1790000000000</span>,
   <span class="k">projectKey</span>:    <span class="s">"9f2c…"</span>,         <span class="c">// salted HMAC, never the path</span>
-  <span class="k">clientVersion</span>: <span class="s">"0.1.13"</span>,
+  <span class="k">clientVersion</span>: <span class="s">"0.1.16"</span>,
   <span class="k">os</span>:            <span class="s">"darwin"</span>,
   <span class="k">arch</span>:          <span class="s">"arm64"</span>
 <span class="c">}</span></pre>
@@ -181,7 +181,7 @@ publisher login · expires in 5 min</span></div>
       <div class="never reveal">
         <div>
           <h3 class="h3">Never sent</h3>
-          <p class="p-sm" style="margin-top: 4px">Not hashed, not sampled, not "anonymised". Not sent.</p>
+          <p class="p-sm" style="margin-top: 4px">These never leave your machine in any form — not even hashed. (The <span class="mono">projectKey</span> above is a salted HMAC of the project, computed locally; the path itself is never sent.)</p>
         </div>
         <ul>
           <li>your directory path <span class="x">✕</span></li>
@@ -304,7 +304,7 @@ publisher login · expires in 5 min</span></div>
     </button>
     <div class="sub">
       <span>Leaving takes one command:</span>
-      <a href="#" id="copy-uninstall">dwell uninstall</a>
+      <button type="button" id="copy-uninstall" aria-label="Copy the uninstall command" title="Click to copy">dwell uninstall</button>
     </div>
   </section>
 </main>
