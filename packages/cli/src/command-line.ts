@@ -21,7 +21,7 @@
 
 import { spawnSync } from 'node:child_process'
 import { existsSync, realpathSync } from 'node:fs'
-import { delimiter, join, win32 } from 'node:path'
+import { join, posix, win32 } from 'node:path'
 
 const hasSpace = (s: string): boolean => /\s/.test(s)
 const fwd = (p: string): string => p.replace(/\\/g, '/')
@@ -127,13 +127,14 @@ export function findOnPath(
   platform: NodeJS.Platform = process.platform,
 ): string | null {
   const path = env['PATH'] ?? env['Path'] ?? ''
-  const sep = platform === 'win32' ? ';' : delimiter
+  // Hedef platformun ayraci — ana makinenin (`path.delimiter`) degil.
+  const sep = platform === 'win32' ? ';' : ':'
   const exts = platform === 'win32'
     ? (env['PATHEXT'] ?? '.COM;.EXE;.BAT;.CMD').split(';').filter(Boolean)
     : ['']
   for (const dir of path.split(sep).filter(Boolean)) {
     for (const ext of exts) {
-      const candidate = (platform === 'win32' ? win32.join : join)(dir.replace(/^"|"$/g, ''), name + ext)
+      const candidate = (platform === 'win32' ? win32.join : posix.join)(dir.replace(/^"|"$/g, ''), name + ext)
       if (existsSync(candidate)) return candidate
     }
   }

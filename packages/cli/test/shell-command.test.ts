@@ -128,11 +128,16 @@ describe('splitCommand / sameShimCommand', () => {
 
 describe('findOnPath', () => {
   it('PATH\'teki ilk eslesmeyi bulur', () => {
+    // Gercek dosya sistemi: yollar ve ayrac calistigi platformunki.
+    const win = process.platform === 'win32'
     const d = mkdtempSync(join(tmpdir(), 'dwell-path-'))
+    const sep = win ? ';' : ':'
+    const exe = win ? 'node.EXE' : 'node'
     try {
-      writeFileSync(join(d, 'node'), '')
-      expect(findOnPath('node', { PATH: `/yok/burada:${d}` }, 'linux')).toBe(join(d, 'node'))
-      expect(findOnPath('node', { PATH: '/yok/burada' }, 'linux')).toBeNull()
+      writeFileSync(join(d, exe), '')
+      const env = { PATH: `${join(d, 'yok')}${sep}${d}`, PATHEXT: '.EXE' }
+      expect(findOnPath('node', env, process.platform)).toBe(join(d, exe))
+      expect(findOnPath('node', { PATH: join(d, 'yok'), PATHEXT: '.EXE' }, process.platform)).toBeNull()
     } finally { rmSync(d, { recursive: true, force: true }) }
   })
 })
