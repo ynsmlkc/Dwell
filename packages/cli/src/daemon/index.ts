@@ -14,7 +14,7 @@ import { ImpressionQueue } from './queue.js'
 import { SpinnerSync } from './spinner-sync.js'
 import { ServerSync } from './sync.js'
 import { writeFileSync, existsSync, unlinkSync } from 'node:fs'
-import { join, dirname } from 'node:path'
+import { join } from 'node:path'
 import { SOCKET_PATH, DWELL_HOME, type Request, type Response, type HookEvent } from '../ipc.js'
 import { VERSION } from '../version.js'
 
@@ -83,7 +83,9 @@ export async function startDaemon(opts: DaemonOptions = {}): Promise<Daemon> {
    */
   const spinnerAd = (): AdPayload | null => (sync ? sync.peekAd() : peekAd())
   // Acilista diskteki duraklatma durumunu geri yukle.
-  const pausePath = (): string => join(dirname(opts.socketPath ?? SOCKET_PATH), 'paused')
+  // Veri dizinine yazilir, soketin dizinine DEGIL: Windows'ta soket bir
+  // named pipe ve "dizini" (\\.\pipe\) dosya tutmaz.
+  const pausePath = (): string => join(opts.dataDir ?? DWELL_HOME, 'paused')
   let paused = existsSync(pausePath())
   let lastError: string | null = null
   const queue = new ImpressionQueue({

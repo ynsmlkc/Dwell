@@ -7,7 +7,7 @@
 
 import { spawn } from 'node:child_process'
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, openSync } from 'node:fs'
-import { socketPathFor } from '../ipc.js'
+import { socketPathFor, dwellHome } from '../ipc.js'
 import { join } from 'node:path'
 import { connect } from 'node:net'
 import { encode, type Request, type Response } from '../ipc.js'
@@ -19,8 +19,7 @@ import { encode, type Request, type Response } from '../ipc.js'
  * hem test edilemez hale gelir hem de `DWELL_HOME`'u sonradan degistiren
  * her cagiran sessizce yanlis dizine yazar.
  */
-const home = (): string =>
-  process.env['DWELL_HOME'] ?? join(process.env['HOME'] ?? '', '.dwell')
+const home = (): string => dwellHome()
 
 export const pidPath = (): string => join(home(), 'daemon.pid')
 export const logPath = (): string => join(home(), 'daemon.log')
@@ -91,6 +90,8 @@ export async function start(opts: StartOptions): Promise<{ pid: number } | { err
 
   const child = spawn(process.execPath, [opts.entry], {
     detached: true,
+    // Windows'ta detached surec kendi konsol penceresini acar; gizli kalsin.
+    windowsHide: true,
     stdio: ['ignore', logFd, logFd],
     env: { ...process.env, ...opts.env },
   })

@@ -3,7 +3,9 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { socketPathFor, encode, decode } from '../src/ipc.js'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+import { socketPathFor, isNamedPipe, dwellHome, encode, decode } from '../src/ipc.js'
 
 describe('encode/decode', () => {
   it('gidis donus bozulmaz', () => {
@@ -60,5 +62,45 @@ describe('socketPathFor', () => {
     const turkce = `/Users/${'ş'.repeat(60)}/.dwell`      // 60 karakter, 120 byte
     expect(turkce.length).toBeLessThan(LIMIT)
     expect(Buffer.byteLength(socketPathFor(turkce))).toBeLessThanOrEqual(LIMIT)
+  })
+})
+
+/**
+ * Windows: Node unix soket dosyasi dinleyemez, yerel IPC named pipe ile olur.
+ * Gercek kurulumda bulundu — `dwell init` her Windows makinesinde DWL-1001
+ * ile dusuyordu.
+ */
+describe('socketPathFor — Windows', () => {
+  const win = (h: string) => socketPathFor(h, 'win32')
+
+  it('named pipe verir, soket dosyasi DEGIL', () => {
+    const p = win('C:\\Users\\90542\\.dwell')
+    expect(p.startsWith('\\\\.\\pipe\\dwell-')).toBe(true)
+    expect(isNamedPipe(p)).toBe(true)
+  })
+
+  /** Git Bash'ten gelen yol ile PowerShell'den gelen yol ayni pipe'a cikmali. */
+  it('ayirac ve buyuk/kucuk harf farki AYNI pipe\'i verir', () => {
+    expect(win('C:/Users/90542/.dwell')).toBe(win('c:\\users\\90542\\.dwell'))
+  })
+
+  it('farkli ev dizinleri CAKISMAZ', () => {
+    expect(win('C:\\Users\\a\\.dwell')).not.toBe(win('C:\\Users\\b\\.dwell'))
+  })
+
+  it('unix yollari pipe sayilmaz', () => {
+    expect(isNamedPipe('/Users/ali/.dwell/dwelld.sock')).toBe(false)
+    expect(isNamedPipe('C:\\Users\\a\\.dwell\\dwelld.sock')).toBe(false)
+  })
+})
+
+/** `HOME` Windows'ta tanimli degil; ev dizini ondan okunursa yol bozulur. */
+describe('dwellHome', () => {
+  it('HOME olmadan da mutlak yol verir', () => {
+    expect(dwellHome({})).toBe(join(homedir(), '.dwell'))
+  })
+
+  it('DWELL_HOME her seyi ezer', () => {
+    expect(dwellHome({ DWELL_HOME: '/tmp/x' })).toBe('/tmp/x')
   })
 })

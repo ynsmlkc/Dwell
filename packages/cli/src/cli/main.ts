@@ -9,8 +9,8 @@
 import { resolve, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { existsSync, realpathSync } from 'node:fs'
-import { install, uninstall, diagnose, readSettings, detectConflicts, SETTINGS_PATH } from '../settings.js'
-import { DWELL_HOME, SOCKET_PATH } from '../ipc.js'
+import { install, uninstall, diagnose, readSettings, detectConflicts, shellCommand, SETTINGS_PATH } from '../settings.js'
+import { DWELL_HOME, SOCKET_PATH, isNamedPipe } from '../ipc.js'
 import * as daemon from './daemon-control.js'
 import { out, ok, warn, info, fail, rows, dim, bold, green, yellow, red, orange, banner, usdc } from './output.js'
 import { cmdLogin, cmdLogout, cmdWhoami } from './login.js'
@@ -48,7 +48,7 @@ const shimPath = (): string => {
 const hookPath = (): string => join(PKG_ROOT, 'dist', 'hook.mjs')
 const daemonEntry = (): string => join(PKG_ROOT, 'dist', 'daemon.mjs')
 
-const statusLineCommand = (): string => `${process.execPath} ${shimPath()}`
+const statusLineCommand = (): string => shellCommand([process.execPath, shimPath()])
 
 /* ─────────────────────────── komutlar ─────────────────────────── */
 
@@ -112,7 +112,7 @@ async function cmdInit(argv: string[]): Promise<void> {
   // 2. settings.json
   const result = install({
     statusLineCommand: statusLineCommand(),
-    hookCommand: `${process.execPath} ${hookPath()}`,
+    hookCommand: shellCommand([process.execPath, hookPath()]),
     refreshIntervalSec: 1,
     ...(withSpinner ? { spinnerVerbs: ['✶ Dwell'] } : {}),
     force,
@@ -166,7 +166,8 @@ async function cmdDoctor(): Promise<void> {
   const checks: [string, boolean, string][] = [
     ['settings.json', d.installed, d.detail],
     ['daemon', alive, alive ? `pid ${daemon.readPid() ?? '?'}` : 'not running — `dwell init`'],
-    ['socket', existsSync(SOCKET_PATH), SOCKET_PATH],
+    // Named pipe'in dosyasi yok; varligini ancak cevap vermesi kanitlar.
+    ['socket', isNamedPipe(SOCKET_PATH) ? alive : existsSync(SOCKET_PATH), SOCKET_PATH],
     ['shim', existsSync(shimPath()), shimPath().endsWith('.ts')
       ? 'TypeScript source — the compiled version is faster' : 'compiled'],
     ['spinner', d.spinnerOwner !== 'baskasinin', d.spinnerDetail ?? 'not installed'],

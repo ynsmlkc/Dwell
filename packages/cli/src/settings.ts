@@ -25,6 +25,23 @@ export const SETTINGS_PATH = join(CLAUDE_DIR, 'settings.json')
 /** Bizim yazdigimiz her seye bu iz konur — kaldirirken bunu arariz. */
 export const MARKER = '__dwell'
 
+/**
+ * `settings.json`'a yazilacak komut satiri.
+ *
+ * Claude Code Windows'ta komutlari Git Bash ile calistirir: orada ters bolu
+ * kacis karakteridir ("C:\Users\a" → "C:Usersa") ve
+ * "C:\Program Files\nodejs\node.exe" bosluktan ikiye bolunur. Ileri bolu
+ * Windows'ta Node icin de gecerli; bosluk iceren parca tirnaklanir. Bosluk
+ * yoksa komut eskisiyle BIREBIR ayni kalir — mevcut kurulumlar "baskasinin"
+ * gorunmesin.
+ */
+export function shellCommand(parts: readonly string[], platform: NodeJS.Platform = process.platform): string {
+  return parts
+    .map((p) => (platform === 'win32' ? p.replace(/\\/g, '/') : p))
+    .map((p) => (/\s/.test(p) ? `"${p}"` : p))
+    .join(' ')
+}
+
 export interface StatusLineSetting {
   type: 'command'
   command: string

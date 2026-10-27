@@ -14,7 +14,7 @@ import { createServer, type Server, type Socket } from 'node:net'
 import { chmodSync, mkdirSync, unlinkSync, existsSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname } from 'node:path'
-import { encode, decode, type Request, type Response } from '../ipc.js'
+import { encode, decode, isNamedPipe, type Request, type Response } from '../ipc.js'
 
 export type Handler = (req: Request) => Response | Promise<Response>
 
@@ -28,8 +28,14 @@ export async function startSocketServer(
   handle: Handler,
   onError: (e: unknown) => void = () => {},
 ): Promise<SocketServer> {
+  // Windows named pipe: dizini, dosyasi ve modu yok. `dirname` "\\.\pipe\"
+  // verir; mkdir/chmod orada patlar ve daemon hic ayaga kalkmaz. Bayat
+  // pipe da kalmaz — sahibi olunce isletim sistemi kaldirir; canli bir
+  // kopya varsa `listen` EADDRINUSE ile reddeder.
+  const pipe = isNamedPipe(socketPath)
+
   const dir = dirname(socketPath)
-  mkdirSync(dir, { recursive: true, mode: 0o700 })
+  if (!pipe) mkdirSync(dir, { recursive: true, mode: 0o700 })
 
   // Dizini yalnizca BIZIM ise kilitleriz.
   //
@@ -38,13 +44,13 @@ export async function startSocketServer(
   // makinedeki diger programlarin isini bozar. O durumda korumayi soket
   // dosyasinin kendi 0600 modu tasir — asil kontrol zaten odur, dizin izni
   // ikinci savunma katmaniydi.
-  if (dir !== tmpdir()) {
+  if (!pipe && dir !== tmpdir()) {
     try { chmodSync(dir, 0o700) } catch { /* Windows'ta anlamsiz */ }
   }
 
   // Bayat soket: daemon carptiysa dosya kalir ve bind engellenir.
   // Once gercekten olu mu diye bakilir, canliysa DOKUNULMAZ.
-  if (existsSync(socketPath)) {
+  if (!pipe && existsSync(socketPath)) {
     if (await isSocketAlive(socketPath)) {
       throw new Error(`dwelld is already running: ${socketPath}`)
     }
@@ -97,17 +103,25 @@ export async function startSocketServer(
   })
 
   await new Promise<void>((resolve, reject) => {
-    server.once('error', reject)
-    server.listen(socketPath, () => { server.off('error', reject); resolve() })
+    server.once('error', (e: NodeJS.ErrnoException) => {
+      // Pipe'ta bayat dosya kontrolu yok; canli kopyayi `listen` yakalar.
+      // Mesaj Unix'teki ile ayni olmali — `dwell init` "already" arar.
+      reject(pipe && e.code === 'EADDRINUSE'
+        ? new Error(`dwelld is already running: ${socketPath}`)
+        : e)
+    })
+    server.listen(socketPath, () => { server.removeAllListeners('error'); resolve() })
   })
 
-  chmodSync(socketPath, 0o600)
+  // Pipe'ta izin bitleri yok; varsayilan DACL zaten yalnizca ayni
+  // kullaniciya (ve SYSTEM/Administrators'a) baglanma hakki verir.
+  if (!pipe) chmodSync(socketPath, 0o600)
 
   return {
     connections: () => live,
     close: () => new Promise<void>((resolve) => {
       server.close(() => {
-        try { unlinkSync(socketPath) } catch { /* zaten gitmis */ }
+        if (!pipe) try { unlinkSync(socketPath) } catch { /* zaten gitmis */ }
         resolve()
       })
     }),
