@@ -229,3 +229,66 @@ fn solvency_invariant_karisik_islemler_sonrasi_da_saglam() {
     let kasa_bakiyesi = s.token.balance(&s.vault.address);
     assert_eq!(kasa_bakiyesi, toplam_hak, "kasa bakiyesi tum haklarin toplamina esit olmali");
 }
+
+#[test]
+fn set_admin_hem_eski_hem_yeni_adminin_imzasini_ister() {
+    let s = setup();
+    let yeni = Address::generate(&s.env);
+
+    s.vault.set_admin(&yeni);
+    let auths = s.env.auths();
+    assert!(auths.iter().any(|(addr, _)| *addr == s.admin));
+    assert!(auths.iter().any(|(addr, _)| *addr == yeni));
+    assert_eq!(s.vault.get_admin(), yeni);
+}
+
+#[test]
+fn set_admin_sonrasi_release_yeni_admine_gecer() {
+    let s = setup();
+    let adv = Address::generate(&s.env);
+    let publisher = Address::generate(&s.env);
+    s.sac_admin.mint(&adv, &1_000);
+    s.vault.deposit(&adv, &500);
+
+    let yeni = Address::generate(&s.env);
+    s.vault.set_admin(&yeni);
+    s.vault.release(&adv, &publisher, &200);
+    let auths = s.env.auths();
+    assert!(auths.iter().any(|(addr, _)| *addr == yeni));
+    assert!(!auths.iter().any(|(addr, _)| *addr == s.admin));
+}
+
+#[test]
+fn set_admin_mevcut_admin_imzalamadan_calismaz() {
+    let env = Env::default();
+    let admin = Address::generate(&env);
+    let platform = Address::generate(&env);
+    let sac = env.register_stellar_asset_contract_v2(Address::generate(&env));
+    let id = env.register(DwellVault, (admin.clone(), sac.address(), platform, 5_000u32));
+    let vault = DwellVaultClient::new(&env, &id);
+
+    // Hicbir yetki taklit edilmiyor: cagri reddedilmeli.
+    assert!(vault.try_set_admin(&Address::generate(&env)).is_err());
+    assert_eq!(vault.get_admin(), admin);
+}
+
+#[test]
+fn harcama_bakiye_kaydinin_omrunu_uzatir() {
+    use soroban_sdk::testutils::storage::Persistent as _;
+    use soroban_sdk::testutils::Ledger as _;
+
+    let s = setup();
+    let adv = Address::generate(&s.env);
+    let publisher = Address::generate(&s.env);
+    s.sac_admin.mint(&adv, &1_000);
+    s.vault.deposit(&adv, &500);
+
+    // 100 gun ilerle: yatirmadan kalan omur esigin altina dustu.
+    s.env.ledger().with_mut(|l| l.sequence_number += 100 * DAY_IN_LEDGERS);
+    s.vault.release(&adv, &publisher, &100);
+
+    let ttl = s.env.as_contract(&s.vault.address, || {
+        s.env.storage().persistent().get_ttl(&DataKey::Balance(adv.clone()))
+    });
+    assert!(ttl >= BUMP_TO - 1, "debit sonrasi TTL uzatilmali, kalan: {ttl}");
+}

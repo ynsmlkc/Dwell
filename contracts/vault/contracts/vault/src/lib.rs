@@ -84,6 +84,15 @@ pub struct Released {
     pub publisher_amount: i128,
 }
 
+/// Admin anahtari degisti — zincirde herkes gorebilsin.
+#[contractevent]
+pub struct AdminChanged {
+    #[topic]
+    pub old_admin: Address,
+    #[topic]
+    pub new_admin: Address,
+}
+
 #[contractevent]
 pub struct Withdrawn {
     #[topic]
@@ -131,6 +140,8 @@ impl DwellVault {
         }
         advertiser.require_auth();
 
+        Self::bump_instance(&env);
+
         let token = Self::token(&env)?;
         let vault = env.current_contract_address();
         TokenClient::new(&env, &token).transfer(&advertiser, &vault, &amount);
@@ -154,6 +165,7 @@ impl DwellVault {
             return Err(Error::AmountNotPositive);
         }
         Self::admin(&env)?.require_auth();
+        Self::bump_instance(&env);
 
         let bal = Self::balance(env.clone(), advertiser.clone());
         if bal < amount {
@@ -204,6 +216,7 @@ impl DwellVault {
             return Err(Error::AmountNotPositive);
         }
         advertiser.require_auth();
+        Self::bump_instance(&env);
 
         let bal = Self::balance(env.clone(), advertiser.clone());
         if bal < amount {
@@ -217,6 +230,30 @@ impl DwellVault {
         let new_bal = Self::debit(&env, &advertiser, amount);
         Withdrawn { advertiser, amount }.publish(&env);
         Ok(new_bal)
+    }
+
+    /// Admin anahtarini degistirir. Sunucudaki sicak anahtar calinir ya da
+    /// rutin olarak dondurulmek istenirse, onceden bu fonksiyon yoktu ve
+    /// anahtar SONSUZA kadar gecerliydi.
+    ///
+    /// Iki imza: mevcut admin (yetki) VE yeni admin (anahtarin gercekten
+    /// kullanilabilir oldugunun kaniti — yanlis yazilmis bir adres kasayi
+    /// admin'siz birakmasin). `publisher_bps` ve `platform` DEGISMEZ; bu
+    /// fonksiyon yalnizca kimin `release` cagirabilecegini degistirir.
+    pub fn set_admin(env: Env, new_admin: Address) -> Result<(), Error> {
+        let old_admin = Self::admin(&env)?;
+        old_admin.require_auth();
+        new_admin.require_auth();
+
+        env.storage().instance().set(&DataKey::Admin, &new_admin);
+        Self::bump_instance(&env);
+        AdminChanged { old_admin, new_admin }.publish(&env);
+        Ok(())
+    }
+
+    /// Mevcut admin — herkes dogrulayabilsin.
+    pub fn get_admin(env: Env) -> Result<Address, Error> {
+        Self::admin(&env)
     }
 
     /// Herkes sorgulayabilir — Dwell'in veritabanina guvenmeden.
@@ -234,6 +271,13 @@ impl DwellVault {
             .instance()
             .get(&DataKey::Admin)
             .ok_or(Error::NotInitialized)
+    }
+
+    /// Instance kaydi (admin, token, platform, bps) yalnizca kurulumda
+    /// uzatiliyordu; ~120 gun sonra arsivlenip kontrati kullanilamaz
+    /// birakirdi. Her yazan cagri uzatir.
+    fn bump_instance(env: &Env) {
+        env.storage().instance().extend_ttl(BUMP_THRESHOLD, BUMP_TO);
     }
 
     fn token(env: &Env) -> Result<Address, Error> {
@@ -259,6 +303,12 @@ impl DwellVault {
         let bal: i128 = env.storage().persistent().get(&key).unwrap_or(0);
         let new_bal = bal - amount;
         env.storage().persistent().set(&key, &new_bal);
+        // `credit` gibi: harcama da bakiye kaydini canli tutar. Uzatilmasaydi
+        // yalnizca harcanan (yeni yatirma yapilmayan) bir bakiye arsive
+        // duserdi.
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, BUMP_THRESHOLD, BUMP_TO);
         new_bal
     }
 }
