@@ -68,6 +68,25 @@ describe('/v1/auth hiz siniri', () => {
     expect((await challenge('10.0.0.99, 203.0.113.9')).status).toBe(429)
   })
 
+  /**
+   * Canlida olculen Railway basliklari: kenar sunucusu her istekte farkli.
+   * Onceki surum o degisen adresi kova anahtari yapti ve sinir hic
+   * devreye girmedi.
+   */
+  it('Railway: kenar adresi degisse de ayni istemci sinirlanir', async () => {
+    const railway = (edge: number) => app.request('/v1/auth/challenge', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-for': `91.93.229.160, 152.233.12.${edge}`,
+        'x-real-ip': '91.93.229.160',
+      },
+      body: JSON.stringify({ address: Keypair.random().publicKey() }),
+    })
+    for (let i = 0; i < 5; i++) expect((await railway(200 + i)).status).toBe(200)
+    expect((await railway(250)).status).toBe(429)
+  })
+
   it('kova zamanla dolar', async () => {
     for (let i = 0; i < 6; i++) await challenge('203.0.113.9')
     clock.advance(30_000)

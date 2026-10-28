@@ -184,15 +184,6 @@ export function createApp(deps: AppDeps) {
    */
   app.get('/health', (c) => c.json({ ok: true, version: PROTOCOL_VERSION }))
 
-  // GECICI — Railway kenarinin IP basliklarini nasil doldurdugunu olcmek
-  // icin. Isteyene yalnizca KENDI basliklarini gosterir. Olcumden sonra
-  // kaldirilacak.
-  app.get('/v1/_ip-probe', (c) => c.json({
-    xForwardedFor: c.req.header('x-forwarded-for') ?? null,
-    xRealIp: c.req.header('x-real-ip') ?? null,
-    chosen: clientIp((n) => c.req.header(n)) ?? null,
-  }))
-
   /* ─────────────────── cuzdanla giris ─────────────────── */
 
   /**
