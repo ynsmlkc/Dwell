@@ -363,13 +363,18 @@ async function readJson(req: IncomingMessage): Promise<Record<string, unknown> |
   catch { return null }
 }
 
-function openBrowser(url: string): void {
-  const cmd = process.platform === 'darwin' ? 'open'
-    : process.platform === 'win32' ? 'cmd' : 'xdg-open'
+export function openBrowser(
+  url: string,
+  cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'cmd' : 'xdg-open',
+): void {
   const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url]
   try {
     // Tarayici acilamazsa SORUN DEGIL: URL zaten ekranda yazili.
-    spawn(cmd, args, { stdio: 'ignore', detached: true }).unref()
+    // Komut yoksa (SSH, sunucu, WSL'de xdg-open kurulu degil) spawn ATMAZ,
+    // sonradan 'error' olayi yayar; dinleyici yoksa surec coker.
+    const child = spawn(cmd, args, { stdio: 'ignore', detached: true })
+    child.on('error', () => { /* sessiz */ })
+    child.unref()
   } catch { /* sessiz */ }
 }
 

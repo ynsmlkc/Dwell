@@ -10,7 +10,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, readFileSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { runLoginServer, parseLoginArgs, kimligiTazele } from '../src/cli/login.js'
+import { runLoginServer, parseLoginArgs, kimligiTazele, openBrowser } from '../src/cli/login.js'
 import { saveCredentials, loadCredentials, clearCredentials } from '../src/credentials.js'
 
 const dirs: string[] = []
@@ -458,5 +458,24 @@ describe('siralama adimi', () => {
     expect(b.html).toMatch(/class="manual hide" id="profilebox"/)
     expect(b.html).toContain('"TR"')
     expect(b.html).not.toMatch(/id="p-listed"[^>]*checked/)
+  })
+})
+
+describe('openBrowser', () => {
+  /**
+   * SSH, sunucu ya da WSL'de xdg-open yok. spawn bunu sonradan 'error'
+   * olayiyla bildirir; dinleyici olmadan `dwell login` cokuyordu.
+   */
+  it('tarayici acici yoksa surec cokmez', async () => {
+    const hatalar: unknown[] = []
+    const yakala = (e: unknown): void => { hatalar.push(e) }
+    process.on('uncaughtException', yakala)
+    try {
+      openBrowser('http://127.0.0.1:1/', 'dwell-olmayan-tarayici-acici')
+      await new Promise((r) => setTimeout(r, 200))
+    } finally {
+      process.off('uncaughtException', yakala)
+    }
+    expect(hatalar).toEqual([])
   })
 })
