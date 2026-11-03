@@ -24,6 +24,25 @@ jobs:
       # The testnet payout test sends real transactions and is skipped unless
       # DWELL_TESTNET is set, so CI never touches the network or a wallet.
       - run: pnpm test
+      - run: pnpm --filter dwellsh build
+      # Paketlenmis CLI ile uctan uca, Windows isindeki adimlarin aynisi:
+      # daemon unix soket uzerinde ayaga kalkmali ve Claude Code'un
+      # kullandigi sh kurulu komutlari calistirabilmeli.
+      - name: End to end (Linux)
+        env:
+          DWELL_HOME: ${{ runner.temp }}/dwell-home
+          CLAUDE_CONFIG_DIR: ${{ runner.temp }}/claude
+        run: |
+          set -eu
+          node packages/cli/dist/dwell.mjs init
+          status=$(node packages/cli/dist/dwell.mjs status)
+          echo "$status"
+          echo "$status" | grep -q uptime || { echo '::error::daemon is not answering on the socket'; exit 1; }
+          doctor=$(node packages/cli/dist/dwell.mjs doctor)
+          echo "$doctor"
+          if echo "$doctor" | grep -q 'cannot run the Dwell commands'; then echo '::error::Claude Code could not run the installed commands'; exit 1; fi
+          echo "$doctor" | grep -qE 'runs . used by Claude Code' || { echo '::error::doctor did not run the installed commands'; exit 1; }
+          node packages/cli/dist/dwell.mjs uninstall
 
   # Windows'ta daemon unix soket yerine named pipe kullanir. Bu is GERCEK
   # pipe uzerinde kosar; geri kalan suite unix yollari varsaydigi icin
@@ -54,6 +73,7 @@ jobs:
           $status = node packages/cli/dist/dwell.mjs status | Out-String
           Write-Output $status
           if ($status -notmatch 'uptime') { Write-Error 'daemon is not answering on the pipe'; exit 1 }
+          # The heading also says "runs", so match the probe line itself.
           # doctor runs the installed commands in Git Bash, PowerShell, pwsh
           # and cmd. Every one of them must succeed, not just the one Claude
           # Code happens to pick on this runner.
@@ -61,5 +81,5 @@ jobs:
           Write-Output $doctor
           if ($doctor -match 'cannot run the Dwell commands') { Write-Error 'Claude Code could not run the installed commands'; exit 1 }
           if ($doctor -match 'exit [^\r\n]*not used by Claude Code') { Write-Error 'a shell could not run the installed commands'; exit 1 }
-          if ($doctor -notmatch 'runs') { Write-Error 'doctor did not run the installed commands'; exit 1 }
+          if ($doctor -notmatch 'runs . used by Claude Code') { Write-Error 'doctor did not run the installed commands'; exit 1 }
           node packages/cli/dist/dwell.mjs uninstall
