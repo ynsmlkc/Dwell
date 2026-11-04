@@ -13,7 +13,7 @@
     "@dwell/payments": "workspace:*",
     "@dwell/protocol": "workspace:*",
     "@hono/node-server": "^2.1.1",
-    "@stellar/stellar-sdk": "^14.6.1",
+    "@stellar/stellar-sdk": "^16.4.1",
     "hono": "^4.13.1",
     "maxmind": "^5.0.7"
   },

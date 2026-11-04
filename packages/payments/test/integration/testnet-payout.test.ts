@@ -87,7 +87,7 @@ describe.skipIf(!process.env['DWELL_TESTNET'])('testnet odemesi', () => {
       networkPassphrase: NET,
       sourceSecret: hot.secret(),
       assetCode: asset.getCode(),
-      assetIssuer: asset.getIssuer(),
+      assetIssuer: issuer.publicKey(),
     })
   }, TIMEOUT)
 
