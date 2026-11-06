@@ -26,12 +26,9 @@ export interface Campaign {
   readonly creative: Creative
   readonly status: CampaignStatus
   /**
-   * Tekrar kisitlamasinin genisligi. `0` = kisitlama yok, SWRR'nin dogal
-   * tur sirasina tam guveniliyor (varsayilan — PROBLEMS.md #8 karari).
-   * `N > 0` ise bu kampanya son N gosterimden herhangi birinde
-   * gorunduyse elenir; yani en az N+1 gosterimde bir gorunebilir ve bu,
-   * payini `1/(N+1)`'e kilitler — fiyat ne olursa olsun. `1` klasik
-   * "ardisik tekrar yok" kuralidir ve iki kampanyada payi sabit %50 yapar.
+   * ARTIK SECIMDE KULLANILMIYOR: sahne turunda kampanya art arda gosterilir.
+   * Eylul oncesi kampanyalarda varsayilan 1 kalmis olabilir; dikkate alinsaydi
+   * sahne haklari birbirine karisirdi. Veritabani sutunu icin duruyor.
    */
   readonly frequencyCap: number
   /**
@@ -247,9 +244,6 @@ export class AdSelector {
   /**
    * Sahne turu + ikinci fiyat (NEXT.md "Reklam secimi", ADR-009 ucuncu revizyon).
    *
-   * Aday kumesi: kampanyanin kendi `frequencyCap`'ine takilmayanlar. Bos
-   * kalirsa butun uygunlar: reklam gostermemektense tekrar.
-   *
    * Fiyat: kendi teklifini gecmeyen en yuksek rakip teklif + 1 kurus, en fazla
    * kendi teklifi. Sirasi gelen kampanya ustundeki teklife gore fiyatlanmaz.
    * Ayni reklamverenin diger kampanyalari rakip sayilmaz (kendi fiyatini
@@ -258,19 +252,11 @@ export class AdSelector {
    * anlamsiz olurdu.
    */
   #auction(publisherId: string, eligible: readonly Campaign[]): { chosen: Campaign; clearingCpm: Stroops } {
-    const recent = this.#recentByPublisher.get(publisherId) ?? []
-
-    // frequencyCap 0 → kisitlama yok. `slice(-0)` tum diziyi doner; bu yuzden
-    // 0 ayrica ele aliniyor, yoksa "kisitlama yok" tam tersine donerdi.
-    const fresh = eligible.filter((c) =>
-      c.frequencyCap === 0 || !recent.slice(-c.frequencyCap).includes(c.id))
-    const candidates = fresh.length > 0 ? fresh : eligible
-
-    const chosen = this.#nextInTour(publisherId, eligible, candidates)
+    const chosen = this.#nextInTour(publisherId, eligible)
 
     if (chosen.poolId != null) return { chosen, clearingCpm: chosen.bidCpm }
 
-    const rival = [...candidates].sort(byBid)
+    const rival = [...eligible].sort(byBid)
       .find((c) => c.advertiserId !== chosen.advertiserId && c.bidCpm <= chosen.bidCpm)
     const reserve = this.deps.reserveCpm ?? MIN_BID_CPM
     const second = rival ? add(rival.bidCpm, BID_INCREMENT_CPM) : reserve
@@ -284,18 +270,12 @@ export class AdSelector {
    * turda girer, uygunlugunu yitiren (durdurulan, parasi biten) atlanir.
    * Durum yayinci basina tutuldugu icin prompt'lar arasinda sira korunur.
    */
-  #nextInTour(publisherId: string, eligible: readonly Campaign[], candidates: readonly Campaign[]): Campaign {
+  #nextInTour(publisherId: string, eligible: readonly Campaign[]): Campaign {
     const byId = new Map(eligible.map((c) => [c.id, c]))
-    const allowed = new Set(candidates.map((c) => c.id))
-
     let tour = this.#tour(publisherId).filter((id) => byId.has(id))
-    let next = tour.findIndex((id) => allowed.has(id))
-    if (next === -1) {
-      tour = [...tour, ...this.#buildTour(publisherId, eligible)]
-      next = tour.findIndex((id) => allowed.has(id))
-    }
-    const [id] = tour.splice(next, 1)
-    this.#setTour(publisherId, tour)
+    if (tour.length === 0) tour = this.#buildTour(publisherId, eligible)
+    const [id, ...rest] = tour
+    this.#setTour(publisherId, rest)
     return byId.get(id!)!
   }
 

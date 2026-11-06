@@ -116,13 +116,13 @@ describe('PROBLEMS.md #8c — gunluk harcama tavani', () => {
 })
 
 describe('frekans kurali', () => {
-  it('ayni reklam ardisik tekrar etmez (frequencyCap: 1)', () => {
-    const { sel } = setup([camp('a', 30, { frequencyCap: 1 }), camp('b', 20, { frequencyCap: 1 })])
-    expect(sel.select('p1')!.campaign.id).toBe('a')
-    expect(sel.select('p1')!.campaign.id, 'ikinci seferde digeri').toBe('b')
+  it('eski frequencyCap sahne haklarini bolmez', () => {
+    const { sel } = setup([camp('a', 30, { frequencyCap: 1 }), camp('b', 10, { frequencyCap: 1 })])
+    const sira = Array.from({ length: 4 }, () => sel.select('p1')!.campaign.id)
+    expect(sira).toEqual(['a', 'a', 'a', 'b'])
   })
 
-  it('havuz tukenirse kural gevser — reklam gostermemektense tekrar', () => {
+  it('tek kampanya kalirsa tekrar eder — reklam gostermemektense', () => {
     const { sel } = setup([camp('tek', 30, { frequencyCap: 1 })])
     expect(sel.select('p1')!.campaign.id).toBe('tek')
     expect(sel.select('p1')!.campaign.id).toBe('tek')
