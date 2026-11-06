@@ -9,6 +9,7 @@
  * Istemci bilinmeyen alanlari yok sayar, sunucu fazlalik alanlari strip eder.
  */
 
+import { bodyLimit } from 'hono/body-limit'
 import { Hono } from 'hono'
 import { createHash } from 'node:crypto'
 import {
@@ -106,6 +107,33 @@ const hashIp = (ip: string | undefined, salt: string): string | null =>
   ip ? createHash('sha256').update(salt).update(ip).digest('hex').slice(0, 32) : null
 
 /** Kampanyanin disariya gorunen sekli. Ic alanlar sizmaz. */
+/** En buyuk mesru istek: 500 gosterimlik paket, ~200 KB. */
+export const MAX_BODY_BYTES = 512 * 1024
+
+/**
+ * Site ve API ayni adreste. `frame-ancestors` panelin baska bir sitede gorunmez
+ * cerceveye alinip kullaniciya tiklatilmasini engeller; cuzdan ve para cekme
+ * ekranlari var. Sayfalarda satir ici script oldugu icin `unsafe-inline` sart.
+ */
+export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
+  'strict-transport-security': 'max-age=31536000; includeSubDomains',
+  'x-content-type-options': 'nosniff',
+  'x-frame-options': 'DENY',
+  'referrer-policy': 'strict-origin-when-cross-origin',
+  'content-security-policy': [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data: blob:",
+    "connect-src 'self' https://horizon-testnet.stellar.org",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join('; '),
+}
+
 const toCampaignJson = (c: import('../ads/selector.js').Campaign) => ({
   id: c.id,
   brand: c.creative.brand,
@@ -169,8 +197,15 @@ export function createApp(deps: AppDeps) {
 
   app.use('*', async (c, next) => {
     c.header(PROTOCOL_HEADER, PROTOCOL_VERSION)
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) c.header(name, value)
     await next()
   })
+
+  // Govde okunmadan once: sinirsiz istek bellegi doldurup sunucuyu dusurur.
+  app.use('/v1/*', bodyLimit({
+    maxSize: MAX_BODY_BYTES,
+    onError: (c) => c.json(err('DWL_9001', 'istek govdesi cok buyuk'), 413),
+  }))
 
   /* ─────────────────── yetki ─────────────────── */
 

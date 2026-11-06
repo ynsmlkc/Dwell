@@ -12,9 +12,9 @@
   "dependencies": {
     "@dwell/payments": "workspace:*",
     "@dwell/protocol": "workspace:*",
-    "@hono/node-server": "^2.1.1",
+    "@hono/node-server": "^2.1.6",
     "@stellar/stellar-sdk": "^14.6.1",
-    "hono": "^4.13.1",
+    "hono": "^4.13.16",
     "maxmind": "^5.0.7"
   },
   "devDependencies": {

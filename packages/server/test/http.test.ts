@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { fixedClock, stroops, FALLBACK_CONFIG, PROTOCOL_HEADER } from '@dwell/protocol'
 import type { RemoteConfig, ImpressionEvent } from '@dwell/protocol'
 import type { PaymentRail, PayoutBatch, SubmissionReceipt } from '@dwell/payments'
-import { createApp } from '../src/http/app.js'
+import { createApp, MAX_BODY_BYTES } from '../src/http/app.js'
 import { RateLimiter } from '../src/http/rate-limit.js'
 import { TokenStore, hashToken } from '../src/http/auth.js'
 import { Pipeline } from '../src/pipeline.js'
@@ -574,5 +574,45 @@ describe('POST /v1/ads/next — hiz siniri (PROBLEMS #1.4)', () => {
     expect(limiter.take('a')).toBe(0)
     expect(limiter.take('a')).toBeGreaterThan(0)
     expect(limiter.take('b')).toBe(0)
+  })
+})
+
+describe('istek siniri ve guvenlik basliklari', () => {
+  const post = (body: string) =>
+    app.request('/v1/impressions', { method: 'POST', body, headers: auth() })
+
+  it('sinirin ustundeki govde 413 alir', async () => {
+    const r = await post('x'.repeat(MAX_BODY_BYTES + 1))
+    expect(r.status).toBe(413)
+  })
+
+  it('content-length vermeyen parcali govde de sinira takilir', async () => {
+    const parca = new Uint8Array(64 * 1024)
+    let kalan = MAX_BODY_BYTES / parca.length + 2
+    const body = new ReadableStream<Uint8Array>({
+      pull(ctrl) { if (kalan-- > 0) ctrl.enqueue(parca); else ctrl.close() },
+    })
+    const r = await app.request('/v1/impressions', {
+      method: 'POST', body, headers: auth(), duplex: 'half',
+    } as RequestInit)
+    expect(r.status).toBe(413)
+  })
+
+  it('en buyuk mesru gosterim paketi sinirin altinda kalir', () => {
+    const olay = {
+      id: 'x'.repeat(26), campaignId: 'c-' + 'x'.repeat(26), nonce: 'x'.repeat(32),
+      sessionId: 'x'.repeat(128), surface: 'statusline', durationMs: 86_400_000,
+      clientTs: 1_800_000_000_000, rejectedReason: 'sure 9999ms < 10000ms',
+    }
+    const paket = JSON.stringify({ events: Array(500).fill(olay) })
+    expect(paket.length).toBeLessThan(MAX_BODY_BYTES)
+  })
+
+  it('her yanit guvenlik basliklarini tasir', async () => {
+    const r = await app.request('/health')
+    expect(r.headers.get('x-frame-options')).toBe('DENY')
+    expect(r.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(r.headers.get('strict-transport-security')).toContain('max-age=')
+    expect(r.headers.get('content-security-policy')).toContain("frame-ancestors 'none'")
   })
 })
