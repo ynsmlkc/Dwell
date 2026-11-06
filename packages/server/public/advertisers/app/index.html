@@ -381,7 +381,7 @@
 </footer>
 
 <script type="module">
-import { $, show, usd, toStroops, short, api, ApiError, session, login, freighterReady, copyButton, explorer } from '/app.js';
+import { $, show, usd, toStroops, short, api, ApiError, session, signOut, login, freighterReady, copyButton, explorer } from '/app.js';
 
 const MAX_LINE = 80;
 const MIN_CPM = 1000000n;          // $0.10 / 1000 (stroop = 1e-7 USDC)
@@ -418,7 +418,7 @@ async function doLogin() {
 $('#connect').onclick = doLogin;
 $('#retry-connect').onclick = doLogin;
 $('#reconnect').onclick = () => { session.clear(); view('v-connect'); };
-$('#signout').onclick = () => { session.clear(); location.reload(); };
+$('#signout').onclick = async () => { await signOut(); location.reload(); };
 $('#retry-load').onclick = () => load();
 $('#add-funds').onclick = () => { forceDeposit = true; render(); };
 $('#fund-banner-btn').onclick = () => { forceDeposit = true; render(); };

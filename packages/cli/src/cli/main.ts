@@ -14,7 +14,7 @@ import { buildNodeCommand, currentCommandEnv, probeCommand, type BuiltCommand } 
 import { DWELL_HOME, SOCKET_PATH, isNamedPipe } from '../ipc.js'
 import * as daemon from './daemon-control.js'
 import { out, ok, warn, info, fail, rows, dim, bold, green, yellow, red, orange, banner, usdc } from './output.js'
-import { cmdLogin, cmdLogout, cmdWhoami } from './login.js'
+import { cmdLogin, cmdLogout, cmdWhoami, forgetLogin } from './login.js'
 import { cmdBalance } from './balance.js'
 import { cmdProfile } from './profile.js'
 import { loadCredentials, shortAddress } from '../credentials.js'
@@ -156,15 +156,13 @@ async function cmdInit(argv: string[]): Promise<void> {
 
   // 4. Giris yapilmadiysa BUNU SOYLE.
   //
-  // Sunucu bagli degilken daemon icine gomulu ornek reklamlari gosteriyor.
-  // Ekranda her sey calisiyor gorunuyor ama hicbir gosterim hicbir yere
-  // yazilmiyor. Bunu sessiz gecmek, kullaniciyi kazandigini SANARAK
-  // beklemeye birakmak olurdu.
+  // Sunucu bagli degilken reklam yok, yalnizca "kazanmiyorsun" satiri var.
+  // Bunu sessiz gecmek, kullaniciyi kazandigini SANARAK beklemeye birakmak
+  // olurdu.
   if (!loadCredentials()) {
     out()
-    warn(`${bold('demo mode')} — no wallet connected, ${bold('no earnings')}`)
-    info(dim('the ads you see are samples; nothing is being recorded'))
-    info(`to actually earn: ${bold('dwell login')}`)
+    warn(`no wallet connected — ${bold('no ads, no earnings')}`)
+    info(`to start earning: ${bold('dwell login')}`)
   }
 
   // 5. Ne degistigini SOYLE — kullanicidan bir sey aldik.
@@ -313,8 +311,16 @@ function probeOurCommands(): boolean {
 
 async function cmdUninstall(): Promise<void> {
   banner()
+  // Sira onemli: daemon kapanirken bekleyen gosterimleri bu token'la gonderir.
   await daemon.stop()
   ok('daemon stopped')
+
+  const c = loadCredentials()
+  if (c) {
+    const revoked = await forgetLogin(c)
+    ok(`wallet disconnected — ${shortAddress(c.publisherId)}`)
+    if (!revoked) warn('could not reach the server — the token stays valid there until it is revoked')
+  }
 
   const r = uninstall()
   if (r.removed.length === 0) warn('couldn\'t find any of our own settings in settings.json')
@@ -341,7 +347,7 @@ async function cmdUninstall(): Promise<void> {
 
   out()
   info('Your other settings were untouched.')
-  info(`Your earnings are still there — ${bold('dwell init')} brings you back.`)
+  info(`Your earnings stay with your wallet — ${bold('dwell init')} and ${bold('dwell login')} bring you back.`)
   out()
 }
 
@@ -455,7 +461,10 @@ export async function main(argv: readonly string[]): Promise<void> {
       await daemon.stop()
       return daemon.start({ entry: daemonEntry() })
     })
-    case 'logout': return cmdLogout()
+    case 'logout': return cmdLogout({
+      stop: () => daemon.stop(),
+      start: () => daemon.start({ entry: daemonEntry() }),
+    })
     case 'whoami': return cmdWhoami()
     case 'balance': return cmdBalance(rest)
     case 'profile': return cmdProfile(rest)

@@ -56,6 +56,7 @@ export function safeEqual(a: string, b: string): boolean {
 export interface TokenLookup {
   find(rawToken: string): DeviceTokenRecord | null
   touch(tokenId: string, at: number, clientVersion: string | null): void
+  revoke(tokenId: string, at: number): boolean
 }
 
 export class TokenStore implements TokenLookup {

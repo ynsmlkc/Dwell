@@ -57,7 +57,7 @@ Stellar adresinin kendisi.
 - [x] Daemon kimliği dosyadan okuyor
 - [ ] Sponsorlu trustline butonu (ADR-020)
 - [x] `dwell balance` — bekleyen / ödenebilir / yolda + stellar.expert linkleri
-- [ ] Token iptal ucu — `logout` şu an yalnızca yerel dosyayı siliyor
+- [x] Token iptal ucu — `POST /v1/logout`; `dwell logout`, `dwell uninstall` ve web "sign out" iptal ediyor. Girişsiz daemon reklam göstermiyor, yalnızca durum satırı.
 
 Gerçek testnet'e karşı doğrulandı (friendbot'la fonlanmış hesap, Horizon'dan
 signer okuma dahil):

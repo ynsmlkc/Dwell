@@ -20,6 +20,7 @@ import { randomBytes } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import {
   loadCredentials, saveCredentials, clearCredentials, credentialsPath, shortAddress,
+  type Credentials,
 } from '../credentials.js'
 import { out, ok, warn, info, fail, dim, bold, green, orange } from './output.js'
 import { loginPage } from './login-page.js'
@@ -380,15 +381,47 @@ export function openBrowser(
 
 /* ─────────────────────────── logout / whoami ─────────────────────────── */
 
-export function cmdLogout(): void {
+/**
+ * Token'i sunucuda iptal eder ve yerel kimligi siler. Sunucuya ulasilamasa da
+ * yerel kimlik silinir; `false` kullaniciya bunu soylemek icindir. 401 zaten
+ * gecersiz demek, iptal basarili sayilir.
+ */
+export async function forgetLogin(c: Credentials, fetchImpl: typeof fetch = fetch): Promise<boolean> {
+  let revoked = false
+  try {
+    const res = await fetchImpl(`${c.serverUrl}/v1/logout`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${c.token}` },
+      signal: AbortSignal.timeout(5_000),
+    })
+    revoked = res.ok || res.status === 401
+  } catch { /* ag yok: asagida yine siliniyor */ }
+  clearCredentials()
+  return revoked
+}
+
+export interface LogoutDaemon {
+  /** Calisiyorduysa `true`. */
+  readonly stop: () => Promise<boolean>
+  readonly start: () => Promise<unknown>
+}
+
+/**
+ * Sira onemli: daemon kapanirken bekleyen gosterimleri token'la gonderir, bu
+ * yuzden once durur, sonra token iptal edilir. Kimlik yalnizca acilista
+ * okundugu icin daemon ancak yeniden baslayinca reklami birakir.
+ */
+export async function cmdLogout(daemon?: LogoutDaemon, fetchImpl: typeof fetch = fetch): Promise<void> {
   const c = loadCredentials()
-  const removed = clearCredentials()
-  if (!removed) { warn('not logged in'); return }
-  ok(`logged out${c ? ` — ${shortAddress(c.publisherId)}` : ''}`)
-  // Token sunucuda HALA GECERLI. Iptal ucu yazilinca burada cagrilacak;
-  // simdilik durumu gizlemek yerine soyluyoruz.
-  info(dim('note: the device token is still valid on the server — revocation isn\'t built yet'))
-  info(dim('if the daemon is running, stop it with `dwell restart`'))
+  if (!c) { warn('not logged in'); return }
+
+  const wasRunning = (await daemon?.stop()) ?? false
+  const revoked = await forgetLogin(c, fetchImpl)
+  if (wasRunning) await daemon?.start()
+
+  ok(`logged out — ${shortAddress(c.publisherId)}`)
+  if (!revoked) warn('could not reach the server — the token stays valid there until it is revoked')
+  info(dim('no ads and no earnings until you log in again; your balance stays with your wallet'))
 }
 
 export function cmdWhoami(): void {

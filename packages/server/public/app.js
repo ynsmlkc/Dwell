@@ -87,6 +87,12 @@ export async function api(path, { method = 'GET', body, auth = true } = {}) {
   return data;
 }
 
+/** Token'i sunucuda iptal eder, sonra yerelden siler. Sunucuya ulasilamasa da cikis olur. */
+export async function signOut() {
+  await api('/v1/logout', { method: 'POST' }).catch(() => {});
+  session.clear();
+}
+
 /* ─────────────────────────── cuzdan ─────────────────────────── */
 
 /**

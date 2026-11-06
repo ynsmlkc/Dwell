@@ -355,6 +355,17 @@ export function createApp(deps: AppDeps) {
     return c.json({ xdr: r.xdr, network_passphrase: r.networkPassphrase })
   })
 
+  /**
+   * Cikis: token kendini iptal eder. Kapsam istemiyor, cunku her token kendi
+   * oturumunu kapatabilmeli. `/v1/auth/*` altinda degil: oradaki IP hiz siniri
+   * iptali 429 ile dusurup token'i gecerli birakabilirdi.
+   */
+  app.post('/v1/logout', requireScope(), (c) => {
+    deps.tokens.revoke(c.get('auth').tokenId, deps.clock.now())
+    note(c, { auth: 'logout' })
+    return c.json({ ok: true })
+  })
+
   app.post('/v1/ads/next', requireVersion, requireScope('report:impressions'), (c) => {
     const { publisherId } = c.get('auth')
 

@@ -236,7 +236,7 @@
 
 <script type="module">
 import {
-  $, show, usd, short, api, ApiError, session, login, freighterReady,
+  $, show, usd, short, api, ApiError, session, signOut, login, freighterReady,
   walletState, enableUsdc, copyButton, explorer, toStroops,
 } from '/app.js';
 import { flag, countryName, countryCodes } from '/globe.js';
@@ -274,7 +274,7 @@ async function doLogin() {
 $('#connect').onclick = doLogin;
 $('#retry-connect').onclick = doLogin;
 $('#reconnect').onclick = () => { session.clear(); view('v-connect'); };
-$('#signout').onclick = () => { session.clear(); location.reload(); };
+$('#signout').onclick = async () => { await signOut(); location.reload(); };
 
 /* ─────────── veri ─────────── */
 

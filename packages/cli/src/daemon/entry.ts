@@ -12,26 +12,16 @@ import type { AdPayload } from '@dwell/protocol'
 import { loadCredentials, shortAddress } from '../credentials.js'
 
 /**
- * Giris yapilmamisken gosterilen ornek satirlar.
+ * Giris yapilmamisken gosterilen TEK satir. Reklam degil, durum bildirimi.
  *
- * Bunlar KENDIMIZI anlatiyor, baska markalari degil.
- *
- * Onceden burada Firecrawl, Resend ve Neon yaziyordu — gercek sirketler ve
- * hicbiri bize izin vermedi. Paket npm'de: kuran herkes o markalarin bize
- * para verdigini sanardi. Var olmayan bir musteri iliskisini ima etmek,
- * hem o sirketlere hem kullaniciya karsi durust degil.
- *
- * Ikinci fayda: demo artik gercekten ayirt ediliyor. Kullanici satiri
- * okudugu anda kazanmadigini ve ne yapmasi gerektigini biliyor — daha once
- * `dwell init` ciktisindaki uyariyi kacirdiysa burada yakaliyor.
+ * Onceden uc ornek satir donuyordu ve kullanici programi calisir gorup
+ * kazandigini saniyordu: bir makinede bir ay hicbir sey sayilmadi. Tek ve
+ * degismeyen bir satir reklama benzemiyor, ne yapmasi gerektigini soyluyor.
+ * Sunucuya baglanmadigi icin hicbir yere gitmez, kimseye fatura edilmez.
  */
-const DEV_ADS: AdPayload[] = [
-  { campaignId: 'sample-1', nonce: '0'.repeat(32), nonceExpiresAt: 9e12,
-    creative: { brand: 'Dwell', text: 'sample line — you are not earning yet', cta: 'dwell login' } },
-  { campaignId: 'sample-2', nonce: '1'.repeat(32), nonceExpiresAt: 9e12,
-    creative: { brand: 'Dwell', text: 'connect a wallet to show real ads', cta: 'dwell login' } },
-  { campaignId: 'sample-3', nonce: '2'.repeat(32), nonceExpiresAt: 9e12,
-    creative: { brand: 'Dwell', text: 'no server connected — nothing is recorded', cta: 'dwell login' } },
+const LOGGED_OUT_LINE: AdPayload[] = [
+  { campaignId: 'not-logged-in', nonce: '0'.repeat(32), nonceExpiresAt: 9e12,
+    creative: { brand: 'Dwell', text: 'not earning — connect your wallet', cta: 'dwell login' } },
 ]
 
 const log = (m: string): void => {
@@ -46,8 +36,8 @@ const SERVER = process.env['DWELL_SERVER'] ?? creds?.serverUrl ?? ''
 const TOKEN = process.env['DWELL_TOKEN'] ?? creds?.token ?? ''
 
 const daemon = await startDaemon({
-  // Sunucu adresi verilmisse oradan, yoksa yerel listeden (gelistirme).
-  ...(SERVER ? { serverUrl: SERVER, token: TOKEN } : { ads: DEV_ADS }),
+  // Giris yoksa reklam da yok: yalnizca bildirim satiri.
+  ...(SERVER ? { serverUrl: SERVER, token: TOKEN } : { ads: LOGGED_OUT_LINE }),
   syncSpinner: true,
   onLog: log,
   config: {
@@ -69,7 +59,7 @@ log(
   SERVER
     ? `dwelld basladi — sunucu: ${SERVER}` +
       (creds ? ` · cuzdan: ${shortAddress(creds.publisherId)}` : ' · token: ortamdan')
-    : 'dwelld basladi — yerel reklamlar (sunucu yok, `dwell login` ile bagla)',
+    : 'dwelld basladi — giris yok, reklam gosterilmiyor (`dwell login`)',
 )
 
 // Temiz kapanis: soket dosyasi geride kalmasin, yoksa bir sonraki baslatma

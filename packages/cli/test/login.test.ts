@@ -10,7 +10,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, readFileSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { runLoginServer, parseLoginArgs, kimligiTazele, openBrowser } from '../src/cli/login.js'
+import { runLoginServer, parseLoginArgs, kimligiTazele, openBrowser, cmdLogout, forgetLogin } from '../src/cli/login.js'
 import { saveCredentials, loadCredentials, clearCredentials } from '../src/credentials.js'
 
 const dirs: string[] = []
@@ -479,3 +479,63 @@ describe('openBrowser', () => {
     expect(hatalar).toEqual([])
   })
 })
+
+describe('dwell logout', () => {
+  const eski = process.env['DWELL_CREDENTIALS']
+  const kimlik = { token: 'dwl_x', publisherId: GOOD, serverUrl: 'https://dwell.test', loggedInAt: 1 }
+  const kur = (): string => {
+    const path = join(tmp(), 'credentials.json')
+    process.env['DWELL_CREDENTIALS'] = path
+    saveCredentials(kimlik as any, path)
+    return path
+  }
+  afterEach(() => {
+    if (eski === undefined) delete process.env['DWELL_CREDENTIALS']
+    else process.env['DWELL_CREDENTIALS'] = eski
+  })
+
+  it('once daemon durur, sonra token iptal edilir, sonra daemon yeniden baslar', async () => {
+    kur()
+    const sira: string[] = []
+    const fetchImpl = (async (url: any, init: any) => {
+      sira.push(`iptal ${String(url)} ${init.headers.authorization}`)
+      expect(loadCredentials(), 'iptal aninda kimlik henuz silinmedi').not.toBeNull()
+      return new Response('{}', { status: 200 })
+    }) as typeof fetch
+    await cmdLogout({
+      stop: async () => { sira.push('dur'); return true },
+      start: async () => { sira.push('basla'); expect(loadCredentials()).toBeNull() },
+    }, fetchImpl)
+    expect(sira).toEqual(['dur', 'iptal https://dwell.test/v1/logout Bearer dwl_x', 'basla'])
+  })
+
+  it('calismayan daemon baslatilmaz', async () => {
+    kur()
+    let basladi = false
+    await cmdLogout({
+      stop: async () => false,
+      start: async () => { basladi = true },
+    }, (async () => new Response('{}')) as typeof fetch)
+    expect(basladi).toBe(false)
+  })
+
+  it('sunucuya ulasilamazsa yerel kimlik yine silinir ama false doner', async () => {
+    kur()
+    const r = await forgetLogin(kimlik as any, (async () => { throw new Error('ag yok') }) as typeof fetch)
+    expect(r).toBe(false)
+    expect(loadCredentials()).toBeNull()
+  })
+
+  it('401 zaten gecersiz demek: iptal basarili sayilir', async () => {
+    kur()
+    const r = await forgetLogin(kimlik as any, (async () => new Response('{}', { status: 401 })) as typeof fetch)
+    expect(r).toBe(true)
+  })
+
+  it('500 iptal sayilmaz', async () => {
+    kur()
+    const r = await forgetLogin(kimlik as any, (async () => new Response('{}', { status: 500 })) as typeof fetch)
+    expect(r).toBe(false)
+  })
+})
+

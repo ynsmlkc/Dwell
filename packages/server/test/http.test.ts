@@ -616,3 +616,25 @@ describe('istek siniri ve guvenlik basliklari', () => {
     expect(r.headers.get('content-security-policy')).toContain("frame-ancestors 'none'")
   })
 })
+
+describe('POST /v1/logout', () => {
+  it('token kendini iptal eder, sonraki istek 401 alir', async () => {
+    const r = await app.request('/v1/logout', { method: 'POST', headers: auth() })
+    expect(r.status).toBe(200)
+    const sonra = await app.request('/v1/me/balance', { headers: auth() })
+    expect(sonra.status).toBe(401)
+  })
+
+  it('yalnizca kendi token\'ini iptal eder', async () => {
+    await app.request('/v1/logout', { method: 'POST', headers: auth() })
+    const diger = await app.request('/v1/me/balance', { headers: auth(WALLET_TOKEN) })
+    expect(diger.status).toBe(200)
+  })
+
+  it('token yoksa 401, iptal edilmis token tekrar cikamaz', async () => {
+    expect((await app.request('/v1/logout', { method: 'POST' })).status).toBe(401)
+    const r = await app.request('/v1/logout', { method: 'POST', headers: auth(REVOKED_TOKEN) })
+    expect(r.status).toBe(401)
+  })
+})
+
