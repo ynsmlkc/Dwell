@@ -352,8 +352,12 @@ async function cmdStatus(): Promise<void> {
     fail('DWL-1001', 'Daemon is not running', '`dwell init` to start it')
   }
   const i = health.info
+  // Cuzdan satiri: girissiz daemon ornek satirlar gosterip "showing" diyor,
+  // kullanici kazandigini saniyordu (6 Kasim, bir ay hicbir sey sayilmadi).
+  const creds = loadCredentials()
   rows([
     ['version', i.version],
+    ['wallet', creds ? shortAddress(creds.publisherId) : yellow('not connected — not earning · `dwell login`')],
     ['status', i.phase === 'idle' ? dim('waiting') : green(i.phase)],
     ['uptime', `${Math.round(i.uptimeMs / 60_000)} min`],
     ['queued', `${i.queuedImpressions} impression(s)`],
