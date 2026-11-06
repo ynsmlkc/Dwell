@@ -99,7 +99,10 @@ function runEverywhere(command: string, procEnv: NodeJS.ProcessEnv, expectArgs: 
   }
 }
 
-describe.skipIf(!onWindows)('Windows: uretilen komut her kabukta calisir', () => {
+// Her test komutu her kabukta (PowerShell, cmd, pwsh, Git Bash) sirayla
+// calistiriyor; PowerShell'in soguk acilisi CI'da tek basina saniyeler
+// suruyor. Varsayilan 5 sn'lik sinir bu yuzden rastgele asiliyordu.
+describe.skipIf(!onWindows)('Windows: uretilen komut her kabukta calisir', { timeout: 120_000 }, () => {
   it('bosluklu node, PATH\'te AYNI node → `node`', () => {
     const { env, procEnv } = scenario(spacedNode, spacedNodeDir)
     const r = buildNodeCommand(plainScript, ['Stop'], env)
