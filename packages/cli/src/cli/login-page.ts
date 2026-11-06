@@ -1,7 +1,7 @@
 /**
  * `dwell login` sirasinda tarayicida acilan sayfa.
  *
- * Neden tarayici? Cunku ozel anahtari GORMEK ISTEMIYORUZ (ADR-014). Freighter
+ * Neden tarayici? Cunku ozel anahtari GORMEK ISTEMIYORUZ (ADR-014). Varial
  * bir tarayici eklentisi; imzayi o atar, biz yalnizca imzalanmis XDR'i
  * aliriz. Terminalden "secret key'ini yapistir" demek en kolay yol olurdu ve
  * en kotu karar olurdu.
@@ -205,9 +205,9 @@ export function loginPage(opts: LoginPageOpts): string {
         </div>
       </div>
 
-      <button id="primary" class="primary">Connect with Freighter</button>
-      <p class="hide" id="nowallet" style="margin:0">Freighter not detected. <a href="https://freighter.app" target="_blank" rel="noreferrer">Install it</a> and reload this page, or sign manually below.</p>
-      <button id="toggle-manual" class="linkish" style="justify-self:start">No Freighter? Sign the XDR manually</button>
+      <button id="primary" class="primary">Connect with Varial</button>
+      <p class="hide" id="nowallet" style="margin:0">Varial (formerly Freighter) not detected. <a href="https://varialwallet.com" target="_blank" rel="noreferrer">Install it</a> and reload this page, or sign manually below.</p>
+      <button id="toggle-manual" class="linkish" style="justify-self:start">No Varial? Sign the XDR manually</button>
 
       <div class="manual hide" id="manualbox">
         <p>Enter your address, sign the resulting XDR in your wallet or Stellar Laboratory, and paste the result back here.</p>
@@ -282,20 +282,23 @@ async function post(path, body) {
   return j
 }
 
-/* ─────────────────────────── Freighter ─────────────────────────── */
+/* ─────────────────────────── Varial ─────────────────────────── */
 
 /**
  * Protokol — @stellar/freighter-api v6 ile ayni.
  *
  * Eklenti window.freighterApi BIRAKMIYOR; o global yalnizca resmi
  * kutuphanenin UMD paketi script etiketiyle yuklendiginde olusuyor. Ilk
- * yazdigimda ona bakiyordum ve Freighter kurulu makinede bile
+ * yazdigimda ona bakiyordum ve Varial kurulu makinede bile
  * "bulunamadi" diyordu. Eklentinin biraktigi tek sey window.freighter.
  *
  * Ayni mantik sitenin app.js dosyasinda da var; biri degisirse digeri de.
  *
  * DIKKAT: bu blok bir sablon dizesinin ICINDE — backtick kullanma.
  */
+// Cuzdanin adi Varial oldu (Ekim 2026, eski adi Freighter). Eklentinin
+// mesaj adlari ve window.freighter hala eski adla: bunlar onun API'si,
+// degistirirsek baglanti kopar.
 const REQ = 'FREIGHTER_EXTERNAL_MSG_REQUEST'
 const RES = 'FREIGHTER_EXTERNAL_MSG_RESPONSE'
 
@@ -305,7 +308,7 @@ function fSend(payload, timeoutMs) {
   return new Promise((resolve) => {
     let timer = 0
     const onMsg = (e) => {
-      // Cevapta alan adi "messagedId" — Freighter'in kendi yazim hatasi.
+      // Cevapta alan adi "messagedId" — Varial'in kendi yazim hatasi.
       // "messageId" diye bakarsak hicbir cevap eslesmez ve her istek
       // sessizce zaman asimina ugrar.
       if (e.source !== window) return
@@ -316,7 +319,7 @@ function fSend(payload, timeoutMs) {
       resolve(d)
     }
     window.addEventListener('message', onMsg, false)
-    // Imza beklerken zaman asimi YOK: kullanici Freighter penceresinde
+    // Imza beklerken zaman asimi YOK: kullanici Varial penceresinde
     // dusunuyor olabilir.
     if (timeoutMs) timer = setTimeout(() => {
       window.removeEventListener('message', onMsg); resolve(null)
@@ -351,20 +354,20 @@ async function connect() {
   try {
     if (!(await freighterReady())) {
       $('nowallet').classList.remove('hide')
-      throw new Error('Freighter not found — install it and reload the page, or sign manually below')
+      throw new Error('Varial not found — install it and reload the page, or sign manually below')
     }
 
     const acc = await fSend({ type: 'REQUEST_ACCESS' })
     if (acc && acc.apiError) throw new Error(acc.apiError.message || 'access denied')
     const address = acc && acc.publicKey
-    if (!address) throw new Error('Freighter did not return an address')
+    if (!address) throw new Error('Varial did not return an address')
 
     const ch = await post('/challenge', { address })
     log('→ challenge generated (seq 0, will not be submitted)', SOFT)
 
     status('awaiting signature', INK)
-    setPrimary('confirm in Freighter…', { busy: true })
-    log('⋯ waiting for a signature in the Freighter window', INK)
+    setPrimary('confirm in Varial…', { busy: true })
+    log('⋯ waiting for a signature in the Varial window', INK)
 
     const signed = await fSend({
       type: 'SUBMIT_TRANSACTION',
@@ -524,7 +527,7 @@ $('p-skip').onclick = async () => {
 $('toggle-manual').onclick = () => {
   const gizli = $('manualbox').classList.toggle('hide')
   $('toggle-manual').textContent = gizli
-    ? 'No Freighter? Sign the XDR manually'
+    ? 'No Varial? Sign the XDR manually'
     : 'Hide manual XDR signing'
 }
 
@@ -552,7 +555,7 @@ $('m-send').onclick = async () => {
 freighterReady().then((ok) => {
   if (ok) return
   setTimeout(() => freighterReady().then((ok2) => {
-    if (!ok2) log('  Freighter not detected — if it\\u2019s installed, reload the page', DIM)
+    if (!ok2) log('  Varial not detected — if it\\u2019s installed, reload the page', DIM)
   }), 900)
 })
 </script>

@@ -90,11 +90,11 @@ export async function api(path, { method = 'GET', body, auth = true } = {}) {
 /* ─────────────────────────── cuzdan ─────────────────────────── */
 
 /**
- * Freighter ile konusma — `@stellar/freighter-api` v6'nin protokolu.
+ * Varial ile konusma — `@stellar/freighter-api` v6'nin protokolu.
  *
  * Eklenti `window.freighterApi` diye bir nesne BIRAKMIYOR. O global yalnizca
  * resmi kutuphanenin UMD paketini <script> ile yuklersen olusuyor. Ilk
- * yazdigimda ona bakiyordum ve Freighter kurulu olan makinede bile
+ * yazdigimda ona bakiyordum ve Varial kurulu olan makinede bile
  * "bulunamadi" diyordu.
  *
  * Eklentinin gercekte biraktigi tek sey `window.freighter = true`. Geri
@@ -109,6 +109,9 @@ export async function api(path, { method = 'GET', body, auth = true } = {}) {
  * degisirse digeri de degismeli.
  */
 
+// Cuzdanin adi Varial oldu (Ekim 2026, eski adi Freighter). Eklentinin
+// mesaj adlari ve `window.freighter` hala eski adla: bunlar onun API'si,
+// degistirirsek baglanti kopar.
 const FREIGHTER_REQ = 'FREIGHTER_EXTERNAL_MSG_REQUEST';
 const FREIGHTER_RES = 'FREIGHTER_EXTERNAL_MSG_RESPONSE';
 
@@ -119,7 +122,7 @@ function freighterSend(payload, timeoutMs = 0) {
   return new Promise((resolve) => {
     let timer = 0;
     const onMsg = (e) => {
-      // DIKKAT: cevapta alan adi `messagedId` — Freighter'in kendi yazim
+      // DIKKAT: cevapta alan adi `messagedId` — Varial'in kendi yazim
       // hatasi. `messageId` diye bakarsak hicbir cevap eslesmez ve her
       // istek sessizce zaman asimina ugrar.
       if (e.source !== window) return;
@@ -132,7 +135,7 @@ function freighterSend(payload, timeoutMs = 0) {
     window.addEventListener('message', onMsg, false);
 
     // Yalnizca "orada misin" turu sorularda zaman asimi: imza beklerken
-    // kullanici Freighter penceresinde dusunuyor olabilir, onu kesmeyiz.
+    // kullanici Varial penceresinde dusunuyor olabilir, onu kesmeyiz.
     if (timeoutMs > 0) {
       timer = setTimeout(() => {
         window.removeEventListener('message', onMsg);
@@ -151,8 +154,8 @@ export async function freighterReady() {
 
 export async function walletAddress() {
   const r = await freighterSend({ type: 'REQUEST_ACCESS' });
-  if (r?.apiError) throw new Error(r.apiError.message || 'Freighter refused access');
-  if (!r?.publicKey) throw new Error('Freighter returned no address');
+  if (r?.apiError) throw new Error(r.apiError.message || 'Varial refused access');
+  if (!r?.publicKey) throw new Error('Varial returned no address');
   return r.publicKey;
 }
 
@@ -163,8 +166,8 @@ async function signXdr(xdr, networkPassphrase, address) {
     networkPassphrase,
     accountToSign: address,
   });
-  if (r?.apiError) throw new Error(r.apiError.message || 'Freighter refused to sign');
-  if (!r?.signedTransaction) throw new Error('Freighter returned no signature');
+  if (r?.apiError) throw new Error(r.apiError.message || 'Varial refused to sign');
+  if (!r?.signedTransaction) throw new Error('Varial returned no signature');
   return r.signedTransaction;
 }
 
@@ -173,19 +176,19 @@ async function signXdr(xdr, networkPassphrase, address) {
 /**
  * Cuzdanla giris. Sifre yok, hesap yok — adres kimligin kendisi.
  *
- * Uc adim: sunucudan bir challenge iste, Freighter'a imzalat, imzayi geri
+ * Uc adim: sunucudan bir challenge iste, Varial'a imzalat, imzayi geri
  * gonder. Sunucu imzayi dogrularsa token verir.
  *
  * Imzalanan sey `sequence = 0` olan bir transaction: aga gonderilmesi
  * PROTOKOL GEREGI imkansiz. Yani bu imza hicbir zaman para hareket
  * ettiremez, yalnizca "bu adres benim"i kanitlar.
  *
- * `onStep` her adimda dugmenin yazisini degistiriyor. Freighter penceresi
+ * `onStep` her adimda dugmenin yazisini degistiriyor. Varial penceresi
  * acilmadan once kullanicinin ne bekledigini bilmesi gerekiyor — yoksa
  * donen bir dugmeye bakip sayfanin dondugunu saniyor.
  */
 export async function login(role, onStep = () => {}) {
-  onStep('Waiting for Freighter…');
+  onStep('Waiting for Varial…');
   const address = await walletAddress();
 
   onStep('Preparing…');
@@ -193,7 +196,7 @@ export async function login(role, onStep = () => {}) {
     method: 'POST', auth: false, body: { address },
   });
 
-  onStep('Sign in Freighter…');
+  onStep('Sign in Varial…');
   const signed = await signXdr(challenge.transaction, challenge.network_passphrase, address);
 
   onStep('Verifying…');
@@ -228,7 +231,7 @@ export async function walletState(address) {
  * USDC kabulunu acar.
  *
  * XDR'i sunucu kuruyor — tarayiciya Stellar SDK koymamak icin. Imzayi
- * Freighter atiyor, sonucu dogrudan Horizon'a gonderiyoruz: sunucudan
+ * Varial atiyor, sonucu dogrudan Horizon'a gonderiyoruz: sunucudan
  * gecirmeye gerek yok, islem zaten kullanicinin kendi hesabinda.
  */
 export async function enableUsdc(address) {

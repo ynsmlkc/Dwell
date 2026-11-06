@@ -43,7 +43,7 @@ dwell login      # connect your wallet — earnings go here
 dwell balance    # what you have earned
 ```
 
-`dwell login` opens a page on your own machine and you sign with Freighter.
+`dwell login` opens a page on your own machine and you sign with Varial.
 **Your private key never enters this tool.**
 
 Your identity *is* your wallet address. No GitHub, no email, no password.

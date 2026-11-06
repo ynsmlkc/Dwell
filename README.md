@@ -4,7 +4,7 @@
 
 While Claude Code is thinking, a single clearly-disclosed sponsored line appears. Verified impressions accrue to the developer's balance, which they can withdraw in USDC on Stellar at any time, in any amount. No bank account, no country restrictions, no minimum threshold.
 
-**Status: live on Stellar testnet.** The CLI is on npm ([`dwellsh`](https://www.npmjs.com/package/dwellsh)), the server runs at [dwellsh.dev](https://dwellsh.dev), wallet login (SEP-10 via Freighter) and the advertiser panel work, and real USDC payouts have settled on testnet. Mainnet is not live: no real money moves yet. Runs on macOS and Linux; Windows support is new in 0.1.16 and still being verified.
+**Status: live on Stellar testnet.** The CLI is on npm ([`dwellsh`](https://www.npmjs.com/package/dwellsh)), the server runs at [dwellsh.dev](https://dwellsh.dev), wallet login (SEP-10 via Varial) and the advertiser panel work, and real USDC payouts have settled on testnet. Mainnet is not live: no real money moves yet. Runs on macOS and Linux; Windows support is new in 0.1.16 and still being verified.
 
 ---
 
@@ -102,7 +102,7 @@ cd spikes/stellar-payout && npm install && npm run spike
 - [x] `protocol` — money, sanitizer, schemas, injectable clock
 - [x] Daemon — turn state machine, IPC, shim, disk queue (macOS, Linux; Windows in progress)
 - [x] Backend — ad serving, impression ingest, ledger (live at dwellsh.dev)
-- [x] Wallet linking — SEP-10 via Freighter
+- [x] Wallet linking — SEP-10 via Varial
 - [x] Payouts — on-demand USDC withdrawals on Stellar testnet
 - [x] Advertiser panel — self-serve campaigns and budgets
 - [ ] Mainnet

@@ -101,11 +101,11 @@
     <p class="body" style="margin: 0 0 20px">This one matters. Deposits are matched by <strong style="color: var(--ink-soft)">who sent them</strong>, so the wallet you connect now is the only wallet whose money we can credit to you.</p>
 
     <div class="note note-accent hidden" id="no-wallet" style="margin-bottom: 18px">
-      Freighter is not installed. <a href="https://freighter.app" target="_blank" rel="noopener" style="color: var(--accent)">Install it</a>, then reload.
+      Varial (formerly Freighter) is not installed. <a href="https://varialwallet.com" target="_blank" rel="noopener" style="color: var(--accent)">Install it</a>, then reload.
     </div>
 
     <button class="btn btn-primary" id="connect" style="width: 100%">
-      <span class="spinner hidden" id="connect-spin"></span><span id="connect-label">Connect Freighter</span>
+      <span class="spinner hidden" id="connect-spin"></span><span id="connect-label">Connect Varial</span>
     </button>
 
     <div class="note note-warn hidden" id="connect-error" style="margin-top: 18px">
@@ -407,12 +407,12 @@ async function doLogin() {
     await load();
   } catch (e) {
     $('#connect-error-text').textContent = /reject|denied|closed|declined/i.test(e.message)
-      ? 'Freighter closed without signing. Nothing happened — you can start again.'
+      ? 'Varial closed without signing. Nothing happened — you can start again.'
       : e.message;
     show($('#connect-error'), true);
   } finally {
     show($('#connect-spin'), false);
-    $('#connect-label').textContent = 'Connect Freighter';
+    $('#connect-label').textContent = 'Connect Varial';
   }
 }
 $('#connect').onclick = doLogin;

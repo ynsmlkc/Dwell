@@ -28,12 +28,12 @@
     <p class="body" style="margin: 0 0 26px">This is the wallet you will be paid into. There is no account and no password — your address is your identity.</p>
 
     <div class="note note-accent hidden" id="no-wallet" style="margin-bottom: 18px">
-      Freighter is not installed in this browser.
-      <a href="https://freighter.app" target="_blank" rel="noopener" style="color: var(--accent)">Install it</a>, then reload this page.
+      Varial (formerly Freighter) is not installed in this browser.
+      <a href="https://varialwallet.com" target="_blank" rel="noopener" style="color: var(--accent)">Install it</a>, then reload this page.
     </div>
 
     <button class="btn btn-primary" id="connect" style="width: 100%">
-      <span class="spinner hidden" id="connect-spin"></span><span id="connect-label">Connect Freighter</span>
+      <span class="spinner hidden" id="connect-spin"></span><span id="connect-label">Connect Varial</span>
     </button>
 
     <div class="note note-warn hidden" id="connect-error" style="margin-top: 18px">
@@ -41,7 +41,7 @@
       <button class="btn btn-sm btn-quiet" id="retry-connect">Try again</button>
     </div>
 
-    <p class="small" style="margin: 22px 0 0">You sign a message to prove the address is yours. It cannot be submitted to the network and it moves nothing. Your private key never leaves Freighter.</p>
+    <p class="small" style="margin: 22px 0 0">You sign a message to prove the address is yours. It cannot be submitted to the network and it moves nothing. Your private key never leaves Varial.</p>
   </div>
 
   <!-- ═══ yukleniyor ═══ -->
@@ -259,16 +259,16 @@ async function doLogin() {
     await login('publisher', (step) => { $('#connect-label').textContent = step; });
     await load();
   } catch (e) {
-    // Freighter'in reddi hata degil, KARARDIR. Kullaniciya "bir sey ters
+    // Varial'in reddi hata degil, KARARDIR. Kullaniciya "bir sey ters
     // gitti" demek yerine ne oldugunu soyluyoruz.
     const msg = /reject|denied|closed|declined/i.test(e.message)
-      ? 'Freighter closed without signing. Nothing happened — you can start again.'
+      ? 'Varial closed without signing. Nothing happened — you can start again.'
       : e.message;
     $('#connect-error-text').textContent = msg;
     show($('#connect-error'), true);
   } finally {
     show($('#connect-spin'), false);
-    $('#connect-label').textContent = 'Connect Freighter';
+    $('#connect-label').textContent = 'Connect Varial';
   }
 }
 $('#connect').onclick = doLogin;
@@ -422,7 +422,7 @@ async function checkTrustline() {
 $('#enable-usdc').onclick = async () => {
   show($('#trust-error'), false);
   show($('#trust-spin'), true);
-  $('#trust-label').textContent = 'Confirm in Freighter…';
+  $('#trust-label').textContent = 'Confirm in Varial…';
   try {
     await enableUsdc(session.address);
     show($('#trustline'), false);

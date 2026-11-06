@@ -7,7 +7,7 @@
  *
  * Akis:
  *   dwell login  → 127.0.0.1'de gecici sunucu + tarayici
- *   tarayici     → Freighter/LOBSTR ile imza
+ *   tarayici     → Varial/LOBSTR ile imza
  *   yerel sunucu → Dwell sunucusuna proxy, token'i diske yazar
  *
  * Ozel anahtar HICBIR ZAMAN bu surece girmez. Terminale secret key sordurmak
