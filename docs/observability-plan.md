@@ -35,8 +35,24 @@ Aşama 1 ve Aşama 2'nin amacı, aşağıdaki plandan farklı bir yolla yapıld�
 - **pino eklenmedi.** Erişim satırları zaten JSON; sunucunun olay satırları (`main.ts`'teki
   `log()`) da `{t, msg}` JSON'una çevrildi, hata yakalayıcı da tek JSON satırı yazıyor.
   Yeni bağımlılık ve bundle riski yok.
-- Testler: `packages/server/test/access-log.test.ts` (token, sorgu, havuz kodu, ham IP loga
-  girmiyor; 404 yolu ve User-Agent yazılıyor).
+- **İş olayları ayrı satır değil, aynı satırın `evt` alanı** (Aşama 2 / 4. madde). Bir istek =
+  bir satır, arama tek yerden:
+  - `/v1/impressions`: `{accepted, duplicates, rejected: {sebep: adet}}`
+  - para çekme (yayıncı, reklamveren, platform): `{withdraw, amount, tx}` ya da `{withdraw, failed}`
+  - yetki reddi: `{auth: 'missing' | 'unknown' | 'revoked' | 'scope' | 'admin'}`
+  - Cüzdan adresi yazılmaz: IP hash'iyle aynı satırda kimliği IP'ye bağlardı. `tx` zaten
+    zincirde herkese açık.
+- Testler: `packages/server/test/access-log.test.ts` (token, sorgu, havuz kodu, ham IP ve cüzdan
+  adresi loga girmiyor; 404 yolu, User-Agent ve olay alanları yazılıyor).
+
+Örnek satır:
+```json
+{"t":"2026-11-06T20:03:00.000Z","m":"POST","route":"/v1/impressions","status":200,"ms":4,"ip":"9f2c41a07b3e","ua":"dwell/0.1.19","evt":{"accepted":2,"duplicates":0}}
+```
+
+**Aşama 3-4 hesap istiyor:** Axiom ya da Better Stack hesabı açılıp Railway'e bağlanınca
+yukarıdaki satırlar orada aranabilir olur. Tarama alarmları (`route:null` + 404 patlaması,
+`ua` içinde `sqlmap`/`nuclei`) o panelde kurulur; kodda değişiklik gerekmez.
 
 **Aşağıdaki planda düzeltilmesi gerekenler:**
 - Repo `npm` değil `pnpm` kullanıyor: `pnpm --filter @dwell/server build`. Sunucu Docker'da Node 24.

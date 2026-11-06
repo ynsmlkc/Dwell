@@ -94,7 +94,8 @@ export interface AppDeps {
   readonly accessLog?: (line: string) => void
 }
 
-type Vars = { auth: AuthContext }
+/** `evt`: istegin erisim log satirina eklenen olay alanlari (`note` ile). */
+type Vars = { auth: AuthContext; evt?: Record<string, unknown> }
 
 const err = (code: ErrorCode, hint?: string) => ({
   code, message: ERROR_CODES[code], ...(hint ? { hint } : {}),
@@ -124,6 +125,16 @@ export function createApp(deps: AppDeps) {
   const app = new Hono<{ Variables: Vars }>()
   const adLimit = deps.adRateLimit ?? new RateLimiter({ now: () => deps.clock.now() })
 
+  /**
+   * Isteginin log satirina olay ekler: ne oldugunu (kac gosterim kabul,
+   * hangi tx) yalnizca handler biliyor. Ayri bir satir degil, ayni satir:
+   * bir istek = bir satir, arama tek yerden. Cuzdan adresi YAZILMAZ — IP
+   * hash'iyle ayni satirda kimligi IP'ye baglardi.
+   */
+  const note = (c: any, f: Record<string, unknown>): void => {
+    if (deps.accessLog) c.set('evt', { ...c.get('evt'), ...f })
+  }
+
   /*
    * Erisim logu. Log da bir depo: Railway saklar, bir drain disari tasir.
    * Bu yuzden yalnizca rota KALIBI yazilir (`/v1/pools/:code`, kodun kendisi
@@ -150,6 +161,7 @@ export function createApp(deps: AppDeps) {
           ms: Date.now() - start,
           ip: hashIp(clientIp((n) => c.req.header(n)), deps.ipSalt)?.slice(0, 12) ?? null,
           ...(ua ? { ua: ua.slice(0, 120) } : {}),
+          ...(c.get('evt') ? { evt: c.get('evt') } : {}),
         }))
       }
     })
@@ -165,16 +177,21 @@ export function createApp(deps: AppDeps) {
   const requireScope = (...needed: TokenScope[]) =>
     async (c: any, next: any) => {
       const raw = bearerToken(c.req.header('authorization'))
-      if (!raw) return c.json(err('DWL_2001', '`dwell login` calistir'), 401)
+      if (!raw) {
+        note(c, { auth: 'missing' })
+        return c.json(err('DWL_2001', '`dwell login` calistir'), 401)
+      }
 
       const rec = deps.tokens.find(raw)
       if (!rec || rec.revokedAt !== null) {
+        note(c, { auth: rec ? 'revoked' : 'unknown' })
         return c.json(err('DWL_2002', 'Token iptal edilmis veya gecersiz'), 401)
       }
 
       // Kapsam kontrolu. Daemon token'i cuzdan degistiremez.
       const missing = needed.filter((s) => !rec.scopes.includes(s))
       if (missing.length > 0) {
+        note(c, { auth: 'scope', missing })
         return c.json(err('DWL_2003', `gerekli kapsam: ${missing.join(', ')}`), 403)
       }
 
@@ -346,6 +363,12 @@ export function createApp(deps: AppDeps) {
     const ipHash = hashIp(clientIp((n) => c.req.header(n)), deps.ipSalt)
 
     const result = deps.pipeline.ingest.ingest(publisherId, parsed.data.events, { ipHash })
+    const reasons: Record<string, number> = {}
+    for (const x of result.rejected) reasons[x.reason] = (reasons[x.reason] ?? 0) + 1
+    note(c, {
+      accepted: result.accepted.length, duplicates: result.duplicates.length,
+      ...(result.rejected.length ? { rejected: reasons } : {}),
+    })
 
     // Kismi basari 200 doner: istemci hangi ID'lerin kabul edildigini bilir
     // ve yalnizca onlari kuyrugundan siler. Toptan hata donmek, iyi kayitlari
@@ -422,6 +445,8 @@ export function createApp(deps: AppDeps) {
     }
 
     const r = await deps.publisherWithdraw.withdraw(publisherId, stroops(BigInt(raw)))
+    note(c, r.ok ? { withdraw: 'publisher', amount: r.amount.toString(), tx: r.txHash }
+      : { withdraw: 'publisher', failed: r.reason })
     if (!r.ok) {
       // 409 = "su an olmaz, sonra olabilir". 400 = "boyle olmaz".
       return c.json(err('DWL_9001', r.reason), r.retryable ? 409 : 400)
@@ -533,6 +558,8 @@ export function createApp(deps: AppDeps) {
       }
 
       const r = await deps.withdraw.withdraw(advertiserId, stroops(BigInt(raw)))
+      note(c, r.ok ? { withdraw: 'advertiser', amount: r.amount.toString(), tx: r.txHash }
+        : { withdraw: 'advertiser', failed: r.reason })
       if (!r.ok) {
         // 409 = "su an olmaz, sonra olabilir". 400 = "boyle olmaz".
         return c.json(err('DWL_9001', r.reason), r.retryable ? 409 : 400)
@@ -769,6 +796,7 @@ export function createApp(deps: AppDeps) {
       // Uc internete acik; sabit zamanli karsilastirma, geri kalan token
       // dogrulamasiyla ayni (bkz. `safeEqual`).
       if (!raw || !safeEqual(raw, deps.adminSecret!)) {
+        note(c, { auth: 'admin' })
         return c.json(err('DWL_2002', 'gecersiz admin sirri'), 401)
       }
       await next()
@@ -816,6 +844,8 @@ export function createApp(deps: AppDeps) {
       }
 
       const r = await deps.platformWithdraw.withdraw(to, stroops(BigInt(raw)))
+      note(c, r.ok ? { withdraw: 'platform', amount: r.amount.toString(), tx: r.txHash }
+        : { withdraw: 'platform', failed: r.reason })
       if (!r.ok) return c.json(err('DWL_9001', r.reason), r.retryable ? 409 : 400)
       return c.json({ txHash: r.txHash, amountStroops: r.amount.toString() })
     })
