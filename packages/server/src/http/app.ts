@@ -90,6 +90,8 @@ export interface AppDeps {
   readonly adRateLimit?: RateLimiter
   /** `/v1/auth/*` icin IP basina hiz siniri. Verilmezse 5'lik kova, 30 sn'de bir dolum. */
   readonly authRateLimit?: RateLimiter
+  /** Her istek icin bir JSON satiri alir. Verilmezse erisim logu kapali. */
+  readonly accessLog?: (line: string) => void
 }
 
 type Vars = { auth: AuthContext }
@@ -121,6 +123,37 @@ const toCampaignJson = (c: import('../ads/selector.js').Campaign) => ({
 export function createApp(deps: AppDeps) {
   const app = new Hono<{ Variables: Vars }>()
   const adLimit = deps.adRateLimit ?? new RateLimiter({ now: () => deps.clock.now() })
+
+  /*
+   * Erisim logu. Log da bir depo: Railway saklar, bir drain disari tasir.
+   * Bu yuzden yalnizca rota KALIBI yazilir (`/v1/pools/:code`, kodun kendisi
+   * degil), sorgu dizesi ve basliklar yazilmaz, IP fraud kontrolleriyle ayni
+   * tuzlu hash'le yazilir (§10: ham IP hicbir yere yazilmaz). Ham yol yalnizca
+   * eslesmeyen isteklerde: taramalar (`/.env`, `/wp-login.php`) orada gorunur.
+   */
+  if (deps.accessLog) {
+    const write = deps.accessLog
+    app.use('*', async (c, next) => {
+      const start = Date.now()
+      try {
+        await next()
+      } finally {
+        const route = c.req.routePath
+        const matched = route !== '*' && route !== '/*'
+        const ua = c.req.header('user-agent')
+        write(JSON.stringify({
+          t: new Date(start).toISOString(),
+          m: c.req.method,
+          route: matched ? route : null,
+          ...(matched ? {} : { path: c.req.path.slice(0, 120) }),
+          status: c.res.status,
+          ms: Date.now() - start,
+          ip: hashIp(clientIp((n) => c.req.header(n)), deps.ipSalt)?.slice(0, 12) ?? null,
+          ...(ua ? { ua: ua.slice(0, 120) } : {}),
+        }))
+      }
+    })
+  }
 
   app.use('*', async (c, next) => {
     c.header(PROTOCOL_HEADER, PROTOCOL_VERSION)
@@ -792,7 +825,12 @@ export function createApp(deps: AppDeps) {
 
   app.onError((e, c) => {
     // Stack trace ASLA disari cikmaz — istemciye kod ve tek cumle gider.
-    console.error('[dwell]', e)
+    // Sunucu logunda tek JSON satiri: erisim loguyla ayni alanlarla aranir.
+    console.error(JSON.stringify({
+      t: new Date().toISOString(), level: 'error', m: c.req.method, route: c.req.routePath,
+      err: e instanceof Error ? e.message : String(e),
+      stack: e instanceof Error ? e.stack : undefined,
+    }))
     return c.json(err('DWL_9001'), 500)
   })
 

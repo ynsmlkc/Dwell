@@ -69,7 +69,10 @@ const DEV_ADVERTISER = 'dev-advertiser'
 
 const clock = systemClock
 const ids = cryptoIdGenerator(clock)
-const log = (m: string): void => { process.stdout.write(`${new Date().toISOString()} ${m}\n`) }
+// Olay satirlari da erisim logu gibi JSON: ayni log aracinda ayni alanlarla aranir.
+const log = (m: string): void => {
+  process.stdout.write(JSON.stringify({ t: new Date().toISOString(), msg: m }) + '\n')
+}
 
 /* ─────────────────────────── defter ─────────────────────────── */
 
@@ -466,6 +469,10 @@ const app = createApp({
   config: () => config,
   walletAuth,
   ipSalt: ENV.ipSalt,
+  // Her istek tek JSON satiri. `DWELL_ACCESS_LOG=0` kapatir.
+  ...(process.env['DWELL_ACCESS_LOG'] === '0'
+    ? {}
+    : { accessLog: (line: string) => { process.stdout.write(line + '\n') } }),
   payoutThreshold: PAYOUT_THRESHOLD,
   payouts,
   campaigns: campaignStore,
