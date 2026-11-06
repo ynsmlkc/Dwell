@@ -418,3 +418,15 @@ describe('temizlik', () => {
     expect(l.balance(accountId('advertiser', 'adv'))).toBe(1_000_000n)
   })
 })
+
+describe('sahne turu kaydi', () => {
+  it('tur diske yazilir, yeni baglantida okunur, bozuk kayit bos doner', () => {
+    const database = openDb(':memory:')
+    const mirror = new SqliteImpressionMirror(database)
+    expect(mirror.loadTour('alice')).toEqual([])
+    mirror.saveTour('alice', ['a', 'a', 'b'])
+    expect(new SqliteImpressionMirror(database).loadTour('alice')).toEqual(['a', 'a', 'b'])
+    database.prepare("UPDATE kv SET value = 'bozuk' WHERE key = 'tour:alice'").run()
+    expect(mirror.loadTour('alice')).toEqual([])
+  })
+})

@@ -187,35 +187,93 @@ describe('ADR-009 (ikinci revizyon) — fiyat sirali kuyruk + ikinci fiyat', () 
     expect(sel.select('u')!.clearingCpm).toBe(usd(5))
   })
 
-  it('yumusak siklik siniri: saatte 3 kez sonra sira digerine gecer, herkes sinirdaysa en yuksek doner', () => {
-    const { sel } = setup([c('a', 3), c('b', 2)])
+  it('sahne turu: tekliften asagi, teklifi kadar sahnede, sonra basa doner', () => {
+    const { sel } = setup([c('x', 1), c('iki', 2), c('dort', 4)])
+    const sira = Array.from({ length: 14 }, () => sel.select('p1')!.campaign.id)
+    const tur = ['dort', 'dort', 'dort', 'dort', 'iki', 'iki', 'x']
+    expect(sira).toEqual([...tur, ...tur])
+  })
+
+  it('10 reklam ornegi: 2 tane 4x, 2 tane 2x, 6 tane x → 18 gosterimlik tur', () => {
+    const { sel } = setup([
+      c('a', 4), c('b', 4), c('d', 2), c('e', 2),
+      c('f', 1), c('g', 1), c('h', 1), c('i', 1), c('j', 1), c('k', 1),
+    ])
+    const say: Record<string, number> = {}
+    for (let i = 0; i < 18; i++) {
+      const id = sel.select('p1')!.campaign.id
+      say[id] = (say[id] ?? 0) + 1
+    }
+    expect(say).toEqual({ a: 4, b: 4, d: 2, e: 2, f: 1, g: 1, h: 1, i: 1, j: 1, k: 1 })
+  })
+
+  it('sahne hakki 4 ile sinirli: $400 ekrani tek basina tutamaz', () => {
+    const { sel } = setup([c('elliot', 400), c('tamer', 40), c('open', 15)])
     const sira = Array.from({ length: 8 }, () => sel.select('p1')!.campaign.id)
-    expect(sira).toEqual(['a', 'a', 'a', 'b', 'b', 'b', 'a', 'a'])
+    expect(sira).toEqual(['elliot', 'elliot', 'elliot', 'elliot', 'tamer', 'tamer', 'tamer', 'open'])
   })
 
-  it('sinirda olan rakip fiyati belirlemez — B, A sinirdayken taban oder', () => {
-    const { sel } = setup([c('a', 3), c('b', 2)])
-    for (let i = 0; i < 3; i++) sel.select('p1')
-    const s4 = sel.select('p1')!
-    expect(s4.campaign.id).toBe('b')
-    expect(s4.clearingCpm).toBe(usd(0.1))
+  it('prompt biter, saatler gecer: sira kaldigi yerden devam eder', () => {
+    const { sel, clock } = setup([c('dort', 4), c('x', 1)])
+    sel.select('p1'); sel.select('p1')
+    clock.advance(6 * 3_600_000)
+    const sira = Array.from({ length: 3 }, () => sel.select('p1')!.campaign.id)
+    expect(sira, 'kalan 2 hak, sonra sira x').toEqual(['dort', 'dort', 'x'])
   })
 
-  it('siklik siniri bir saat sonra sifirlanir ve yayinciya ozeldir', () => {
-    const { sel, clock } = setup([c('a', 3), c('b', 2)])
-    for (let i = 0; i < 3; i++) sel.select('p1')
-    expect(sel.select('p1')!.campaign.id).toBe('b')
-    expect(sel.select('p2')!.campaign.id, 'p2 etkilenmez').toBe('a')
-    clock.advance(3_600_000)
-    expect(sel.select('p1')!.campaign.id, 'saat doldu').toBe('a')
-  })
-
-  it('siklik siniri 0 ise kapali: hep en yuksek', () => {
-    const sel = new AdSelector({
-      clock: fixedClock(1), ids: fakeIdGenerator('n'), campaigns: () => [c('a', 3), c('b', 2)],
-      spendableBalance: () => stroops(10n ** 15n), spentToday: () => stroops(0n), hourlyCapPerPublisher: 0,
+  it('sunucu yeniden baslayinca tur kayittan devam eder', () => {
+    const kayit = new Map<string, readonly string[]>()
+    const kur = () => new AdSelector({
+      clock: fixedClock(1), ids: fakeIdGenerator('n'), campaigns: () => [c('dort', 4), c('x', 1)],
+      spendableBalance: () => stroops(10n ** 15n), spentToday: () => stroops(0n),
+      tourStore: { load: (p) => kayit.get(p) ?? [], save: (p, t) => { kayit.set(p, t) } },
     })
-    expect(Array.from({ length: 6 }, () => sel.select('p1')!.campaign.id)).toEqual(Array(6).fill('a'))
+    const ilk = kur()
+    ilk.select('p1'); ilk.select('p1'); ilk.select('p1')
+    const sonra = kur()
+    expect(sonra.select('p1')!.campaign.id).toBe('dort')
+    expect(sonra.select('p1')!.campaign.id).toBe('x')
+  })
+
+  it('tur ortasinda eklenen kampanya sonraki turda girer', () => {
+    const campaigns = [c('a', 2), c('b', 1)]
+    const { sel } = setup(campaigns)
+    sel.select('p1')
+    campaigns.push(c('yeni', 2))
+    const sira = Array.from({ length: 3 }, () => sel.select('p1')!.campaign.id)
+    expect(sira.slice(0, 2), 'mevcut tur bitiyor').toEqual(['a', 'b'])
+    expect(sira[2], 'yeni turda girdi').not.toBe('b')
+  })
+
+  it('tur ortasinda durdurulan kampanya atlanir', () => {
+    const campaigns = [c('a', 2), c('b', 1)]
+    const { sel } = setup(campaigns)
+    sel.select('p1')
+    campaigns[0] = c('a', 2, { status: 'paused' })
+    expect(sel.select('p1')!.campaign.id).toBe('b')
+  })
+
+  it('sirasi gelen dusuk teklif ustundeki teklife gore fiyatlanmaz', () => {
+    const { sel } = setup([c('a', 2), c('b', 1), c('d', 0.5)])
+    const sonuc = Array.from({ length: 7 }, () => sel.select('p1')!)
+    const b = sonuc.find((s) => s.campaign.id === 'b')!
+    const d = sonuc.find((s) => s.campaign.id === 'd')!
+    expect(b.clearingCpm, 'alttaki rakip + 1 kurus').toBe(usd(0.51))
+    expect(d.clearingCpm, 'altinda rakip yok: taban').toBe(usd(0.1))
+  })
+
+  it('tur yayinciya ozeldir', () => {
+    const { sel } = setup([c('a', 1), c('b', 1)])
+    const ilk = sel.select('p1')!.campaign.id
+    expect(sel.select('p1')!.campaign.id).not.toBe(ilk)
+    expect(['a', 'b'], 'p2 kendi turunu baslatir').toContain(sel.select('p2')!.campaign.id)
+  })
+
+  it('geri verilen hak turun basina doner', () => {
+    const { sel } = setup([c('a', 1), c('b', 1), c('d', 1)])
+    const ilk = sel.select('p1')!.campaign.id
+    sel.returnSlots('p1', [ilk])
+    expect(sel.select('p1')!.campaign.id).toBe(ilk)
   })
 
   /**

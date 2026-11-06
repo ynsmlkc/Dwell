@@ -51,11 +51,15 @@ export interface PipelineOptions {
     readonly saveImpression: (i: StoredImpression) => void
     readonly loadDeliveries: () => readonly DeliveredAd[]
     readonly saveDelivery: (d: DeliveredAd) => void
+    readonly loadTour?: (publisherId: string) => readonly string[]
+    readonly saveTour?: (publisherId: string, tour: readonly string[]) => void
   }
 }
 
 export class Pipeline {
   readonly #deliveries = new Map<string, DeliveredAd>()
+  /** Sahne hakki tura geri verilmis, suresi dolmus teslimatlar. */
+  readonly #returned = new Set<string>()
   readonly #impressions = new Map<string, StoredImpression>()
   readonly selector: AdSelector
   readonly ingest: ImpressionIngest
@@ -73,6 +77,9 @@ export class Pipeline {
       ...(opts.poolAllows ? { poolAllows: opts.poolAllows } : {}),
       ...(opts.reservedForPools ? { reservedForPools: opts.reservedForPools } : {}),
       ...(opts.reserveCpm != null ? { reserveCpm: opts.reserveCpm } : {}),
+      ...(opts.persist?.loadTour && opts.persist.saveTour
+        ? { tourStore: { load: opts.persist.loadTour, save: opts.persist.saveTour } }
+        : {}),
     })
 
     this.ingest = new ImpressionIngest({
@@ -103,7 +110,11 @@ export class Pipeline {
       for (const i of opts.persist.loadImpressions()) {
         this.#impressions.set(this.#key(i.publisherId, i.id), i)
       }
-      for (const d of opts.persist.loadDeliveries()) this.#deliveries.set(d.nonce, d)
+      for (const d of opts.persist.loadDeliveries()) {
+        this.#deliveries.set(d.nonce, d)
+        // Onceki calismada dolmuslar: hakki geri verildiyse ikinci kez verilmesin.
+        if (d.expiresAt < opts.clock.now()) this.#returned.add(d.nonce)
+      }
     }
   }
 
@@ -229,6 +240,7 @@ export class Pipeline {
 
   /** `POST /v1/ads/next` — teslimat kaydedilir ki nonce dogrulanabilsin. */
   serveAd(publisherId: string): AdSelection | null {
+    this.#returnExpiredSlots(publisherId)
     const sel = this.selector.select(publisherId)
     if (!sel) return null
 
@@ -310,10 +322,26 @@ export class Pipeline {
   }
 
   /** Suresi dolmus teslimatlari at — bellek sinirsiz buyumesin. */
+  /** Bkz. `AdSelector.returnSlots`. Teslimatlar sunum sirasinda, sira korunur. */
+  #returnExpiredSlots(publisherId: string): void {
+    const now = this.opts.clock.now()
+    const ids: string[] = []
+    for (const d of this.#deliveries.values()) {
+      if (d.publisherId === publisherId && !d.consumed && d.expiresAt < now && !this.#returned.has(d.nonce)) {
+        this.#returned.add(d.nonce)
+        ids.push(d.campaignId)
+      }
+    }
+    this.selector.returnSlots(publisherId, ids)
+  }
+
   #gcDeliveries(): void {
     const now = this.opts.clock.now()
     for (const [nonce, d] of this.#deliveries) {
-      if (d.expiresAt < now - 3600_000) this.#deliveries.delete(nonce)
+      if (d.expiresAt < now - 3600_000) {
+        this.#deliveries.delete(nonce)
+        this.#returned.delete(nonce)
+      }
     }
   }
 }

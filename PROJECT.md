@@ -397,6 +397,10 @@ Bir kreatifte ESC bulunması "biraz dağınık girdi" değil, saldırı denemesi
 > - Aynı yayıncıya bir saatte 3 kez gösterilen kampanya o yayıncı için sıranın sonuna geçer; herkes sınırdaysa en yüksek teklif yine gösterilir. Bu, eski `frequencyCap`'in %50/%50 kilidine (#8a) düşmeden çeşitlilik sağlar.
 > - PROBLEMS.md #8b ve #8c kapanıyor: ortalama fiyat rekabetle belirlenir, teklifi artırmak payı değil sırayı satın alır.
 
+> ## ⟳ Üçüncü revizyon — 2026-11-06
+>
+> **Saatlik sıklık sınırı kaldırıldı. Her yayıncının kalıcı bir sahne turu var:** kampanyalar tekliften aşağı sırayla çıkar, teklifi kadar (en fazla 4 gösterim) sahnede kalır, sıra prompt ve deploy arasında korunur. Fiyat, kendi teklifini geçmeyen en yüksek rakip + 1 kuruş. Ayrıntı: NEXT.md "Reklam seçimi" kural 4.
+
 ### ADR-010 — Kimlik: hesap açmanın bir maliyeti olmalı
 
 **Karar:** Publisher hesabı **GitHub OAuth** ile açılır. Her cihaz için ayrı, iptal edilebilir bir **device token** üretilir; `~/.dwell/credentials.json` içinde `0600` izinle saklanır. Tüm API çağrıları bu token ile authenticate olur.

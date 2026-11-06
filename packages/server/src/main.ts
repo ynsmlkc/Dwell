@@ -152,6 +152,8 @@ const pipeline: Pipeline = new Pipeline({
     saveImpression: (i) => mirror.saveImpression(i),
     loadDeliveries: () => mirror.loadDeliveries(),
     saveDelivery: (d) => mirror.saveDelivery(d),
+    loadTour: (p) => mirror.loadTour(p),
+    saveTour: (p, t) => mirror.saveTour(p, t),
   },
   campaigns: () => campaignStore.all(),
   poolOf: (publisherId) => pools.poolOf(publisherId),

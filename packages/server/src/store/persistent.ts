@@ -418,6 +418,23 @@ export class SqliteImpressionMirror {
     }))
   }
 
+  /** Sahne turu: yayincinin kalan haklari. Kaydi bozuksa tur bastan kurulur. */
+  loadTour(publisherId: string): readonly string[] {
+    const r = this.db.prepare('SELECT value FROM kv WHERE key = ?').get(`tour:${publisherId}`) as { value: string } | undefined
+    if (!r) return []
+    try {
+      const tour: unknown = JSON.parse(r.value)
+      return Array.isArray(tour) ? tour.filter((id): id is string => typeof id === 'string') : []
+    } catch { return [] }
+  }
+
+  saveTour(publisherId: string, tour: readonly string[]): void {
+    this.db.prepare(`
+      INSERT INTO kv (key, value) VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `).run(`tour:${publisherId}`, JSON.stringify(tour))
+  }
+
   saveDelivery(d: DeliveredAd): void {
     this.db.prepare(`
       INSERT INTO deliveries

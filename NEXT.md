@@ -374,13 +374,13 @@ ADR-009'un ikinci revizyonu. SWRR (teklife orantılı pay) yerine geçiyor.
 1. **Fiyat sıralı kuyruk.** Her gösterim fırsatında uygun kampanyalar blok başına teklife göre sıralanır, en yüksek kazanır. Eşitlikte bu yayıncıya en uzun süredir gösterilmeyen önce gelir (yeniden başlatmada hep aynı kampanyanın kazanmasını önleyen eski kural korunuyor).
 2. **İkinci fiyat.** Kazanan kendi teklifini değil, aynı fırsat için yarışan bir sonraki teklifin bir kuruş (blok başına $0.01) fazlasını öder; asla kendi teklifinden fazla değil. Rakip yoksa taban fiyatı (`MIN_BID_CPM`, blok başına $0.10) öder. Aynı reklamverenin diğer kampanyaları "rakip" sayılmaz: kendi fiyatını kendisi yükseltemez. Fiyat teslim anında dondurulur (ADR-011), defter değişmez.
 3. **Hız ayarı (pacing).** Slow / Medium / Fast günlük tavana dönüşür (toplam ÷ 7 gün / 3 gün / sınırsız). Panelde varsayılan **Medium**. Tavanına gelen kampanya o gün kuyruktan çıkar, fırsat sıradakine düşer: pahalı reklamveren ağı tek başına tutamaz.
-4. **Kişi başı sıklık sınırı (yumuşak).** Aynı yayıncıya aynı kampanya son 1 saatte 3 kez gösterildiyse, o yayıncı için sınırda olmayan kampanyalar önce gelir. Herkes sınırdaysa en yüksek teklif yine gösterilir: sınır sırayı değiştirir, kimseyi susturmaz. Sert sınır olsaydı az kampanyalı bir ağda yayıncı saatin çoğunda reklamsız kalırdı (eski `frequencyCap` %50/%50 kilidiyle aynı tuzak, PROBLEMS.md #8a).
+4. **Sahne turu (2026-11-06, kişi başı sıklık sınırının yerine).** Kampanyalar tekliften aşağı sırayla sahneye çıkar ve teklifi kadar kalır: hak = teklif ÷ turdaki en düşük teklif, yuvarlanır, en az 1, en fazla 4 (1 hak = 1 gösterim, 20 sn). Tur bitince yenisi kurulur. Sıra yayıncı başına kalıcıdır: prompt bitince, sunucu yeniden başlayınca sıfırlanmaz; hiç gösterilmeden süresi dolan reklamın hakkı turun başına döner. Yeni kampanya sonraki turda girer. Saatte 3 kuralı, herkes sınıra gelince ekranı en yüksek iki teklife kilitliyordu.
 
 ### Örnek
 
 A blok başına $3 teklif, B $2, C $0.50. Hepsi uygun, kimse sınırda değil:
 - A kazanır, blok başına **$2.01** öder (B + 1 kuruş). Gösterim başına $0.00201; yarısı geliştiriciye.
-- A o yayıncıya bu saat 3 kez gösterildiyse sıradaki fırsatı B kazanır ve **$0.51** öder (C + 1 kuruş).
+- A hakları bitince (burada 4) B sahneye çıkar ve **$0.51** öder (C + 1 kuruş), sonra C taban fiyatı öder, sonra tur baştan kurulur.
 - A'nın günlük tavanı dolduysa A o gün kuyrukta yok; B kazanır, $0.51 öder.
 
 ### Yapılacaklar

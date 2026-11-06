@@ -225,3 +225,19 @@ describe('fiyat dondurma — ADR-011', () => {
     expect(ledger.balance(accountId('publisher', PUB))).toBe(150_000n)
   })
 })
+
+describe('sahne turu — gosterilmeyen reklam', () => {
+  it('hic gosterilmeden suresi dolan reklamin hakki sirayi atlatmaz', () => {
+    ledger.deposit({ advertiserId: ADV, amount: stroops(100_000_000n), topupId: 't1' })
+    campaigns = [
+      { ...campaigns[0]!, id: 'a', frequencyCap: 0 },
+      { ...campaigns[0]!, id: 'b', frequencyCap: 0 },
+      { ...campaigns[0]!, id: 'd', frequencyCap: 0 },
+    ]
+    const ilk = pipe.serveAd(PUB)!.campaign.id
+    clock.advance(10 * 60_000)              // nonce doldu, reklam hic raporlanmadi
+    expect(pipe.serveAd(PUB)!.campaign.id, 'ayni hak geri geldi').toBe(ilk)
+    const sonraki = pipe.serveAd(PUB)!.campaign.id
+    expect(sonraki, 'hak bir kez geri verilir').not.toBe(ilk)
+  })
+})

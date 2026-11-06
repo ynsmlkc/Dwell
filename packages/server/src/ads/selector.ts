@@ -1,12 +1,10 @@
 /**
- * Reklam secimi — ADR-009 (revize) + ADR-021.
+ * Reklam secimi — ADR-009 (ucuncu revizyon) + ADR-021.
  *
- * Gercek acik artirma motoru YOK. Ama secim artik teklifle ORANTILI:
- * pürüzsüz agirlikli sira (SWRR, nginx'in yuk dengeleme algoritmasi).
- * 2x odeyen ortalamada 2x gosterim alir. Onceki surum "en yuksek teklif
- * her zaman kazanir, sadece bir onceki tekrari elenir" idi — bu, iki
- * kampanyali her senaryoyu fiyat farkindan bagimsiz %50/%50'ye kilitliyordu
- * (PROBLEMS.md #8). Detay asagida, algoritmanin kendisinde.
+ * Gercek acik artirma motoru YOK. Her yayincinin bir SAHNE TURU var: kampanyalar
+ * tekliften asagi sirayla sahneye cikar, teklifi kadar sahnede kalir, tur
+ * bitince yenisi kurulur. Prompt bitince sira sifirlanmaz, kaldigi yerden
+ * devam eder. Detay `#nextInTour`'da.
  */
 
 import { type Stroops, stroops, rateFromCpm, add } from '@dwell/protocol'
@@ -29,7 +27,7 @@ export interface Campaign {
   readonly status: CampaignStatus
   /**
    * Tekrar kisitlamasinin genisligi. `0` = kisitlama yok, SWRR'nin dogal
-   * orantisina tam guveniliyor (varsayilan — PROBLEMS.md #8 karari).
+   * tur sirasina tam guveniliyor (varsayilan — PROBLEMS.md #8 karari).
    * `N > 0` ise bu kampanya son N gosterimden herhangi birinde
    * gorunduyse elenir; yani en az N+1 gosterimde bir gorunebilir ve bu,
    * payini `1/(N+1)`'e kilitler — fiyat ne olursa olsun. `1` klasik
@@ -115,11 +113,13 @@ export interface SelectorDeps {
   readonly reservedForPools?: (advertiserId: string) => Stroops
   readonly nonceTtlMs?: number
   /**
-   * Yumusak siklik siniri: ayni yayinciya ayni kampanya son bir saatte bu
-   * kadar gosterildiyse, sinirda olmayan kampanyalar once gelir. Herkes
-   * sinirdaysa en yuksek teklif yine gosterilir. Varsayilan 3; 0 = kapali.
+   * Sahne turunun kalici kopyasi. Verilmezse sira yalnizca bellekte kalir ve
+   * sunucu yeniden baslayinca tur bastan kurulur.
    */
-  readonly hourlyCapPerPublisher?: number
+  readonly tourStore?: {
+    readonly load: (publisherId: string) => readonly string[]
+    readonly save: (publisherId: string, tour: readonly string[]) => void
+  }
   /**
    * Taban fiyat (reserve), blok basina. Rakipsiz kazanan bunu oder.
    * Varsayilan `MIN_BID_CPM`. Ag buyudukce yukseltilebilir; teklifin
@@ -130,16 +130,30 @@ export interface SelectorDeps {
 
 /** Ikinci fiyatin ustune eklenen adim: blok basina 1 kurus. */
 export const BID_INCREMENT_CPM = stroops(100_000n)
-export const DEFAULT_HOURLY_CAP = 3
-const HOUR = 3_600_000
 
 /** Nonce omru. Kisa: replay penceresini daraltir. */
 export const DEFAULT_NONCE_TTL_MS = 5 * 60_000
 
+/**
+ * Bir kampanyanin bir turda alabilecegi en fazla sahne hakki (1 hak = 1
+ * gosterim). Sinir olmasa $400 ile $15 yan yana geldiginde pahali reklam 27
+ * hak alir ve ekrani 9 dakika tek basina tutardi.
+ */
+export const MAX_STAGE_SLOTS = 4
+
+/** Teklifin turdaki en dusuk teklife orani, yuvarlanip 1..MAX_STAGE_SLOTS'a sikistirilir. */
+export function stageSlots(bid: Stroops, lowestBid: Stroops): number {
+  const ratio = Number((bid * 2n + lowestBid) / (lowestBid * 2n))
+  return Math.min(MAX_STAGE_SLOTS, Math.max(1, ratio))
+}
+
+const byBid = (a: Campaign, b: Campaign): number =>
+  a.bidCpm === b.bidCpm ? 0 : a.bidCpm > b.bidCpm ? -1 : 1
+
 export class AdSelector {
   readonly #recentByPublisher = new Map<string, string[]>()
-  /** Son bir saatte bu yayinciya sunulanlar — yumusak siklik siniri icin. Bellekte. */
-  readonly #shownByPublisher = new Map<string, { id: string; at: number }[]>()
+  /** Bu yayincinin turunda kalan sahne haklari, siradaki en basta. */
+  readonly #tourByPublisher = new Map<string, string[]>()
 
   constructor(private readonly deps: SelectorDeps) {}
 
@@ -231,54 +245,33 @@ export class AdSelector {
   }
 
   /**
-   * Fiyat sirali kuyruk + ikinci fiyat (NEXT.md "Reklam secimi", ADR-009
-   * ikinci revizyon).
+   * Sahne turu + ikinci fiyat (NEXT.md "Reklam secimi", ADR-009 ucuncu revizyon).
    *
-   * 1. Aday kumesi: bu yayinciya son bir saatte siklik sinirina ulasmamis
-   *    (ve kampanyanin kendi `frequencyCap`'ine takilmamis) kampanyalar.
-   *    Bos kalirsa butun uygunlar — sinir sirayi degistirir, kimseyi
-   *    susturmaz. Sert sinir az kampanyali agda yayinciyi saatin cogunda
-   *    reklamsiz birakirdi (eski %50/%50 kilidiyle ayni tuzak, PROBLEMS.md #8a).
-   * 2. En yuksek teklif kazanir. Esitlikte bu yayinciya en uzun suredir
-   *    gosterilmeyen; ikisi de hic gosterilmediyse rastgele. Sabit bir ID
-   *    sirasi, sik yeniden baslatmada hep ayni reklami kazandiriyordu
-   *    (denetim notu, 2026-09-06).
-   * 3. Fiyat: ayni aday kumesindeki bir sonraki teklif + 1 kurus, en fazla
-   *    kendi teklifi. Ayni reklamverenin diger kampanyalari rakip sayilmaz
-   *    (kendi fiyatini kendisi yukseltemez). Rakip yoksa taban fiyat.
-   *    Havuz kampanyasinda fiyat havuzun sabit fiyatidir — hepsi sponsorun
-   *    adina faturalanir, ikinci fiyat anlamsiz olurdu.
+   * Aday kumesi: kampanyanin kendi `frequencyCap`'ine takilmayanlar. Bos
+   * kalirsa butun uygunlar: reklam gostermemektense tekrar.
+   *
+   * Fiyat: kendi teklifini gecmeyen en yuksek rakip teklif + 1 kurus, en fazla
+   * kendi teklifi. Sirasi gelen kampanya ustundeki teklife gore fiyatlanmaz.
+   * Ayni reklamverenin diger kampanyalari rakip sayilmaz (kendi fiyatini
+   * kendisi yukseltemez). Rakip yoksa taban fiyat. Havuz kampanyasinda fiyat
+   * havuzun sabit fiyatidir — hepsi sponsorun adina faturalanir, ikinci fiyat
+   * anlamsiz olurdu.
    */
   #auction(publisherId: string, eligible: readonly Campaign[]): { chosen: Campaign; clearingCpm: Stroops } {
-    const now = this.deps.clock.now()
     const recent = this.#recentByPublisher.get(publisherId) ?? []
-    const shown = (this.#shownByPublisher.get(publisherId) ?? []).filter((x) => now - x.at < HOUR)
-    const cap = this.deps.hourlyCapPerPublisher ?? DEFAULT_HOURLY_CAP
-    const shownCount = (id: string): number => shown.reduce((n, x) => n + (x.id === id ? 1 : 0), 0)
 
     // frequencyCap 0 → kisitlama yok. `slice(-0)` tum diziyi doner; bu yuzden
     // 0 ayrica ele aliniyor, yoksa "kisitlama yok" tam tersine donerdi.
     const fresh = eligible.filter((c) =>
-      (cap === 0 || shownCount(c.id) < cap)
-      && (c.frequencyCap === 0 || !recent.slice(-c.frequencyCap).includes(c.id)))
+      c.frequencyCap === 0 || !recent.slice(-c.frequencyCap).includes(c.id))
     const candidates = fresh.length > 0 ? fresh : eligible
 
-    const lastPickIndex = (id: string): number => {
-      const idx = recent.lastIndexOf(id)
-      return idx === -1 ? -Infinity : idx
-    }
-    const ranked = [...candidates].sort((a, b) => {
-      if (a.bidCpm !== b.bidCpm) return a.bidCpm > b.bidCpm ? -1 : 1
-      const la = lastPickIndex(a.id)
-      const lb = lastPickIndex(b.id)
-      if (la !== lb) return la < lb ? -1 : 1
-      return this.deps.ids.randomHex(1) < '8' ? -1 : 1
-    })
-    const chosen = ranked[0]!
+    const chosen = this.#nextInTour(publisherId, eligible, candidates)
 
     if (chosen.poolId != null) return { chosen, clearingCpm: chosen.bidCpm }
 
-    const rival = ranked.find((c) => c.advertiserId !== chosen.advertiserId)
+    const rival = [...candidates].sort(byBid)
+      .find((c) => c.advertiserId !== chosen.advertiserId && c.bidCpm <= chosen.bidCpm)
     const reserve = this.deps.reserveCpm ?? MIN_BID_CPM
     const second = rival ? add(rival.bidCpm, BID_INCREMENT_CPM) : reserve
     const floor = second > reserve ? second : reserve
@@ -286,15 +279,77 @@ export class AdSelector {
     return { chosen, clearingCpm: stroops(clearingCpm) }
   }
 
+  /**
+   * Turdaki siradaki hak. Tur bitmeden yenisi kurulmaz: yeni kampanya sonraki
+   * turda girer, uygunlugunu yitiren (durdurulan, parasi biten) atlanir.
+   * Durum yayinci basina tutuldugu icin prompt'lar arasinda sira korunur.
+   */
+  #nextInTour(publisherId: string, eligible: readonly Campaign[], candidates: readonly Campaign[]): Campaign {
+    const byId = new Map(eligible.map((c) => [c.id, c]))
+    const allowed = new Set(candidates.map((c) => c.id))
+
+    let tour = this.#tour(publisherId).filter((id) => byId.has(id))
+    let next = tour.findIndex((id) => allowed.has(id))
+    if (next === -1) {
+      tour = [...tour, ...this.#buildTour(publisherId, eligible)]
+      next = tour.findIndex((id) => allowed.has(id))
+    }
+    const [id] = tour.splice(next, 1)
+    this.#setTour(publisherId, tour)
+    return byId.get(id!)!
+  }
+
+  /**
+   * Tekliften asagi; esitlikte bu yayinciya en uzun suredir gosterilmeyen, o da
+   * esitse rastgele. Sabit bir ID sirasi, sik yeniden baslatmada hep ayni
+   * reklami kazandiriyordu (denetim notu, 2026-09-06).
+   */
+  #buildTour(publisherId: string, eligible: readonly Campaign[]): string[] {
+    const recent = this.#recentByPublisher.get(publisherId) ?? []
+    const lastPickIndex = (id: string): number => {
+      const idx = recent.lastIndexOf(id)
+      return idx === -1 ? -Infinity : idx
+    }
+    const ordered = [...eligible].sort((a, b) => {
+      const bid = byBid(a, b)
+      if (bid !== 0) return bid
+      const la = lastPickIndex(a.id)
+      const lb = lastPickIndex(b.id)
+      if (la !== lb) return la < lb ? -1 : 1
+      return this.deps.ids.randomHex(1) < '8' ? -1 : 1
+    })
+    const lowest = ordered[ordered.length - 1]!.bidCpm
+    return ordered.flatMap((c) => Array<string>(stageSlots(c.bidCpm, lowest)).fill(c.id))
+  }
+
+  #tour(publisherId: string): string[] {
+    let tour = this.#tourByPublisher.get(publisherId)
+    if (!tour) {
+      tour = [...(this.deps.tourStore?.load(publisherId) ?? [])]
+      this.#tourByPublisher.set(publisherId, tour)
+    }
+    return tour
+  }
+
+  #setTour(publisherId: string, tour: string[]): void {
+    this.#tourByPublisher.set(publisherId, tour)
+    this.deps.tourStore?.save(publisherId, tour)
+  }
+
+  /**
+   * Hic gosterilmeden suresi dolan reklamlarin haklarini turun basina koyar.
+   * Daemon reklamlari onceden cekiyor; bunu yapmasak bosta kalan bir yayincida
+   * sira gosterilmemis reklamlar kadar ileri atlardi.
+   */
+  returnSlots(publisherId: string, campaignIds: readonly string[]): void {
+    if (campaignIds.length === 0) return
+    this.#setTour(publisherId, [...campaignIds, ...this.#tour(publisherId)])
+  }
+
   #remember(publisherId: string, campaignId: string): void {
     const list = this.#recentByPublisher.get(publisherId) ?? []
     list.push(campaignId)
     if (list.length > 32) list.shift()
     this.#recentByPublisher.set(publisherId, list)
-
-    const now = this.deps.clock.now()
-    const shown = (this.#shownByPublisher.get(publisherId) ?? []).filter((x) => now - x.at < HOUR)
-    shown.push({ id: campaignId, at: now })
-    this.#shownByPublisher.set(publisherId, shown)
   }
 }
