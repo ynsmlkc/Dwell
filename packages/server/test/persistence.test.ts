@@ -429,4 +429,14 @@ describe('sahne turu kaydi', () => {
     database.prepare("UPDATE kv SET value = 'bozuk' WHERE key = 'tour:alice'").run()
     expect(mirror.loadTour('alice')).toEqual([])
   })
+
+  it('banlar yeniden baslatmadan sag cikar, bozuk kayit bos sayilir', () => {
+    const database = openDb(':memory:')
+    const mirror = new SqliteImpressionMirror(database)
+    expect(mirror.loadBans()).toEqual([])
+    mirror.saveBans([{ publisherId: 'alice', reason: 'farm', at: 5 }])
+    expect(new SqliteImpressionMirror(database).loadBans()).toEqual([{ publisherId: 'alice', reason: 'farm', at: 5 }])
+    database.prepare("UPDATE kv SET value = 'bozuk' WHERE key = 'bans'").run()
+    expect(mirror.loadBans()).toEqual([])
+  })
 })

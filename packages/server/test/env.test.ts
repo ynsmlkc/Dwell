@@ -22,8 +22,12 @@ describe('uretim ayarlari', () => {
     expect(readServerEnv({}).pendingMs).toBe(30_000)
   })
 
-  it('uretimde DWELL_PENDING_MS verilmezse 24 saat — 30 saniye DEGIL', () => {
-    expect(readServerEnv(TAM).pendingMs).toBe(86_400_000)
+  it('mainnet uretiminde DWELL_PENDING_MS verilmezse 24 saat — 30 saniye DEGIL', () => {
+    expect(readServerEnv({ ...TAM, DWELL_NETWORK: 'pubnet' }).pendingMs).toBe(86_400_000)
+  })
+
+  it('testnet uretiminde varsayilan 1 saat', () => {
+    expect(readServerEnv(TAM).pendingMs).toBe(3_600_000)
   })
 
   it('uretimde eksik zorunlu degisken acilisi durdurur', () => {

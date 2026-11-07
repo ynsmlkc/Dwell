@@ -436,15 +436,21 @@ export function createApp(deps: AppDeps) {
 
     // Bekleyen: henuz dogrulanmamis gosterimlerin degeri. Ledger'da YOK,
     // cunku dogrulanana kadar para degil.
-    let pending = 0n
+    let pending = 0n, pendingCount = 0, verifiedCount = 0
     for (const i of deps.pipeline.impressions()) {
-      if (i.publisherId === publisherId && i.state === 'pending') {
+      if (i.publisherId !== publisherId) continue
+      if (i.state === 'verified') verifiedCount++
+      else if (i.state === 'pending') {
+        pendingCount++
         pending += (BigInt(i.rateStroops) * BigInt(i.revShareBps)) / 10_000n
       }
     }
 
     return c.json({
       pendingStroops: pending.toString(),
+      // Anlik sayac: gosterim sunucuya ulastigi an `pending`'e girer.
+      // Para bekleme bitince cekilebilir olur; sayi hemen gorunur.
+      impressions: { verified: verifiedCount, pending: pendingCount },
       payableStroops: payable.toString(),
       inFlightStroops: inFlight.toString(),
       // Kazanilan her sey — cekimden sonra DUSMEZ (eskiden `payable`'di).
@@ -483,6 +489,10 @@ export function createApp(deps: AppDeps) {
   app.post('/v1/publisher/withdraw', requireScope('withdraw:balance'), async (c) => {
     if (!deps.publisherWithdraw) return c.json(err('DWL_9001', 'cekim kapali'), 404)
     const { publisherId } = c.get('auth')
+    if (deps.pipeline.isBanned(publisherId)) {
+      note(c, { withdraw: 'publisher', failed: 'banned' })
+      return c.json(err('DWL_9001', 'this wallet is suspended'), 403)
+    }
 
     const body = await c.req.json().catch(() => null)
     const raw = typeof body?.amountStroops === 'string' ? body.amountStroops : null
@@ -700,8 +710,15 @@ export function createApp(deps: AppDeps) {
     app.get('/v1/leaderboard/profile/:nickname', (c) => {
       const d = board.profile(c.req.param('nickname'), period(c.req.query('period')))
       if (!d) return c.json(err('DWL_9001', 'no such listed profile'), 404)
+      // Siralama onayli sayiyla kalir (ciftci anlik sayiyla firlayamasin);
+      // kart bekleyenleri ayrica gosterir.
+      const owner = profiles.byNickname(d.nickname)?.publisherId
+      let pendingImpressions = 0
+      if (owner) for (const i of deps.pipeline.impressions()) {
+        if (i.publisherId === owner && i.state === 'pending') pendingImpressions++
+      }
       c.header('cache-control', 'public, max-age=30')
-      return c.json(d)
+      return c.json({ ...d, pendingImpressions })
     })
   }
 
@@ -894,6 +911,116 @@ export function createApp(deps: AppDeps) {
         : { withdraw: 'platform', failed: r.reason })
       if (!r.ok) return c.json(err('DWL_9001', r.reason), r.retryable ? 409 : 400)
       return c.json({ txHash: r.txHash, amountStroops: r.amount.toString() })
+    })
+
+    /* ── yayincilar ve ban ── */
+
+    /**
+     * Kim kuruyor, kim kullaniyor. Kaynak sunucuya gelen gosterimler —
+     * daemon calisan herkes burada. IP acik halde YOK (§10): yalnizca tuzlu
+     * hash'in ilk 6 hanesi, "ayni yerden gelen cuzdanlar"i gruplamaya yeter.
+     */
+    app.get('/v1/admin/publishers', requireAdmin, (c) => {
+      const now = deps.clock.now()
+      const dayStart = now - (now % 86_400_000)
+      type Row = {
+        first: number; last: number; today: number
+        verified: number; pending: number; rejected: number; pendingStroops: bigint
+        version: string | null; lastIp: string | null; ips: Set<string>
+      }
+      const rows = new Map<string, Row>()
+      const row = (id: string): Row => {
+        let r = rows.get(id)
+        if (!r) {
+          r = { first: Infinity, last: 0, today: 0, verified: 0, pending: 0, rejected: 0,
+            pendingStroops: 0n, version: null, lastIp: null, ips: new Set() }
+          rows.set(id, r)
+        }
+        return r
+      }
+
+      for (const i of deps.pipeline.impressions()) {
+        const r = row(i.publisherId)
+        if (i.serverTs < r.first) r.first = i.serverTs
+        if (i.serverTs >= r.last) {
+          r.last = i.serverTs
+          r.version = i.clientVersion
+          if (i.ipHash) r.lastIp = i.ipHash.slice(0, 6)
+        }
+        if (i.ipHash) r.ips.add(i.ipHash.slice(0, 6))
+        if (i.state === 'verified') r.verified++
+        else if (i.state === 'pending') {
+          r.pending++
+          r.pendingStroops += (BigInt(i.rateStroops) * BigInt(i.revShareBps)) / 10_000n
+        } else r.rejected++
+        if (i.state !== 'rejected' && i.serverTs >= dayStart) r.today++
+      }
+      for (const p of deps.profiles?.all() ?? []) row(p.publisherId)
+      for (const b of deps.pipeline.bans()) row(b.publisherId)
+
+      // Ayni IP grubunu paylasan cuzdan sayisi — coklu cuzdan ciftciligi.
+      const walletsByIp = new Map<string, Set<string>>()
+      for (const [id, r] of rows) {
+        for (const ip of r.ips) {
+          const s = walletsByIp.get(ip) ?? new Set<string>()
+          s.add(id)
+          walletsByIp.set(ip, s)
+        }
+      }
+
+      const bans = new Map(deps.pipeline.bans().map((b) => [b.publisherId, b]))
+      const out = [...rows].map(([id, r]) => {
+        const shared = new Set<string>()
+        for (const ip of r.ips) for (const w of walletsByIp.get(ip) ?? []) if (w !== id) shared.add(w)
+        const profile = deps.profiles?.get(id) ?? null
+        const ban = bans.get(id)
+        return {
+          publisherId: id,
+          nickname: profile?.nickname ?? null,
+          country: profile?.country ?? null,
+          listed: profile?.listed ?? false,
+          firstSeen: Number.isFinite(r.first) ? r.first : null,
+          lastSeen: r.last || null,
+          today: r.today,
+          verified: r.verified,
+          pending: r.pending,
+          rejected: r.rejected,
+          pendingStroops: r.pendingStroops.toString(),
+          earnedStroops: deps.ledger.earned(accountId('publisher', id)).toString(),
+          clientVersion: r.version,
+          ipGroup: r.lastIp,
+          sharedIpWallets: shared.size,
+          banned: ban ? { reason: ban.reason, at: ban.at } : null,
+        }
+      }).sort((a, b) => (b.lastSeen ?? 0) - (a.lastSeen ?? 0))
+
+      const seenSince = (ms: number) => out.filter((r) => r.lastSeen !== null && r.lastSeen >= now - ms).length
+      return c.json({
+        summary: {
+          activeNow: seenSince(15 * 60_000),
+          today: out.filter((r) => r.lastSeen !== null && r.lastSeen >= dayStart).length,
+          week: seenSince(7 * 86_400_000),
+          total: out.length,
+          banned: bans.size,
+        },
+        publishers: out,
+      })
+    })
+
+    /** `{ publisherId, banned: true|false, reason? }` */
+    app.post('/v1/admin/ban', requireAdmin, async (c) => {
+      const body = await c.req.json().catch(() => null)
+      const id = typeof body?.publisherId === 'string' ? body.publisherId.trim() : ''
+      if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) return c.json(err('DWL_9001', 'publisherId required'), 400)
+      if (typeof body?.banned !== 'boolean') return c.json(err('DWL_9001', 'banned: true or false'), 400)
+      const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 200) : ''
+      note(c, { admin: body.banned ? 'ban' : 'unban', publisher: id.slice(0, 6) })
+      if (body.banned) {
+        const b = deps.pipeline.ban(id, reason || 'admin')
+        return c.json({ publisherId: id, banned: { reason: b.reason, at: b.at } })
+      }
+      deps.pipeline.unban(id)
+      return c.json({ publisherId: id, banned: null })
     })
   }
 

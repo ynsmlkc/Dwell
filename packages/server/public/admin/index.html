@@ -90,6 +90,24 @@
     </div>
 
     <section style="margin-top: clamp(38px, 6vw, 64px); padding-bottom: 0">
+      <h2 style="font-size: clamp(20px, 2.3vw, 26px); margin-bottom: 6px">Publishers</h2>
+      <p class="small" style="margin: 0 0 16px" id="pub-summary">Everyone whose daemon has reported an impression.</p>
+      <p class="small hidden" id="no-publishers" style="margin: 0">None yet.</p>
+      <p class="err hidden" id="pub-error"></p>
+      <div class="table-wrap hidden" id="publishers-wrap">
+        <table>
+          <thead><tr>
+            <th>Wallet</th><th>Name</th><th>First seen</th><th>Last seen</th>
+            <th style="text-align:right">Today</th><th style="text-align:right">Verified</th>
+            <th style="text-align:right">Pending</th><th style="text-align:right">Earned</th>
+            <th>Version</th><th>IP group</th><th></th>
+          </tr></thead>
+          <tbody id="publishers"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section style="margin-top: clamp(38px, 6vw, 64px); padding-bottom: 0">
       <h2 style="font-size: clamp(20px, 2.3vw, 26px); margin-bottom: 6px">Campaigns</h2>
       <p class="small" style="margin: 0 0 16px">Every campaign on the network, not just one advertiser's.</p>
       <p class="small hidden" id="no-campaigns" style="margin: 0">None yet.</p>
@@ -171,6 +189,109 @@ async function load() {
   }
   render(data);
   view('v-dash');
+  loadPublishers();
+}
+
+/* ─────────── yayincilar ─────────── */
+
+const ago = (t) => {
+  if (!t) return '—';
+  const s = Math.max(0, (Date.now() - t) / 1000);
+  if (s < 90) return 'now';
+  if (s < 3600) return Math.round(s / 60) + ' min ago';
+  if (s < 86400) return Math.round(s / 3600) + ' h ago';
+  return Math.round(s / 86400) + ' d ago';
+};
+const day = (t) => t ? new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—';
+const n = (x) => Number(x).toLocaleString('en-US');
+
+let pubs = [];
+
+async function loadPublishers() {
+  show($('#pub-error'), false);
+  let d;
+  try { d = await api('/v1/admin/publishers'); }
+  catch (e) { $('#pub-error').textContent = 'Publishers: ' + e.message; show($('#pub-error'), true); return; }
+  pubs = d.publishers;
+  const s = d.summary;
+  $('#pub-summary').textContent =
+    `Active now: ${s.activeNow} · today: ${s.today} · this week: ${s.week} · total: ${s.total}` +
+    (s.banned ? ` · banned: ${s.banned}` : '');
+  show($('#no-publishers'), pubs.length === 0);
+  show($('#publishers-wrap'), pubs.length > 0);
+
+  const cell = (text, opts = {}) => {
+    const td = document.createElement('td');
+    td.textContent = text;
+    if (opts.num) td.className = 'num';
+    if (opts.mono) td.className = (td.className + ' mono').trim();
+    if (opts.title) td.title = opts.title;
+    if (opts.style) td.style.cssText = opts.style;
+    return td;
+  };
+
+  $('#publishers').replaceChildren(...pubs.map((p) => {
+    const tr = document.createElement('tr');
+    if (p.banned) tr.style.opacity = '0.5';
+
+    const w = document.createElement('td');
+    w.className = 'mono';
+    const a = document.createElement('a');
+    a.href = explorer.account(p.publisherId); a.target = '_blank'; a.rel = 'noopener';
+    a.textContent = short(p.publisherId); a.title = p.publisherId;
+    w.append(a);
+
+    const name = p.nickname ? p.nickname + (p.listed ? '' : ' (hidden)') : '—';
+    const live = p.lastSeen && Date.now() - p.lastSeen < 15 * 60_000;
+    const flagged = p.sharedIpWallets > 0;
+
+    const act = document.createElement('td');
+    const b = document.createElement('button');
+    b.className = 'btn btn-sm btn-quiet';
+    b.textContent = p.banned ? 'Unban' : 'Ban';
+    b.title = p.banned ? `Banned: ${p.banned.reason}` : 'Stops ads and payouts for this wallet';
+    b.onclick = () => setBan([p.publisherId], !p.banned);
+    act.append(b);
+    if (flagged && !p.banned) {
+      const g = document.createElement('button');
+      g.className = 'btn btn-sm btn-quiet';
+      g.textContent = 'Ban group';
+      g.title = 'Ban every wallet in IP group ' + p.ipGroup;
+      g.onclick = () => setBan(pubs.filter((q) => q.ipGroup === p.ipGroup && !q.banned).map((q) => q.publisherId), true);
+      act.append(g);
+    }
+
+    tr.append(
+      w,
+      cell(name),
+      cell(day(p.firstSeen)),
+      cell((live ? '● ' : '') + ago(p.lastSeen), { style: live ? 'color: var(--accent)' : '' }),
+      cell(n(p.today), { num: true }),
+      cell(n(p.verified), { num: true }),
+      cell(n(p.pending), { num: true }),
+      cell(usd(p.earnedStroops), { num: true }),
+      cell(p.clientVersion || '—', { mono: true }),
+      cell((p.ipGroup || '—') + (flagged ? ` ⚠ ${p.sharedIpWallets + 1}` : ''), {
+        mono: true,
+        title: flagged ? `${p.sharedIpWallets} other wallet(s) share an IP with this one` : '',
+        style: flagged ? 'color: var(--warn)' : '',
+      }),
+      act,
+    );
+    return tr;
+  }));
+}
+
+async function setBan(ids, banned) {
+  show($('#pub-error'), false);
+  try {
+    for (const id of ids) {
+      await api('/v1/admin/ban', { method: 'POST', body: { publisherId: id, banned, reason: 'admin' } });
+    }
+  } catch (e) {
+    $('#pub-error').textContent = e.message; show($('#pub-error'), true);
+  }
+  await loadPublishers();
 }
 $('#retry-load').onclick = load;
 

@@ -53,7 +53,16 @@ export interface PipelineOptions {
     readonly saveDelivery: (d: DeliveredAd) => void
     readonly loadTour?: (publisherId: string) => readonly string[]
     readonly saveTour?: (publisherId: string, tour: readonly string[]) => void
+    readonly loadBans?: () => readonly Ban[]
+    readonly saveBans?: (bans: readonly Ban[]) => void
   }
+}
+
+/** Admin'in kapattigi yayinci cuzdani. Reklam gitmez, bekleyenler reddedilir. */
+export interface Ban {
+  readonly publisherId: string
+  readonly reason: string
+  readonly at: number
 }
 
 export class Pipeline {
@@ -61,6 +70,7 @@ export class Pipeline {
   /** Sahne hakki tura geri verilmis, suresi dolmus teslimatlar. */
   readonly #returned = new Set<string>()
   readonly #impressions = new Map<string, StoredImpression>()
+  readonly #bans = new Map<string, Ban>()
   readonly selector: AdSelector
   readonly ingest: ImpressionIngest
   readonly verifier: Verifier
@@ -98,6 +108,7 @@ export class Pipeline {
       dailyCap: opts.dailyCap,
       countToday: (p, at) => this.#countToday(p, at),
       isDatacenterIp: opts.isDatacenterIp ?? (() => false),
+      isBanned: (p) => this.#bans.has(p),
     })
 
     // Diskteki durumu geri yukle. Yeniden baslatmadan sonra:
@@ -115,6 +126,7 @@ export class Pipeline {
         // Onceki calismada dolmuslar: hakki geri verildiyse ikinci kez verilmesin.
         if (d.expiresAt < opts.clock.now()) this.#returned.add(d.nonce)
       }
+      for (const b of opts.persist.loadBans?.() ?? []) this.#bans.set(b.publisherId, b)
     }
   }
 
@@ -240,6 +252,7 @@ export class Pipeline {
 
   /** `POST /v1/ads/next` — teslimat kaydedilir ki nonce dogrulanabilsin. */
   serveAd(publisherId: string): AdSelection | null {
+    if (this.#bans.has(publisherId)) return null
     this.#returnExpiredSlots(publisherId)
     const sel = this.selector.select(publisherId)
     if (!sel) return null
@@ -301,6 +314,29 @@ export class Pipeline {
   }
 
   impressions(): readonly StoredImpression[] { return [...this.#impressions.values()] }
+
+  /* ── ban (admin) ── */
+
+  isBanned(publisherId: string): boolean { return this.#bans.has(publisherId) }
+  bans(): readonly Ban[] { return [...this.#bans.values()] }
+
+  /**
+   * Cuzdani kapatir. Yeni reklam gitmez; bekleyen gosterimleri bir sonraki
+   * dogrulama turunda beklemeyi beklemeden reddedilir. Zaten onaylanmis
+   * kazanc ledger'da kalir — cekimi HTTP katmani kapatir.
+   */
+  ban(publisherId: string, reason: string): Ban {
+    const b: Ban = { publisherId, reason, at: this.opts.clock.now() }
+    this.#bans.set(publisherId, b)
+    this.opts.persist?.saveBans?.(this.bans())
+    return b
+  }
+
+  unban(publisherId: string): boolean {
+    const had = this.#bans.delete(publisherId)
+    if (had) this.opts.persist?.saveBans?.(this.bans())
+    return had
+  }
 
   /* ── ic isler ── */
 

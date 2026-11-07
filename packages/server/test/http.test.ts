@@ -368,6 +368,21 @@ describe('POST /v1/publisher/withdraw', () => {
     expect(ledger.balance(accountId('publisher', PUB))).toBe(0n)
   })
 
+  it('banli cuzdan cekim yapamaz, para hareket etmez', async () => {
+    ledger.postImpression({
+      impressionId: 'i1', advertiserId: ADV, publisherId: PUB, campaignId: 'c1',
+      rate: stroops(20_000_000n), revShareBps: 5000,
+    })
+    pipeline.ban(PUB, 'test')
+    const { withApp } = appWithWithdraw()
+    const r = await withApp.request('/v1/publisher/withdraw', {
+      method: 'POST', headers: auth(),
+      body: JSON.stringify({ amountStroops: '10000000' }),
+    })
+    expect(r.status).toBe(403)
+    expect(ledger.balance(accountId('publisher', PUB))).toBe(10_000_000n)
+  })
+
   it('bakiyenin ustunde istenirse 400 doner, para hareket etmez', async () => {
     ledger.postImpression({
       impressionId: 'i1', advertiserId: ADV, publisherId: PUB, campaignId: 'c1',
@@ -511,6 +526,90 @@ describe('/v1/admin/*', () => {
     })
     expect(r.status).toBe(200)
     expect(ledger.balance(PLATFORM_REVENUE)).toBe(0n)
+  })
+
+  const report = async (withApp: ReturnType<typeof createApp>, id: string) => {
+    const { nonce } = await asJson(await withApp.request('/v1/ads/next', { method: 'POST', headers: auth() }))
+    clock.advance(15_000)
+    await withApp.request('/v1/impressions', {
+      method: 'POST', headers: { ...auth(), 'x-forwarded-for': '203.0.113.7' },
+      body: JSON.stringify({ events: [{
+        id, campaignId: 'c1', nonce, sessionId: 's1',
+        surface: 'statusline', durationMs: 15_000, clientTs: clock.now(),
+        projectKey: 'f'.repeat(64), clientVersion: '1.0.0', os: 'darwin', arch: 'arm64',
+      }] }),
+    })
+  }
+  const admin = { authorization: `Bearer ${ADMIN_SECRET}`, 'content-type': 'application/json' }
+
+  it('yayinci listesi: gosterim gonderen cuzdan, sayilari ve surumuyle gorunur', async () => {
+    const { withApp } = appWithAdmin()
+    await report(withApp, '01HQRS7X8N9P2K3M4V5W6Y7Z8B')
+
+    const r = await withApp.request('/v1/admin/publishers', { headers: admin })
+    expect(r.status).toBe(200)
+    const body = await asJson(r)
+    expect(body.summary.total).toBe(1)
+    expect(body.summary.activeNow).toBe(1)
+    const row = body.publishers[0]
+    expect(row.publisherId).toBe(PUB)
+    expect(row.pending).toBe(1)
+    expect(row.today).toBe(1)
+    expect(row.clientVersion).toBe('1.0.0')
+    expect(row.banned).toBeNull()
+    // IP acik halde DONMEZ, yalnizca hash'in basi
+    expect(JSON.stringify(body)).not.toContain('203.0.113.7')
+  })
+
+  it('yayinci listesi sir ister', async () => {
+    const { withApp } = appWithAdmin()
+    expect((await withApp.request('/v1/admin/publishers')).status).toBe(401)
+    expect((await withApp.request('/v1/admin/ban', { method: 'POST', body: '{}' })).status).toBe(401)
+  })
+
+  it('ban: reklam durur, bekleyen gosterim beklemeden reddedilir; unban geri acar', async () => {
+    const { withApp } = appWithAdmin()
+    await report(withApp, '01HQRS7X8N9P2K3M4V5W6Y7Z8B')
+
+    const b = await withApp.request('/v1/admin/ban', {
+      method: 'POST', headers: admin, body: JSON.stringify({ publisherId: PUB, banned: true, reason: 'farm' }),
+    })
+    expect(b.status).toBe(200)
+    expect((await asJson(b)).banned.reason).toBe('farm')
+
+    expect((await withApp.request('/v1/ads/next', { method: 'POST', headers: auth() })).status).toBe(204)
+    const v = pipeline.runVerification()
+    expect(v.rejected).toBe(1)
+    expect(ledger.balance(accountId('publisher', PUB))).toBe(0n)
+
+    const list = await asJson(await withApp.request('/v1/admin/publishers', { headers: admin }))
+    expect(list.publishers[0].banned.reason).toBe('farm')
+    expect(list.summary.banned).toBe(1)
+
+    await withApp.request('/v1/admin/ban', {
+      method: 'POST', headers: admin, body: JSON.stringify({ publisherId: PUB, banned: false }),
+    })
+    clock.advance(20_000)
+    expect((await withApp.request('/v1/ads/next', { method: 'POST', headers: auth() })).status).toBe(200)
+  })
+
+  it('ban govdesi dogrulanir', async () => {
+    const { withApp } = appWithAdmin()
+    const r = await withApp.request('/v1/admin/ban', {
+      method: 'POST', headers: admin, body: JSON.stringify({ publisherId: PUB }),
+    })
+    expect(r.status).toBe(400)
+  })
+
+  it('bakiye anlik gosterim sayisini dondurur', async () => {
+    const { withApp } = appWithAdmin()
+    await report(withApp, '01HQRS7X8N9P2K3M4V5W6Y7Z8B')
+    const before = await asJson(await withApp.request('/v1/me/balance', { headers: auth() }))
+    expect(before.impressions).toEqual({ verified: 0, pending: 1 })
+    clock.advance(24 * 3600_000 + 1)
+    pipeline.runVerification()
+    const after = await asJson(await withApp.request('/v1/me/balance', { headers: auth() }))
+    expect(after.impressions).toEqual({ verified: 1, pending: 0 })
   })
 
   it('adminSecret verilmemisse tum ucu 404 doner', async () => {

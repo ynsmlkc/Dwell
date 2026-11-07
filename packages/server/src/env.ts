@@ -13,6 +13,7 @@ import { semverSchema } from '@dwell/protocol'
 type Env = Readonly<Record<string, string | undefined>>
 
 const DAY_MS = 86_400_000
+const HOUR_MS = 3_600_000
 
 export interface ServerEnv {
   readonly isProd: boolean
@@ -63,9 +64,11 @@ export function readServerEnv(env: Env): ServerEnv {
 
   return {
     isProd,
-    // Uretimde varsayilan 24 saat; gelistirmede 30 saniye (24 saat beklemek
-    // gelistirmeyi imkansiz kilar).
-    pendingMs: Number(env['DWELL_PENDING_MS'] ?? (isProd ? DAY_MS : 30_000)),
+    // Mainnet'te varsayilan 24 saat (zincir ustu odeme geri alinamaz).
+    // Testnet uretiminde 1 saat: para gercek degil, kullanici kazancini
+    // ayni gun gorsun. Gelistirmede 30 saniye.
+    pendingMs: Number(env['DWELL_PENDING_MS']
+      ?? (!isProd ? 30_000 : env['DWELL_NETWORK'] === 'pubnet' ? DAY_MS : HOUR_MS)),
     minClientVersion: env['DWELL_MIN_CLIENT_VERSION'] ?? '0.0.0',
     ipSalt: env['DWELL_IP_SALT'] ?? 'dev-salt-degistir',
   }

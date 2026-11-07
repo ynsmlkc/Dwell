@@ -663,6 +663,13 @@ as a publisher · expires in 5 min</span></div>
     $('#pc-global').textContent = '#' + d.rank;
     $('#pc-crank').textContent = d.countryRank ? '#' + d.countryRank : '—';
     $('#pc-imp').textContent = int(d.impressions);
+    if (d.pendingImpressions > 0) {
+      const p = document.createElement('span');
+      p.style.cssText = 'font-size: 0.7em; color: var(--muted); margin-left: 6px';
+      p.title = 'counted, being verified';
+      p.textContent = '+' + int(d.pendingImpressions);
+      $('#pc-imp').append(p);
+    }
     $('#pc-earned').textContent = money(d.earnedStroops);
 
     const days = d.dailyStroops.map(Number);

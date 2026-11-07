@@ -23,6 +23,8 @@ export interface VerifyDeps {
   readonly countToday: (publisherId: string, at: number) => number
   /** IP datacenter araliginda mi? */
   readonly isDatacenterIp: (ipHash: string | null) => boolean
+  /** Admin bu cuzdani kapatti mi? Kapaliysa bekleme suresi beklenmez. */
+  readonly isBanned?: (publisherId: string) => boolean
 }
 
 export type VerifyOutcome =
@@ -39,6 +41,10 @@ export class Verifier {
       return imp.state === 'verified'
         ? { state: 'verified', impression: imp }
         : { state: 'rejected', impression: imp, reason: imp.rejectReason ?? 'zaten reddedilmis' }
+    }
+
+    if (this.deps.isBanned?.(imp.publisherId)) {
+      return { state: 'rejected', impression: imp, reason: 'banned' }
     }
 
     const readyAt = imp.serverTs + this.deps.pendingMs

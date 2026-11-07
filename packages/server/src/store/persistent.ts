@@ -16,6 +16,7 @@ import type { PayoutStore, PayoutItemRecord, PayoutItemState } from '../payouts/
 import type { StoredImpression, DeliveredAd } from '../impressions/ingest.js'
 import type { SubmissionReceipt, WalletBinding } from '@dwell/payments'
 import type { Profile } from '../leaderboard/profiles.js'
+import type { Ban } from '../pipeline.js'
 import { type Db, numOrNull, strOrNull, toInt, toBool } from './db.js'
 
 /* ─────────────────────────── defter ─────────────────────────── */
@@ -433,6 +434,25 @@ export class SqliteImpressionMirror {
       INSERT INTO kv (key, value) VALUES (?, ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value
     `).run(`tour:${publisherId}`, JSON.stringify(tour))
+  }
+
+  /** Admin banlari — tek kayit, kucuk liste. Bozuksa bos sayilir. */
+  loadBans(): readonly Ban[] {
+    const r = this.db.prepare('SELECT value FROM kv WHERE key = ?').get('bans') as { value: string } | undefined
+    if (!r) return []
+    try {
+      const list: unknown = JSON.parse(r.value)
+      if (!Array.isArray(list)) return []
+      return list.filter((b): b is Ban =>
+        b && typeof b.publisherId === 'string' && typeof b.reason === 'string' && typeof b.at === 'number')
+    } catch { return [] }
+  }
+
+  saveBans(bans: readonly Ban[]): void {
+    this.db.prepare(`
+      INSERT INTO kv (key, value) VALUES ('bans', ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `).run(JSON.stringify(bans))
   }
 
   saveDelivery(d: DeliveredAd): void {

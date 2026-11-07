@@ -367,9 +367,15 @@ function render(d) {
   show($('#nothing-to-withdraw'), !canWithdraw);
   if (!canWithdraw) show($('#withdraw-box'), false);
 
-  const rows = [
-    ['Pending', usd(d.pendingStroops), 'counted, not verified yet — may not survive'],
-  ];
+  const rows = [];
+  if (d.impressions) {
+    const total = d.impressions.verified + d.impressions.pending;
+    const n = (x) => x.toLocaleString('en-US');
+    rows.push(['Impressions', n(total), d.impressions.pending
+      ? `${n(d.impressions.verified)} verified · ${n(d.impressions.pending)} being verified`
+      : 'all verified']);
+  }
+  rows.push(['Pending', usd(d.pendingStroops), 'counted, becomes withdrawable after a short hold']);
   if (BigInt(d.inFlightStroops) > 0n) {
     rows.push(['In flight', usd(d.inFlightStroops), 'sent to the chain, waiting for confirmation']);
   }

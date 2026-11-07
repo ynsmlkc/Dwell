@@ -157,6 +157,8 @@ const pipeline: Pipeline = new Pipeline({
     saveDelivery: (d) => mirror.saveDelivery(d),
     loadTour: (p) => mirror.loadTour(p),
     saveTour: (p, t) => mirror.saveTour(p, t),
+    loadBans: () => mirror.loadBans(),
+    saveBans: (b) => mirror.saveBans(b),
   },
   campaigns: () => campaignStore.all(),
   poolOf: (publisherId) => pools.poolOf(publisherId),
@@ -175,7 +177,9 @@ const pipeline: Pipeline = new Pipeline({
   // Uretimde 24 saat (§9 katman 2 — zincir ustu odeme geri alinamaz),
   // gelistirmede 30 saniye. Bkz. `env.ts`.
   pendingMs: ENV.pendingMs,
-  dailyCap: 400,
+  // ~4 saat ajan dusunme suresi (20 sn'de bir gosterim). Durust yogun
+  // kullanici altinda kalir; coklu cuzdan IP grubundan yakalanir.
+  dailyCap: 720,
 })
 
 const tokens = new SqliteTokenStore(db)
