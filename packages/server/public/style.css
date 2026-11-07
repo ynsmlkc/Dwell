@@ -10,23 +10,23 @@
    Geist grotesk, tek turuncu vurgu, yuvarlak hap dugmeler. Eski serif +
    izgara gorunumu ilk taslaktan kalmaydi. */
 :root {
-  --bg:        #12110f;
-  --bg-2:      #181714;
-  --bg-3:      #1e1c19;
-  --bg-deep:   #0e0d0c;
-  --bg-deeper: #0b0a09;
-  --ink:       #efeae3;
-  --ink-soft:  #d6d0c8;
-  --ink-2:     #a39c92;
-  --muted:     #8a847b;
-  --faint:     #6a655e;
-  --dim:       #4f4b45;
-  --line:      rgba(239, 234, 227, 0.07);
-  --line-2:    rgba(239, 234, 227, 0.12);
-  --line-3:    rgba(239, 234, 227, 0.18);
-  --accent:    oklch(0.74 0.16 52);
-  --accent-hi: oklch(0.8 0.14 52);
-  --accent-bg: oklch(0.74 0.16 52 / 0.06);
+  --bg:        #0b0b0c;
+  --bg-2:      #131314;
+  --bg-3:      #1a1a1c;
+  --bg-deep:   #08080a;
+  --bg-deeper: #060607;
+  --ink:       #f7f7f5;
+  --ink-soft:  #dededb;
+  --ink-2:     #a3a3a0;
+  --muted:     #8a8a87;
+  --faint:     #6a6a67;
+  --dim:       #4c4c4a;
+  --line:      rgba(247, 247, 245, 0.07);
+  --line-2:    rgba(247, 247, 245, 0.12);
+  --line-3:    rgba(247, 247, 245, 0.18);
+  --accent:    #c6f432;
+  --accent-hi: #d6fa62;
+  --accent-bg: rgba(198, 244, 50, 0.06);
   --warn:      #b8574a;
   --good:      #8fae7f;
 
@@ -58,7 +58,7 @@ body {
 a { color: var(--ink); text-decoration: none; }
 a:hover { color: var(--accent); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-::selection { background: oklch(0.74 0.16 52 / 0.3); }
+::selection { background: rgba(198, 244, 50, 0.3); }
 
 .mono { font-family: var(--mono); }
 .wrap { max-width: 1240px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 48px); }
@@ -70,7 +70,7 @@ a:hover { color: var(--accent); }
   position: sticky; top: 0; z-index: 30;
   display: flex; align-items: center; justify-content: space-between;
   gap: 16px; padding: 12px clamp(16px, 4vw, 48px);
-  background: rgba(18, 17, 15, 0.8);
+  background: rgba(11, 11, 12, 0.8);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line);
 }
@@ -91,7 +91,7 @@ a:hover { color: var(--accent); }
   padding: 0 11px; border: 1px solid var(--line-2);
   border-radius: 999px; font-family: var(--mono); font-size: 12px; color: var(--ink-2); white-space: nowrap;
 }
-.chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px oklch(0.74 0.16 52 / 0.18); }
+.chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px rgba(198, 244, 50, 0.18); }
 
 /* ── tipografi ── */
 h1, h2, h3 { font-family: var(--sans); font-weight: 500; letter-spacing: -0.03em; margin: 0; text-wrap: balance; }
@@ -116,17 +116,17 @@ section:first-of-type { border-top: 0; }
 
 /* ── terminal ── */
 .term {
-  border: 1px solid rgba(239, 234, 227, 0.1); border-radius: 10px; background: rgba(20, 19, 17, 0.94); overflow: hidden; margin: 0;
+  border: 1px solid rgba(247, 247, 245, 0.1); border-radius: 10px; background: rgba(16, 16, 17, 0.94); overflow: hidden; margin: 0;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 30px 60px -28px rgba(0, 0, 0, 0.7);
 }
 .term-bar {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 10px 14px; border-bottom: 1px solid rgba(236, 231, 225, 0.1);
+  padding: 10px 14px; border-bottom: 1px solid rgba(247, 247, 245, 0.1);
   font-family: var(--mono); font-size: 12px; color: var(--faint);
 }
 .term-body { padding: 20px 16px 0; font-family: var(--mono); font-size: clamp(12px, 1.35vw, 14.5px); line-height: 1.85; }
 .term-status {
-  border-top: 1px solid rgba(236, 231, 225, 0.1); background: var(--bg-deeper);
+  border-top: 1px solid rgba(247, 247, 245, 0.1); background: var(--bg-deeper);
   padding: 12px 16px; min-height: 46px;
   display: flex; align-items: center; justify-content: space-between; gap: 18px;
   font-family: var(--mono); font-size: clamp(11.5px, 1.3vw, 14px);
@@ -149,7 +149,7 @@ section:first-of-type { border-top: 0; }
   -webkit-appearance: none; appearance: none;
   transition: background 150ms, border-color 150ms, color 150ms;
 }
-.btn:hover { border-color: rgba(239, 234, 227, 0.32); }
+.btn:hover { border-color: rgba(247, 247, 245, 0.32); }
 .btn-primary { background: var(--ink); border-color: var(--ink); color: var(--bg); }
 .btn-primary:hover { background: #fff; border-color: #fff; color: var(--bg); }
 .btn-quiet { background: transparent; }
@@ -157,7 +157,7 @@ section:first-of-type { border-top: 0; }
 .btn-cmd { font-family: var(--mono); font-weight: 400; font-size: 13px; border-radius: 8px; background: var(--bg-3); border-color: var(--line); }
 .btn-sm { height: 34px; padding: 0 14px; font-size: 13.5px; }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; border-color: var(--line-2); }
-.btn-primary:disabled { background: rgba(239, 234, 227, 0.09); border-color: transparent; color: var(--faint); }
+.btn-primary:disabled { background: rgba(247, 247, 245, 0.09); border-color: transparent; color: var(--faint); }
 .btn .tag {
   color: var(--accent); font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
   /* Genislik sabit: "copy" → "✓" degisiminde dugme ziplamasin. */
@@ -182,7 +182,7 @@ section:first-of-type { border-top: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .spinner {
   width: 12px; height: 12px; border-radius: 50%;
-  border: 1.5px solid rgba(12, 11, 10, 0.35); border-top-color: var(--bg);
+  border: 1.5px solid rgba(11, 11, 12, 0.35); border-top-color: var(--bg);
   display: inline-block; animation: spin 700ms linear infinite; flex: none;
 }
 @keyframes pulse { 0%, 100% { opacity: 0.35 } 50% { opacity: 1 } }
@@ -194,7 +194,7 @@ section:first-of-type { border-top: 0; }
 .note-accent { border-left-color: var(--accent); }
 .note-warn { border-left-color: var(--warn); }
 .banner {
-  border: 1px solid oklch(0.74 0.16 52 / 0.5); border-left: 3px solid var(--accent);
+  border: 1px solid rgba(198, 244, 50, 0.5); border-left: 3px solid var(--accent);
   border-radius: 10px; background: var(--accent-bg); padding: clamp(18px, 3vw, 26px);
 }
 .grid-1px { display: grid; gap: 1px; background: var(--line-2); border: 1px solid var(--line-2); border-radius: 10px; overflow: hidden; }
@@ -214,9 +214,9 @@ table { width: 100%; min-width: 520px; border-collapse: collapse; font-family: v
 th {
   text-align: left; font-weight: 400; font-size: 11.5px; letter-spacing: 0.1em;
   text-transform: uppercase; color: var(--dim);
-  padding: 0 16px 10px 0; border-bottom: 1px solid rgba(236, 231, 225, 0.11);
+  padding: 0 16px 10px 0; border-bottom: 1px solid rgba(247, 247, 245, 0.11);
 }
-td { padding: 13px 16px 13px 0; border-bottom: 1px solid rgba(236, 231, 225, 0.06); color: var(--muted); }
+td { padding: 13px 16px 13px 0; border-bottom: 1px solid rgba(247, 247, 245, 0.06); color: var(--muted); }
 td.num { text-align: right; color: var(--ink); white-space: nowrap; }
 
 /* ── formlar ── */
@@ -226,12 +226,12 @@ input[type="text"], input[type="number"], input[type="password"], input[type="se
   background: var(--bg-deep); color: var(--ink);
   font-family: var(--mono); font-size: 14px; text-transform: none; letter-spacing: 0; width: 100%;
 }
-input[type="text"]:focus, input[type="number"]:focus, input[type="password"]:focus, select:focus, textarea:focus { outline: none; border-color: oklch(0.74 0.16 52 / 0.7); }
-input.bad { border-color: oklch(0.74 0.16 52 / 0.6); }
+input[type="text"]:focus, input[type="number"]:focus, input[type="password"]:focus, select:focus, textarea:focus { outline: none; border-color: rgba(198, 244, 50, 0.7); }
+input.bad { border-color: rgba(198, 244, 50, 0.6); }
 .err { margin: 8px 0 0; font-family: var(--sans); font-size: 13.5px; line-height: 1.55; color: var(--accent); }
 
 /* ── ilerleme ── */
-.bar { height: 3px; background: rgba(236, 231, 225, 0.1); border-radius: 2px; overflow: hidden; }
+.bar { height: 3px; background: rgba(247, 247, 245, 0.1); border-radius: 2px; overflow: hidden; }
 .bar > i { display: block; height: 100%; background: var(--accent); transition: width 400ms ease; }
 
 /* ── altlik ── */

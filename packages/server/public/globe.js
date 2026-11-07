@@ -11,8 +11,8 @@
 import { LAND, COUNTRIES } from '/globe-data.js';
 
 const RAD = Math.PI / 180;
-const ACCENT = [245, 140, 60];      // --accent'in canvas karsiligi (oklch canvas'ta her yerde yok)
-const ACCENT_HI = [255, 196, 120];
+const ACCENT = [198, 244, 50];      // --accent'in canvas karsiligi (oklch canvas'ta her yerde yok)
+const ACCENT_HI = [226, 251, 138];
 const MAX_TILT = 60 * RAD;
 const AUTO_SPIN = 0.07;             // rad/sn, bosta donus (bati → dogu, Dunya gibi)
 const MAX_FLING = 3;                // rad/sn
@@ -78,22 +78,22 @@ export function mountGlobe(canvas, { onHover = () => {}, onSelect = () => {} } =
     for (const s of stars) {
       const dx = s.x - cx, dy = s.y - cy;
       if (dx * dx + dy * dy < (R + 12) * (R + 12)) continue;
-      ctx.fillStyle = `rgba(236,231,225,${s.a})`;
+      ctx.fillStyle = `rgba(247, 247, 245,${s.a})`;
       ctx.fillRect(s.x, s.y, 1, 1);
     }
 
     // Dis hale + kure govdesi + kenar isigi.
     const halo = ctx.createRadialGradient(cx, cy, R * 0.92, cx, cy, R * 1.22);
-    halo.addColorStop(0, 'rgba(236,231,225,0.10)'); halo.addColorStop(1, 'rgba(236,231,225,0)');
+    halo.addColorStop(0, 'rgba(247, 247, 245,0.10)'); halo.addColorStop(1, 'rgba(247, 247, 245,0)');
     ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(cx, cy, R * 1.22, 0, Math.PI * 2); ctx.fill();
 
     const body = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.35, R * 0.1, cx, cy, R);
-    body.addColorStop(0, '#12100e'); body.addColorStop(1, '#050404');
+    body.addColorStop(0, '#0f0f10'); body.addColorStop(1, '#040405');
     ctx.fillStyle = body; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
 
     ctx.save();
-    ctx.shadowColor = 'rgba(236,231,225,0.55)'; ctx.shadowBlur = 14;
-    ctx.strokeStyle = 'rgba(236,231,225,0.55)'; ctx.lineWidth = 1.4;
+    ctx.shadowColor = 'rgba(247, 247, 245,0.55)'; ctx.shadowBlur = 14;
+    ctx.strokeStyle = 'rgba(247, 247, 245,0.55)'; ctx.lineWidth = 1.4;
     ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
 
