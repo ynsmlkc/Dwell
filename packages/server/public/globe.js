@@ -11,8 +11,8 @@
 import { LAND, COUNTRIES } from '/globe-data.js';
 
 const RAD = Math.PI / 180;
-const ACCENT = [198, 244, 50];      // --accent'in canvas karsiligi (oklch canvas'ta her yerde yok)
-const ACCENT_HI = [226, 251, 138];
+const ACCENT = [255, 117, 39];      // --accent'in canvas karsiligi (oklch canvas'ta her yerde yok)
+const ACCENT_HI = [255, 180, 120];
 const MAX_TILT = 60 * RAD;
 const AUTO_SPIN = 0.07;             // rad/sn, bosta donus (bati → dogu, Dunya gibi)
 const MAX_FLING = 3;                // rad/sn
